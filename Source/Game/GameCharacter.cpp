@@ -10,6 +10,9 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "blender/utildefines.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -49,13 +52,15 @@ AGameCharacter::AGameCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
+	FollowCamera->SetRelativeTransform(FTransform(FVector(0., 0., 23.0)));
+	FollowCamera->SetActive(true);
 
 	// Create a follow camera
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
 	FirstPersonCamera->SetupAttachment(GetMesh(), "head"); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FirstPersonCamera->SetRelativeTransform(FTransform(FRotator(0, 90, -90), FVector(0, 10, 0)));
 	FirstPersonCamera->bUsePawnControlRotation = true; // Camera rotates relative to head
-
+	FirstPersonCamera->SetActive(false);
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
@@ -95,15 +100,102 @@ void AGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AGameCharacter::Look);
 
 		// Zoom in/out
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AGameCharacter::CameraZoom);
+		EnhancedInputComponent->BindAction(ZoomInAction, ETriggerEvent::Triggered, this, &AGameCharacter::CameraZoomIn);
+		EnhancedInputComponent->BindAction(ZoomOutAction, ETriggerEvent::Triggered, this, &AGameCharacter::CameraZoomOut);
+		EnhancedInputComponent->BindAction(LockAction, ETriggerEvent::Triggered, this, &AGameCharacter::LockOntoEnemy);
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Triggered, this, &AGameCharacter::Interact);
+		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Triggered, this, &AGameCharacter::Attack);
 	}
 	else
 	{
 		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
 	}
 }
+void AGameCharacter::ToggleCamera(bool firstPersonView) {
+	FollowCamera->SetActive(!firstPersonView);
+	FirstPersonCamera->SetActive(firstPersonView);
+}
+void AGameCharacter::SetCameraDistance(float distance) {
+	if (distance < MinZoomOut) {
+		ToggleCamera(true);
+	} else {
+		ToggleCamera(false);
+		this->GetCameraBoom()->TargetArmLength = math::min(MaxZoomOut, distance);
+	}
+}
+void AGameCharacter::CameraZoomIn(const FInputActionValue& Value) {
+	if (this->FollowCamera->IsActive()) { // in third person view
+		float arm = this->GetCameraBoom()->TargetArmLength;
+		if (arm <= MinZoomOut) {
+			ToggleCamera(true);
+		}
+		else {
+			this->GetCameraBoom()->TargetArmLength = math::min(arm-ZoomSpeed, MaxZoomOut);
+		}
+	}
+}
+void AGameCharacter::LockOntoTarget(AActor* target) {
+	if (TargetLockActor != nullptr) { // end previous target lock-on
+		GetWorld()->DestroyActor(TargetLockActor);
+	}
+	if (target == nullptr) { // start new lock-on
+		TargetLockActor = nullptr;
+	}else{
+		FTransform transform = target->GetTransform();
+		double3 translate = transform.GetTranslation();
+		translate.Z += 20;
+		transform.SetTranslation(translate);
+		FActorSpawnParameters params;
+		
+		TargetLockActor = GetWorld()->SpawnActorDeferred<AActor>(WidgetClass, transform);
+		FAttachmentTransformRules rules(EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, true);
+		TargetLockActor->AttachToActor(target, rules);
+	}
+	ToggleDirectionalMovement(target != nullptr);
+}
+void AGameCharacter::ToggleDirectionalMovement(bool trueDirectionalMovement) {
+	UCharacterMovementComponent * mov = this->GetCharacterMovement();
+	mov->bOrientRotationToMovement = trueDirectionalMovement;
+	mov->bUseControllerDesiredRotation = !trueDirectionalMovement;
+}
+void AGameCharacter::CameraZoomOut(const FInputActionValue& Value) {
+	if (this->FirstPersonCamera->IsActive()) {
+		ToggleCamera(false);
+	}
+	else { // in third person view
+		this->GetCameraBoom()->TargetArmLength = math::min(this->GetCameraBoom()->TargetArmLength+ZoomSpeed, MaxZoomOut);
+	}
+}
+UCameraComponent* AGameCharacter::GetCurrentCamera() {
+	return FollowCamera->IsActive() ? FollowCamera : FirstPersonCamera;
+}
+void AGameCharacter::LockOntoEnemy(const FInputActionValue& Value) {
+	const float TargetLockDistance = 1000;
 
-void AGameCharacter::CameraZoom(const FInputActionValue& Value) {
+	if (TargetLockActor==nullptr) {
+		FTransform transform = GetCurrentCamera()->GetComponentTransform();
+		double3 start = transform.GetLocation();
+		start.Z += 20.;
+		double3 forward = transform.GetRotation().GetForwardVector();
+		double3 end = start + forward * TargetLockDistance;
+		TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
+		objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
+		TArray<AActor*> actorsToIgnore;
+		actorsToIgnore.Add(this);
+		FHitResult OutHit; 
+		if (UKismetSystemLibrary::SphereTraceSingleForObjects(GetWorld(), start, end, 150., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true)) {
+			LockOntoTarget(OutHit.GetActor());
+		}
+
+	}
+	else {
+		LockOntoTarget((AActor*)nullptr);
+	}
+}
+void AGameCharacter::Interact(const FInputActionValue& Value) {
+
+}
+void AGameCharacter::Attack(const FInputActionValue& Value) {
 
 }
 
@@ -140,5 +232,15 @@ void AGameCharacter::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void AGameCharacter::Tick(float DeltaTime) {
+	if (TargetLockActor!=nullptr) {
+		double3 playerLocation = GetActorLocation();
+		double3 targetLocation = TargetLockActor->GetActorLocation();
+		FRotator rot = UKismetMathLibrary::FindLookAtRotation(playerLocation, targetLocation);
+		rot.Pitch -= 20.;
+		GetController()->SetControlRotation(rot);
 	}
 }

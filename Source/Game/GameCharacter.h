@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "ui/TargetLockWidgetActor.h"
 #include "GameCharacter.generated.h"
 
 class USpringArmComponent;
@@ -14,6 +15,8 @@ class UInputAction;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
+
+
 
 UCLASS(config=Game)
 class AGameCharacter : public ACharacter
@@ -64,24 +67,54 @@ class AGameCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* AttackAction;
 
+	/** Attack Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* InteractAction;
+
+	/** Attack Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UClass * WidgetClass;
 	/** How quickly camera zooms in/out when user scrolls*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	float ZoomSpeed = 20.0;
 
+	float MaxZoomOut = 400.;
+	float MinZoomOut = 120.0;
+	
+	AActor * TargetLockActor = nullptr;
 public:
 	AGameCharacter();
 	
 
 protected:
-	/** Called for camera zoom in/out input */
-	void CameraZoom(const FInputActionValue& Value);
+	/** Called for attack input */
+	void Attack(const FInputActionValue& Value);
+	/** Called for lock-on input */
+	void LockOntoEnemy(const FInputActionValue& Value);
+	/** Called for interaction input */
+	void Interact(const FInputActionValue& Value);
+	/** Called for camera zoom in input */
+	void CameraZoomIn(const FInputActionValue& Value);
+	/** Called for camera zoom out input */
+	void CameraZoomOut(const FInputActionValue& Value);
 
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
 
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
-			
+public:
+	/**If actor is null pinter then it clears the lock*/
+	void LockOntoTarget(AActor * target);
+	/**Toggle between first person camera and third person camera.*/
+	void ToggleCamera(bool firstPersonView);
+	/**Sets whether user can move in any direction. If false, user will move in camera direction. If true, movement will be independent from camera direction*/
+	void ToggleDirectionalMovement(bool trueDirectionalMovement);
+	/**if distance is distance<MinZoomOut then switches to first person view. Otherwise switches to third person and sets camera boom length to desired distance.
+	The distance is clamped to MaxZoomOut. */
+	void SetCameraDistance(float distance);
+
+	UCameraComponent* GetCurrentCamera();
 
 protected:
 	// APawn interface
@@ -89,7 +122,7 @@ protected:
 	
 	// To add mapping context
 	virtual void BeginPlay();
-
+	virtual void Tick(float DeltaTime) override;
 public:
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }

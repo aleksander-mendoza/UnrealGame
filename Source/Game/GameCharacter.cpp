@@ -13,6 +13,8 @@
 #include "blender/utildefines.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Logging/StructuredLog.h"
+
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -52,7 +54,7 @@ AGameCharacter::AGameCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
-	FollowCamera->SetRelativeTransform(FTransform(FVector(0., 0., 23.0)));
+	FollowCamera->SetRelativeTransform(FTransform(FVector(0., 0., 40.)));
 	FollowCamera->SetActive(true);
 
 	// Create a follow camera
@@ -102,9 +104,9 @@ void AGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 		// Zoom in/out
 		EnhancedInputComponent->BindAction(ZoomInAction, ETriggerEvent::Triggered, this, &AGameCharacter::CameraZoomIn);
 		EnhancedInputComponent->BindAction(ZoomOutAction, ETriggerEvent::Triggered, this, &AGameCharacter::CameraZoomOut);
-		EnhancedInputComponent->BindAction(LockAction, ETriggerEvent::Triggered, this, &AGameCharacter::LockOntoEnemy);
-		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Triggered, this, &AGameCharacter::Interact);
-		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Triggered, this, &AGameCharacter::Attack);
+		EnhancedInputComponent->BindAction(LockAction, ETriggerEvent::Started, this, &AGameCharacter::LockOntoEnemy);
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AGameCharacter::Interact);
+		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &AGameCharacter::Attack);
 	}
 	else
 	{
@@ -135,6 +137,7 @@ void AGameCharacter::CameraZoomIn(const FInputActionValue& Value) {
 	}
 }
 void AGameCharacter::LockOntoTarget(AActor* target) {
+	UE_LOGFMT(LogTemp, Warning, "LockOntoTarget triggered:is_null={0}, tarbget_null={1}", TargetLockActor == nullptr, target==nullptr);
 	if (TargetLockActor != nullptr) { // end previous target lock-on
 		GetWorld()->DestroyActor(TargetLockActor);
 	}
@@ -147,7 +150,12 @@ void AGameCharacter::LockOntoTarget(AActor* target) {
 		transform.SetTranslation(translate);
 		FActorSpawnParameters params;
 		
-		TargetLockActor = GetWorld()->SpawnActorDeferred<AActor>(WidgetClass, transform);
+		TargetLockActor = GetWorld()->SpawnActorDeferred<AActor>(WidgetClass, transform,
+			(AActor*)nullptr,(APawn*)nullptr,
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn,
+			ESpawnActorScaleMethod::OverrideRootScale
+		);
+		TargetLockActor->FinishSpawning(transform);
 		FAttachmentTransformRules rules(EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, true);
 		TargetLockActor->AttachToActor(target, rules);
 	}
@@ -171,8 +179,9 @@ UCameraComponent* AGameCharacter::GetCurrentCamera() {
 }
 void AGameCharacter::LockOntoEnemy(const FInputActionValue& Value) {
 	const float TargetLockDistance = 1000;
-
+	UE_LOGFMT(LogTemp, Warning, "TargetLockOn triggered:is_null={0}", TargetLockActor == nullptr);
 	if (TargetLockActor==nullptr) {
+
 		FTransform transform = GetCurrentCamera()->GetComponentTransform();
 		double3 start = transform.GetLocation();
 		start.Z += 20.;

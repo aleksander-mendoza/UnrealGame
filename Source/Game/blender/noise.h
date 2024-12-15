@@ -190,6 +190,7 @@ namespace noise {
     }
 
     float3 perlin_noise_derivative(float2 position);
+    float3 perlin_noise_derivative(float2 position, float scale);
 
     float perlin_noise(float position);
     float perlin_noise(float2 position);
@@ -272,6 +273,7 @@ namespace noise {
     float random_float(float min_value, float max_value, int id, int seed);
     int random_int(int min_value, int max_value, int id, int seed);
     bool random_bool(float probability, int id, int seed);
+    float3 morenoise(float2 position, float scale, float pointiness, float scalePowerBase, int iterations);
     float3 morenoise(float2 position, float pointiness, float scalePowerBase, int iterations);
 
 

@@ -85,8 +85,14 @@ namespace blender {
             return (float)this->get_int32() / 0x80000000;
         }
 
-       
-
+        float2 get_float2()
+        {
+            return float2(get_float(), get_float());
+        }
+        float3 get_float3()
+        {
+            return float3(get_float(), get_float(), get_float());
+        }
         /**
          * Compute uniformly distributed barycentric coordinates.
          */

@@ -434,7 +434,12 @@ namespace noise {
         return r;
     }
 
-
+    float3 perlin_noise_derivative(float2 position, float scale) {
+        float3 der_and_height = perlin_noise_derivative(position / scale);
+        der_and_height.X /= scale;
+        der_and_height.Y /= scale;
+        return der_and_height;
+    }
     float3 perlin_noise_derivative(float2 position)
     {
         const int64 x = int64(position.X);
@@ -1069,17 +1074,23 @@ namespace noise {
     bool random_bool(float probability, int id, int seed)  {
         return hash_to_float(id, seed) <= probability;
     }
+    float3 morenoise(float2 position,float scale,  float pointiness, float scalePowerBase, int iterations) {
+        float3 der_and_height = morenoise(position / scale, pointiness, scalePowerBase, iterations);
+        der_and_height.X /= scale;
+        der_and_height.Y /= scale;
+        return der_and_height;
+    }
     float3 morenoise(float2 position, float pointiness, float scalePowerBase, int iterations) {
         float2 derivative(0., 0.);
         float3 out(0,0,0);
         float scale = 1;
         
         while (iterations-- > 0) {
-            const float3 perlin_value = perlin_noise_derivative(position);
+            float3 perlin_value = perlin_noise_derivative(position*scale);
             derivative += float2(perlin_value);
-            out += perlin_value / (scale * (1. + pointiness * math::dot(derivative, derivative)));
+            perlin_value.Z /= scale;
+            out += perlin_value /  (1. + pointiness * math::dot(derivative, derivative));
             scale *= scalePowerBase;
-            position *= scalePowerBase;
         }
         return out;
     }

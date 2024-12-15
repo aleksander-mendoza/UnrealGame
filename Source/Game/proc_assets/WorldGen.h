@@ -49,6 +49,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) 
 	UMaterialInterface* TerrainMaterial = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float  rockDensity = 100;
 private:
 	int bottomChunkY;
 	int leftmostChunkX;

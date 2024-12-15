@@ -5,6 +5,9 @@
 #include <assert.h>
 #include "KismetProceduralMeshLibrary.h"
 #include "../blender/proc_assets.h"
+#include "../blender/rand.h"
+#include "../blender/noise.h"
+#include "../proc_assets/Rock.h"
 
 int AWorldGen::getChunkIdx(int chunkX, int chunkY) {
 	int chunkYRelativeToRenderArea = chunkY - this->bottomChunkY;
@@ -76,15 +79,43 @@ void AWorldGen::BeginPlay()
 
 
 void AWorldGen::GenerateChunk(const int x, const int y) {
-	const FVector offset = FVector(x * this->chunkW, y * this->chunkH, this->seaLevel);
+	const float2 offsetf(x * this->chunkW, y * this->chunkH);
+	const FVector offset = FVector(offsetf.X, offsetf.Y, this->seaLevel);
 	const int resX = this->resolutionX;
 	const int resY = this->resolutionY;
+	const float2 size = float2(this->chunkW, this->chunkH);
 	proc_assets::Mesh mesh;
-	proc_assets::morenoise(offset, resX, resY, float2(this->chunkW, this->chunkH), mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
+	//proc_assets::morenoise(offset, resX, resY, size, mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
+	proc_assets::perlin(offset, resX, resY, size, mesh, scale, maxHeight);
+	blender::RandomNumberGenerator rng(noise::hash(x,y));
+	for (int i = 0; i < 30; i++) {
+		const float2 position = offsetf + size * rng.get_float2();
+		//const float3 gradient_and_height = noise::morenoise(position, scale, pointiness, scalingPowerBase, numOfScales)* maxHeight;
+		const float3 gradient_and_height = noise::perlin_noise_derivative(position, scale) * maxHeight;
+		FActorSpawnParameters SpawnInfo;
+		const double3 normal = double3(math::normalize(math::normal(float2(gradient_and_height))));
+		const FRotator3d rot = normal.Rotation();
+		const double3 position3d = double3(position.X, position.Y, this->seaLevel + gradient_and_height.Z);
+		ARock* rock = GetWorld()->SpawnActor<ARock>(ARock::StaticClass(), position3d, rot, SpawnInfo);
+		rock->SetActorLabel(FString::Printf(TEXT("ARock %d 0"), i));
+
+		const double3 position3dX = position3d + double3(rockDensity,0, rockDensity* double(gradient_and_height.X));
+		ARock* rock1 = GetWorld()->SpawnActor<ARock>(ARock::StaticClass(), position3dX, rot, SpawnInfo);
+		rock1->SetActorLabel(FString::Printf(TEXT("ARock %d X"), i));
+
+		const double3 position3dY = position3d + double3(0., rockDensity, rockDensity * double(gradient_and_height.Y));
+		ARock* rock2 = GetWorld()->SpawnActor<ARock>(ARock::StaticClass(), position3dY, rot, SpawnInfo);
+		rock2->SetActorLabel(FString::Printf(TEXT("ARock %d Y"), i));
+
+		const double3 position3dZ = position3d + double3(rockDensity)* normal;
+		ARock* rock3 = GetWorld()->SpawnActor<ARock>(ARock::StaticClass(), position3dZ, rot, SpawnInfo);
+		rock3->SetActorLabel(FString::Printf(TEXT("ARock %d Z"), i));
 	
+	}
 
 	int idx = 0;
 	this->TerrainMesh->CreateMeshSection_LinearColor(idx, mesh.vertices, mesh.triangles, mesh.normals, mesh.uvs, TArray<FLinearColor>(), mesh.tangents, true);
+
 	if (this->TerrainMaterial != nullptr) this->TerrainMesh->SetMaterial(idx, this->TerrainMaterial);
 
 }

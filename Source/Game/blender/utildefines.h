@@ -408,7 +408,28 @@ namespace math {
             + v1.Z * v2.Z
             + v1.W * v2.W;
     }
-
+    inline double dot(double v1, double v2)
+    {
+        return v1 * v2;
+    }
+    inline double dot(double2 v1, double2 v2)
+    {
+        return v1.X * v2.X
+            + v1.Y * v2.Y;
+    }
+    inline double dot(double3 v1, double3 v2)
+    {
+        return v1.X * v2.X
+            + v1.Y * v2.Y
+            + v1.Z * v2.Z;
+    }
+    inline double dot(double4 v1, double4 v2)
+    {
+        return v1.X * v2.X
+            + v1.Y * v2.Y
+            + v1.Z * v2.Z
+            + v1.W * v2.W;
+    }
 
     inline float length(float v1)
     {
@@ -423,6 +444,22 @@ namespace math {
         return sqrt(dot(v1, v1));
     }
     inline float length(float4 v1)
+    {
+        return sqrt(dot(v1, v1));
+    }
+    inline double length(double v1)
+    {
+        return abs(v1);
+    }
+    inline double length(double2 v1)
+    {
+        return sqrt(dot(v1, v1));
+    }
+    inline double length(double3 v1)
+    {
+        return sqrt(dot(v1, v1));
+    }
+    inline double length(double4 v1)
     {
         return sqrt(dot(v1, v1));
     }
@@ -464,13 +501,25 @@ namespace math {
         return 1;
     }
     inline float2 normalize(float2 v) {
-        return div(v, length(v));
+        return v/ length(v);
     }
     inline float3 normalize(float3 v) {
-        return div(v, length(v));
+        return v/ length(v);
     }
     inline float4 normalize(float4 v) {
-        return div(v, length(v));
+        return v/length(v);
+    }
+    inline double normalize(double v) {
+        return 1;
+    }
+    inline double2 normalize(double2 v) {
+        return v / length(v);
+    }
+    inline double3 normalize(double3 v) {
+        return v / length(v);
+    }
+    inline double4 normalize(double4 v) {
+        return v / length(v);
     }
     inline float3 cross_tri(float3 v1, float3 v2, float3 v3)
     {

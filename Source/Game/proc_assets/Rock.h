@@ -4,14 +4,21 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "ProceduralMeshComponent.h"
 #include "Rock.generated.h"
 
 UCLASS()
 class GAME_API ARock : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	UProceduralMeshComponent* RockMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UMaterialInterface* RockMaterial = nullptr;
+
 	// Sets default values for this actor's properties
 	ARock();
 

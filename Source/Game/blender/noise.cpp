@@ -344,14 +344,17 @@ namespace noise {
     }
     inline float fade_derivative(float t)
     {
-        return t * t * ( t * (t *  5.0 * 6.0 -  4.0 * 15.0) +  3.0 * 10.0);
+        return t * t *  (t * (t * 5.0 * 6.0 - 4.0*15.0) + 3.0* 10.0);
     }
 
     float negate_if(float value, int32 condition)
     {
         return (condition != 0u) ? -value : value;
     }
-
+    float negate_if_derivative(int32 condition)
+    {
+        return (condition != 0u) ? -1 : 1;
+    }
     float noise_grad(int32 hash, float x)
     {
         int32 h = hash & 15u;
@@ -365,6 +368,19 @@ namespace noise {
         float u = h < 4u ? x : y;
         float v = 2.0 * (h < 4u ? y : x);
         return negate_if(u, h & 1u) + negate_if(v, h & 2u);
+    }
+
+    float3 noise_grad_derivative(int32 hash, float x, float y)
+    {
+        const int32 h = hash & 7u;
+        const uint8 maskx = h < 4u ? 1u : 2u;
+        const uint8 masky = h < 4u ? 2u : 1u;
+        float mulx = h < 4u ? 1.0 : 2.0;
+        float muly = h < 4u ? 2.0 : 1.0;
+        if ((h & maskx) != 0u) mulx = -mulx;
+        if ((h & masky) != 0u) muly = -muly;
+        const float r = mulx*x + muly*y;
+        return float3(mulx, muly, r);
     }
 
     float noise_grad(int32 hash, float x, float y, float z)
@@ -390,29 +406,11 @@ namespace noise {
     float perlin_noise(float position)
     {
         int X;
-
         float fx = math::floor_fraction(position, X);
-
         float u = fade(fx);
-
-        float r = mix(noise_grad(hash(X), fx), noise_grad(hash(X + 1), fx - 1.0), u);
-
-        return r;
-    }
-
-    float perlin_noise_derivative(float position, float* perlin_value)
-    {
-        int X;
-
-        float fx = math::floor_fraction(position, X);
-
-        float u = fade(fx);
-        float u_der = fade_derivative(fx);
-
         float v0 = noise_grad(hash(X), fx);
         float v1 = noise_grad(hash(X + 1), fx - 1.0);
-        float r = mix_derivative(v0, v1, u) * u_der;
-        if (perlin_value != nullptr)*perlin_value = mix(v0, v1, u);
+        float r = mix(v0, v1, u);
         return r;
     }
 
@@ -436,25 +434,51 @@ namespace noise {
         return r;
     }
 
-    float2 perlin_noise_derivative(float2 position, float*perlin_value)
+
+    float3 perlin_noise_derivative(float2 position)
     {
-        int X, Y;
+        const int64 x = int64(position.X);
+        const int64 y = int64(position.Y);
+        const float fx = position.X - float(x);
+        const float fy = position.Y - float(y);
+        const float u = fade(fx);
+        const float v = fade(fy);
+        const float u_der = fade_derivative(fx);
+        const float v_der = fade_derivative(fy);
+        const int32 X = x;
+        const int32 Y = y;
+        
+        //const float v0 = hash_to_float(X, Y);
+        //const float v1 = hash_to_float(X + 1, Y);
+        //const float v2 = hash_to_float(X, Y + 1);
+        //const float v3 = hash_to_float(X + 1, Y + 1);
+        //const float perlin_value = mix(v0,v1,v2,v3,u,v);
+        //float2 gradient = mix_derivative(v0, v1, v2, v3, u, v);
+        //return float3(gradient.X * u_der, gradient.Y * v_der, perlin_value);
 
-        float fx = math::floor_fraction(position.X, X);
-        float fy = math::floor_fraction(position.Y, Y);
+        const float3 v0 = noise_grad_derivative(hash(X, Y), fx, fy);
+        const float3 v1 = noise_grad_derivative(hash(X + 1, Y), fx - 1.0, fy);
+        const float3 v2 = noise_grad_derivative(hash(X, Y + 1), fx, fy - 1.0);
+        const float3 v3 = noise_grad_derivative(hash(X + 1, Y + 1), fx - 1.0, fy - 1.0);
+        const float perlin_value = mix(v0.Z, v1.Z, v2.Z, v3.Z, u, v);
+        
+        // we make use of the property that
+        // derivative of f(fx) wrt fx = derivative of f(fx) wrt x
+        // from which follows
+        // derivative of v0.Z wrt x (or y) = derivative of v0.X*x + v0.Y*y wrt x (or y)
+        // we seek to compute
+        // derivative of (1.0 - V(y)) * (v0(x,y) * (1 - U(x)) + v1(x,y) * U(x)) + V(y) * (v2(x,y) * (1 - U(x)) + v3(x,y) * U(x)) wrt x 
+        // the notation v0(x,y) stands for v0.Z and says that this value depends on x and y. Similarly U(x) stands for u
+        // feeding the above formula to wolfram alpha yeilds
+        // (1 - V(y)) (-(U(x) - 1) v0^(1, 0)(x, y) + U'(x) (-v0(x, y)) + U(x) v1^(1, 0)(x, y) + U'(x) v1(x, y)) + V(y) (-(U(x) - 1) v2^(1, 0)(x, y) + U'(x) (-v2(x, y)) + U(x) v3^(1, 0)(x, y) + U'(x) v3(x, y))
+        // where v0^(1, 0)(x, y) stands for v0.X and U'(x) = u_der thus giving us
+        float der_x = (1. - v) * (-(u - 1.) * v0.X + u_der * -v0.Z + u * v1.X + u_der * v1.Z) + v * (-(u - 1.) * v2.X + u_der * (-v2.Z) + u * v3.X + u_der * v3.Z);
+        // now for the y wolfram alpha yields
+        // -(V'(y) (U(x) v1(x, y) - (U(x) - 1) v0(x, y))) + V'(y) (U(x) v3(x, y) - (U(x) - 1) v2(x, y)) + (1 - V(y)) (U(x) v1^(0, 1)(x, y) - (U(x) - 1) v0^(0, 1)(x, y)) + V(y) (U(x) v3^(0, 1)(x, y) - (U(x) - 1) v2^(0, 1)(x, y))
+        float der_y = -(v_der* (u* v1.Z - (u - 1.)* v0.Z)) + v_der*(u* v3.Z - (u - 1.) * v2.Z) + (1. - v) * (u * v1.Y - (u - 1.) * v0.Y) + v* (u* v3.Y - (u - 1.)* v2.Y);
 
-        float u = fade(fx);
-        float u_der = fade_derivative(fx);
-        float v = fade(fy);
-        float v_der = fade_derivative(fy);
 
-        float v0 = noise_grad(hash(X, Y), fx, fy);
-        float v1 = noise_grad(hash(X + 1, Y), fx - 1.0, fy);
-        float v2 = noise_grad(hash(X, Y + 1), fx, fy - 1.0);
-        float v3 = noise_grad(hash(X + 1, Y + 1), fx - 1.0, fy - 1.0);
-        float2 r = mix_derivative(v0,v1,v2,v3,u,v);
-        if (perlin_value != nullptr)*perlin_value = mix(v0, v1, v2, v3, u, v);
-        return math::mul(r, float2(u_der, v_der));
+        return float3(der_x, der_y, perlin_value);
     }
 
     float perlin_noise(float3 position)
@@ -536,18 +560,6 @@ namespace noise {
         return perlin_noise(position) * 0.2500f;
     }
 
-
-    float perlin_signed_derivative(float position, float * perlin_value)
-    {
-        float precision_correction = 0.5f * float(math::abs(position) >= 1000000.0f);
-        /* Repeat Perlin noise texture every 100000.0 on each axis to prevent floating point
-         * representation issues. */
-        position = math::mod(position, 100000.0f) + precision_correction;
-        float derivative = perlin_noise_derivative(position, perlin_value) * 0.2500f;
-        if (perlin_value != nullptr)*perlin_value *= 0.2500f;
-        return derivative;
-    }
-
     float perlin_signed(float2 position)
     {
         float2 precision_correction = 0.5f * float2(float(math::abs(position.X) >= 1000000.0f),
@@ -560,18 +572,6 @@ namespace noise {
         return perlin_noise(position) * 0.6616f;
     }
 
-    float2 perlin_signed_derivative(float2 position, float* perlin_value)
-    {
-        float2 precision_correction = 0.5f * float2(float(math::abs(position.X) >= 1000000.0f),
-            float(math::abs(position.Y) >= 1000000.0f));
-        /* Repeat Perlin noise texture every 100000.0f on each axis to prevent floating point
-         * representation issues. This causes discontinuities every 100000.0f, however at such scales
-         * this usually shouldn't be noticeable. */
-        position = math::mod(position, 100000.0f) + precision_correction;
-        float2 gradient = math::mul(perlin_noise_derivative(position, perlin_value), 0.6616f);
-        if (perlin_value != nullptr)*perlin_value *= 0.6616f;
-        return gradient;
-    }
 
     float perlin_signed(float3 position)
     {
@@ -607,21 +607,9 @@ namespace noise {
         return perlin_signed(position) / 2.0f + 0.5f;
     }
 
-    float perlin_derivative(float position, float* perlin_value)
-    {
-        float derivative = perlin_signed_derivative(position, perlin_value) / 2.0f + 0.5f;
-        if (*perlin_value)*perlin_value= *perlin_value / 2.0f + 0.5f;
-        return derivative;
-    }
     float perlin(float2 position)
     {
         return perlin_signed(position) / 2.0f + 0.5f;
-    }
-    float2 perlin_derivative(float2 position, float* perlin_value)
-    {
-        float2 gradient = math::add(math::mul(perlin_signed_derivative(position, perlin_value), 0.5f), 0.5f);
-        if (*perlin_value)*perlin_value = *perlin_value / 2.0f + 0.5f;
-        return gradient;
     }
 
     float perlin(float3 position)
@@ -1088,139 +1076,5 @@ namespace noise {
     bool random_bool(float probability, int id, int seed)  {
         return hash_to_float(id, seed) <= probability;
     }
-    float morenoise(float2 position, float pointiness, int num_scales, float scale_power_base) {
-        float perlin_value;
-        float2 gradient = perlin_noise_derivative(position, &perlin_value);
-        float steepness = math::abs(math::sum(gradient));
-        float erosion = 1. / (1. + pointiness * steepness);
-        if(num_scales==0) {    
-            return perlin_value;
-        } else if(num_scales==1){
-            return gradient.X;
-        }else if (num_scales == 2) {
-            return gradient.Y;
-        }else if (num_scales == 3) {
-            return steepness;
-        }else  if (num_scales == 4) {
-            return erosion;
-        }else  if (num_scales == 5) {
-            return perlin_value * erosion;
-        }else {
-            return perlin_value * erosion;
-        }
-    }
-    float morenoise2(float2 position, float pointiness, int num_scales, float scale_power_base) {
-        float height = 0;
-        float accumulated_steepness = 0;
-        float perlin_value;
-        float scale = 1;
-        while (num_scales-- > 0) {
-            float2 gradient = perlin_noise_derivative(position, &perlin_value);
-            float steepness = math::sum(gradient) * scale;
-            perlin_value *= scale;
-            float erosion = 1. / (1. + pointiness * steepness);
-            accumulated_steepness += erosion;
-            scale /= scale_power_base;
-            height += accumulated_steepness * perlin_value;
-            position = math::div(position, scale_power_base);
-            //height += position.X + position.Y;
-        }
-        return height;
-    }
 
-    static void test_fade() {
-        float e = 0.0001;
-        float error = 0.03;
-        for (int i = 0; i < 100; i++) {
-            float x0 = math::fraction(i * 1.1394);
-            float x1 = x0 + e;
-            float y0 = fade(x0);
-            float y1 = fade(x1);
-            float rate_of_change = (y0 - y1) / (x0 - x1);
-            float derivative = fade_derivative(x0+e/2.);
-            if (math::abs(derivative - rate_of_change) > error) {
-                UE_LOGFMT(LogTemp, Warning, "noise.cpp:test_fade roc != der ({0} !~= {1} at x={2})", rate_of_change, derivative, x0);
-            }
-        }
-    }
-    static void test_perlin_noise() {
-        float e = 0.0001;
-        float error = 0.03;
-        for (int i = 0; i < 100; i++) {
-            float x0 = i * 1.1394;
-            float x1 = x0 + e;
-            float y0 = perlin_noise(x0);
-            float y1 = perlin_noise(x1);
-            float rate_of_change = (y0 - y1) / (x0 - x1);
-            float y0_;
-            float derivative = perlin_noise_derivative(x0, &y0_);
-            if (y0_!=y0) {
-                UE_LOGFMT(LogTemp, Warning, "noise.cpp:test_perlin_noise: y0!=y0_ ({0} != {1} at x={2})", y0, y0_, x0);
-            }
-            if (math::abs(derivative - rate_of_change) > error) {
-                UE_LOGFMT(LogTemp, Warning, "noise.cpp:test_perlin_noise: der!=roc ({0} !~= {1} at x={2})", derivative, rate_of_change, x0);
-            }
-        }
-    }
-
-    static void test_perlin_noise2() {
-        float e = 0.0001;
-        float error = 0.03;
-        for (int i = 0; i < 10; i++) {
-            for (int j = 0; j < 10; j++) {
-                float x0 = i * 1.856;
-                float y0 = j * 1.436436;
-                float x1 = x0 + e;
-                float y1 = y0 + e;
-                float2 p0 = float2(x0, y0);
-                float2 p1x = float2(x1, y0);
-                float2 p1y = float2(x0, y1);
-                float z0 = perlin_noise(p0);
-                float z1x = perlin_noise(p1x);
-                float z1y = perlin_noise(p1y);
-                float rate_of_change_x = (z0 - z1x) / (x0-x1);
-                float rate_of_change_y = (z0 - z1y) / (y0 - y1);
-                float z0_;
-                float2 derivative = perlin_noise_derivative(p0, &z0_);
-                if (z0_ != z0) {
-                    UE_LOGFMT(LogTemp, Warning, "noise.cpp:test_perlin_noise(2): z0!=z0_ ({0} != {1} at x={2}, y={3})", z0, z0_, x0, y0);
-                }
-                if (math::abs(derivative.X - rate_of_change_x) > error) {
-                    UE_LOGFMT(LogTemp, Warning, "noise.cpp:test_perlin_noise: der(x)!=roc(x) ({0} !~= {1} at x={2}, y={3})", derivative.X, rate_of_change_x, x0, y0);
-                }
-                if (math::abs(derivative.Y - rate_of_change_y) > error) {
-                    UE_LOGFMT(LogTemp, Warning, "noise.cpp:test_perlin_noise: der(y)!=roc(y) ({0} !~= {1} at x={2}, y={3})", derivative.Y, rate_of_change_y, x0, y0);
-                }
-            }
-        }
-    }
-    static void test_mix() {
-        float e = 0.0001;
-        float error = 0.03;
-        for (int i = 0; i < 100; i++) {
-            float4 p = hash_to_float4(i*4355);
-            float2 x = hash_to_float2(i * 547);
-            float z = mix(p.X, p.Y, p.Z, p.W, x.X, x.Y);
-            float zx = mix(p.X, p.Y, p.Z, p.W, x.X+e, x.Y);
-            float zy = mix(p.X, p.Y, p.Z, p.W, x.X, x.Y+e);
-            float rate_of_change_x = (zx - z) / e;
-            float rate_of_change_y = (zy - z) / e;
-            float2 derivative = mix_derivative(p.X, p.Y, p.Z, p.W, x.X, x.Y);
-            if (math::abs(derivative.X - rate_of_change_x) > error) {
-                UE_LOGFMT(LogTemp, Warning, "noise.cpp:test_fade roc(x) != der(x) ({0} !~= {1} at x={2})", rate_of_change_x, derivative.X, x.X);
-            }
-            if (math::abs(derivative.Y - rate_of_change_y) > error) {
-                UE_LOGFMT(LogTemp, Warning, "noise.cpp:test_fade roc(x) != der(x) ({0} !~= {1} at x={2})", rate_of_change_y, derivative.Y, x.Y);
-            }
-        }
-    }
-    void test(){
-       
-       
-        test_mix();
-        test_fade();
-        test_perlin_noise();
-        test_perlin_noise2();
-
-    }
 }

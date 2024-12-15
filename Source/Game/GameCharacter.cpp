@@ -14,7 +14,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Logging/StructuredLog.h"
-
+#include "anim/NotifyCombo.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -72,6 +72,16 @@ void AGameCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
+	if (AttackComboAnim != nullptr) {
+		int n = AttackComboAnim->Notifies.Num();
+		for (int i = 0; i < n; i++) {
+			if (UNotifyCombo* notify = Cast<UNotifyCombo>(AttackComboAnim->Notifies[i].Notify)) {
+				notify->Owner = this;
+				notify->IsLast = i+1==n;
+			}
+		}
+	}
+	ToggleDirectionalMovement(true);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -137,7 +147,7 @@ void AGameCharacter::CameraZoomIn(const FInputActionValue& Value) {
 	}
 }
 void AGameCharacter::LockOntoTarget(AActor* target) {
-	UE_LOGFMT(LogTemp, Warning, "LockOntoTarget triggered:is_null={0}, tarbget_null={1}", TargetLockActor == nullptr, target==nullptr);
+	
 	if (TargetLockActor != nullptr) { // end previous target lock-on
 		GetWorld()->DestroyActor(TargetLockActor);
 	}
@@ -179,7 +189,7 @@ UCameraComponent* AGameCharacter::GetCurrentCamera() {
 }
 void AGameCharacter::LockOntoEnemy(const FInputActionValue& Value) {
 	const float TargetLockDistance = 1000;
-	UE_LOGFMT(LogTemp, Warning, "TargetLockOn triggered:is_null={0}", TargetLockActor == nullptr);
+	
 	if (TargetLockActor==nullptr) {
 
 		FTransform transform = GetCurrentCamera()->GetComponentTransform();
@@ -201,11 +211,30 @@ void AGameCharacter::LockOntoEnemy(const FInputActionValue& Value) {
 		LockOntoTarget((AActor*)nullptr);
 	}
 }
+void AGameCharacter::OnComboPartEnd(bool isLast) {
+	if (isLast) {
+		IsAttacking = false;
+	}else if (DoNextCombo) {
+		DoNextCombo = false;
+	}else {
+		UAnimInstance* anim = this->GetMesh()->GetAnimInstance();
+		anim->Montage_Stop(0.2, AttackComboAnim);
+		IsAttacking = false;
+	}
+}
 void AGameCharacter::Interact(const FInputActionValue& Value) {
 
 }
 void AGameCharacter::Attack(const FInputActionValue& Value) {
-
+	if (IsAttacking) {
+		DoNextCombo = true;
+	}
+	else {
+		UAnimInstance * anim = this->GetMesh()->GetAnimInstance();
+		anim->Montage_Play(AttackComboAnim);
+		IsAttacking = true;
+		DoNextCombo = false;
+	}
 }
 
 void AGameCharacter::Move(const FInputActionValue& Value)
@@ -252,4 +281,5 @@ void AGameCharacter::Tick(float DeltaTime) {
 		rot.Pitch -= 20.;
 		GetController()->SetControlRotation(rot);
 	}
+	
 }

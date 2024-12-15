@@ -1,5 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
+# include <assert.h>
 #include "WorldGen.h"
 #include "KismetProceduralMeshLibrary.h"
 #include "blender/noise.h"
@@ -70,45 +71,50 @@ void AWorldGen::BeginPlay()
 	int renderArea = this->getRenderArea();
 	surroundingChunks.Reserve(renderArea);
 	while (surroundingChunks.Num() < renderArea)surroundingChunks.Add(-1);
-	noise::test();
 }
 
 
 void AWorldGen::GenerateChunk(const int x, const int y) {
-	const FVector offset = FVector(x*this->chunkW,y*this->chunkH,this->seaLevel);
+	const FVector offset = FVector(x * this->chunkW, y * this->chunkH, this->seaLevel);
 	const int resX = this->resolutionX;
 	const int resY = this->resolutionY;
-	const float spacingX = this->chunkW / (float)(resX-1);
-	const float spacingY = this->chunkH / (float)(resY-1);
+	const float spacingX = this->chunkW / (float)(resX - 1);
+	const float spacingY = this->chunkH / (float)(resY - 1);
 	TArray<FVector> vertices;
+	vertices.Reserve(resY* resX);
 	TArray<FVector2D> uvs;
 	TArray<int32> triangles;
+	triangles.Reserve((resY-1) * (resX-1) * 2);
 	TArray<FVector> normals;
+	normals.Reserve(resY * resX);
 	TArray<FProcMeshTangent> tangents;
+	normals.Reserve(resY * resX);
 
 	for (int32 vy = 0; vy < resY; vy++) {
 		for (int32 vx = 0; vx < resX; vx++) {
 			FVector vertex = offset;
-			vertex.X += vx * spacingX;
-			vertex.Y += vy * spacingY;
-			//vertex.Z += noise::perlin_noise(float2(vertex.X / scale, vertex.Y / scale)) * maxHeight;
-			float perlin_value;
-			float2 gradient = math::mul(noise::perlin_noise_derivative(float2(vertex.X / scale, vertex.Y / scale), &perlin_value), maxHeight);
-			vertex.Z += perlin_value * maxHeight;
+			vertex.X += float(vx) * spacingX;
+			vertex.Y += float(vy) * spacingY;
+			float3 perlin = noise::perlin_noise_derivative(float2(vertex.X / scale, vertex.Y / scale)) * maxHeight;
+			//float perlin = noise::perlin_noise(float2(vertex.X / scale, vertex.Y / scale)) * maxHeight;
+			
+			vertex.Z += perlin.Z;
 			vertices.Add(vertex);
 			FVector2D uv(vertex);
 			uvs.Add(uv);
-			float3 normal = math::normalize(math::normal(gradient));
+			float3 normal = math::normalize(math::normal(float2(perlin)));
 			normals.Add(FVector(normal));
-			float3 tangent = math::normalize(math::tangent(gradient));
+			float3 tangent = math::normalize(math::tangent(float2(perlin)));
 			tangents.Add(FProcMeshTangent(FVector(tangent), false));
-			
+			//normals.Add(FVector(0,0,1));
+			//tangents.Add(FProcMeshTangent(FVector(1,0,0), false));
+
 		}
 	}
-	
-	
+
+
 	for (int32 vy = 0; vy < resY - 1; vy++) {
-		for (int32 vx = 0; vx < resX-1; vx++) {
+		for (int32 vx = 0; vx < resX - 1; vx++) {
 			const int bottomLeft = vx + vy * resX;
 			const int bottomRight = bottomLeft + 1;
 			const int topLeft = bottomLeft + resX;
@@ -122,12 +128,104 @@ void AWorldGen::GenerateChunk(const int x, const int y) {
 			triangles.Add(topRight);
 		}
 	}
-	
+
 	int idx = 0;
 	this->TerrainMesh->CreateMeshSection_LinearColor(idx, vertices, triangles, normals, uvs, TArray<FLinearColor>(), tangents, true);
-	if(this->TerrainMaterial!=nullptr) this->TerrainMesh->SetMaterial(idx, this->TerrainMaterial);
-	
+	if (this->TerrainMaterial != nullptr) this->TerrainMesh->SetMaterial(idx, this->TerrainMaterial);
+
 }
+
+//void AWorldGen::GenerateChunk(const int x, const int y) {
+//	const float invScale = 1. / scale;
+//	const float chunkWScaled = this->chunkW * invScale;
+//	const float chunkHScaled = this->chunkH * invScale;
+//	const float startX = x * this->chunkW;
+//	const float startY = y * this->chunkH;
+//	const float startXScaled = startX * invScale;
+//	const float startYScaled = startY * invScale;
+//	const float endXScaled = startXScaled + chunkWScaled;
+//	const float endYScaled = startYScaled + chunkHScaled;
+//	const int resX = this->resolutionX;
+//	const int resY = this->resolutionY;
+//	const float spacingX = this->chunkW / (float)(resX-1);
+//	const float spacingY = this->chunkH / (float)(resY-1);;
+//	const int64 startXScaledInt = int64(startXScaled);
+//	const int64 startYScaledInt = int64(startYScaled);
+//	const int64 endXScaledInt = int64(endXScaled) + 1;
+//	const int64 endYScaledInt = int64(endYScaled) + 1;
+//	const int32 widthScaledInt = endXScaledInt - startXScaledInt;
+//	const int32 heightScaledInt = endYScaledInt - startYScaledInt;
+//	const int32 scaledAreaInt = widthScaledInt*heightScaledInt;
+//	float * randomMatrix = new float[scaledAreaInt];
+//	
+//	int32 i = 0;
+//	for (int64 vy = startYScaledInt; vy < endYScaledInt; vy++) {
+//		for (int64 vx = startXScaledInt; vx < endYScaledInt; i++, vx++) {
+//			randomMatrix[i] = noise::hash_to_float(vx, vy) * maxHeight;
+//		}
+//	}
+//	
+//	TArray<FVector> vertices;
+//	TArray<FVector2D> uvs;
+//	TArray<int32> triangles;
+//	TArray<FVector> normals;
+//	TArray<FProcMeshTangent> tangents;
+//	for (int32 vy = 1; vy < resY; vy++) {
+//		const float relativeY = vy * spacingY;
+//		const float vertex_Y = startY + relativeY;
+//		const float relativeYScaled = relativeY * invScale;
+//		const int32 relativeYScaledInt = int32(relativeYScaled);
+//		const float fractionYScaled = relativeYScaled - float(relativeYScaledInt);
+//		
+//		for (int32 vx = 0; vx < resX; vx++) {
+//			const float relativeX = vx * spacingX;
+//			const float vertex_X = startX + relativeX;
+//			const float relativeXScaled = relativeX * invScale;
+//			const int32 relativeXScaledInt = int32(relativeXScaled);
+//			const float fractionXScaled = relativeXScaled - float(relativeXScaledInt);
+//			const int32 idx_bot = relativeXScaledInt + relativeYScaledInt * widthScaledInt;
+//			const float perlin_bot_left = randomMatrix[idx_bot];
+//			const float perlin_bot_right = randomMatrix[idx_bot+1];
+//			const int32 idx_top = idx_bot + widthScaledInt;
+//			const float perlin_top_left = randomMatrix[idx_top];
+//			const float perlin_top_right = randomMatrix[idx_top+1];
+//			float perlin_value = noise::mix(perlin_bot_left, perlin_bot_right, perlin_top_left, perlin_top_right, fractionXScaled, fractionYScaled);
+//			float2 perlin_gradient = noise::mix_derivative(perlin_bot_left, perlin_bot_right, perlin_top_left, perlin_top_right, fractionXScaled, fractionYScaled);
+//
+//			float vertex_Z = seaLevel + perlin_value;
+//			vertices.Add(double3(vertex_X, vertex_Y, vertex_Z));
+//			FVector2D uv(vertex_X, vertex_Y);
+//			uvs.Add(uv);
+//			float3 normal = math::normalize(math::normal(perlin_gradient));
+//			normals.Add(FVector(normal));
+//			float3 tangent = math::normalize(math::tangent(perlin_gradient));
+//			tangents.Add(FProcMeshTangent(FVector(tangent), false));
+//			
+//		}
+//	}
+//	
+//	
+//	for (int32 vy = 0; vy < resY - 1; vy++) {
+//		for (int32 vx = 0; vx < resX-1; vx++) {
+//			const int bottomLeft = vx + vy * resX;
+//			const int bottomRight = bottomLeft + 1;
+//			const int topLeft = bottomLeft + resX;
+//			const int topRight = topLeft + 1;
+//			triangles.Add(bottomLeft);
+//			triangles.Add(topLeft);
+//			triangles.Add(bottomRight);
+//
+//			triangles.Add(bottomRight);
+//			triangles.Add(topLeft);
+//			triangles.Add(topRight);
+//		}
+//	}
+//	
+//	int idx = 0;
+//	this->TerrainMesh->CreateMeshSection_LinearColor(idx, vertices, triangles, normals, uvs, TArray<FLinearColor>(), tangents, true);
+//	if(this->TerrainMaterial!=nullptr) this->TerrainMesh->SetMaterial(idx, this->TerrainMaterial);
+//	
+//}
 
 // Called every frame
 void AWorldGen::Tick(float DeltaTime)

@@ -85,10 +85,10 @@ namespace noise {
     }
     inline float2 mix_derivative(float v0, float v1, float v2, float v3, float x, float y)
     {
-        float x1 = 1.0 - x;
+        float v = v0 - v1 - v2 + v3;
         return float2(
-            (1.0 - y) * (- v0 + v1)  + y * (-v2 + v3),
-            - (v0 * x1 + v1 * x) + (v2 * x1 + v3 * x)
+            -v0 + v1 + v*y,
+            v2  - v0 + v*x
         );
     }
 
@@ -127,6 +127,7 @@ namespace noise {
         float z1 = 1.0 - z;
         return z1 * (y1 * (v0 * x1 + v1 * x) + y * (v2 * x1 + v3 * x)) +
             z * (y1 * (v4 * x1 + v5 * x) + y * (v6 * x1 + v7 * x));
+        
     }
 
     inline float3 mix_derivative(float v0,
@@ -148,6 +149,8 @@ namespace noise {
         float v23x = v2 * x1 + v3 * x;
         float v45x = v4 * x1 + v5 * x;
         float v67x = v6 * x1 + v7 * x;
+        // you can feed this to worfram alpha
+        // ( 1.0 - z) * ((1.0 - y) * (v0 * (1.0 - x) + v1 * x) + y * (v2 * (1.0 - x) + v3 * x)) + z* ((1.0 - y) * (v4 * (1.0 - x) + v5 * x) + y * (v6 * (1.0 - x) + v7 * x))
         return float3(
             z1 * (y1 * (-v0 + v1) + y * (-v2 + v3 )) +
             z * (y1 * (-v4 + v5) + y * (-v6 + v7)),
@@ -185,30 +188,24 @@ namespace noise {
             w);
     }
 
-
+    float3 perlin_noise_derivative(float2 position);
 
     float perlin_noise(float position);
-    float perlin_noise_derivative(float position, float* perlin_value);
     float perlin_noise(float2 position);
-    float2 perlin_noise_derivative(float2 position, float* perlin_value);
     float perlin_noise(float3 position);
     float perlin_noise(float4 position);
 
 	/* Perlin noise in the range [-1, 1]. */
 
 	float perlin_signed(float position);
-    float perlin_signed_derivative(float position, float* perlin_value);
 	float perlin_signed(float2 position);
-    float2 perlin_signed_derivative(float2 position, float* perlin_value);
 	float perlin_signed(float3 position);
 	float perlin_signed(float4 position);
 
 	/* Perlin noise in the range [0, 1]. */
 
 	float perlin(float position);
-    float perlin_derivative(float position, float* perlin_value);
 	float perlin(float2 position);
-    float2 perlin_derivative(float2 position, float* perlin_value);
 	float perlin(float3 position);
 	float perlin(float4 position);
 
@@ -274,8 +271,7 @@ namespace noise {
     float random_float(float min_value, float max_value, int id, int seed);
     int random_int(int min_value, int max_value, int id, int seed);
     bool random_bool(float probability, int id, int seed);
-    float morenoise(float2 position, float pointiness, int num_scales, float scale_power_base);
 
 
-    void test();
 }
+

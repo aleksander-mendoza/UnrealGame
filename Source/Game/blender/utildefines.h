@@ -289,6 +289,41 @@ namespace math {
     {
         return float4(floor(a.X), floor(a.Y), floor(a.Z), floor(a.W));
     }
+
+    inline int floori(const float a)
+    {
+        return floorf(a);
+    }
+    inline int2 floori(const float2& a)
+    {
+        return int2(floori(a.X), floori(a.Y));
+    }
+    inline int3 floori(const float3& a)
+    {
+        return int3(floori(a.X), floori(a.Y), floori(a.Z));
+    }
+    inline int4 floori(const float4& a)
+    {
+        return int4(floori(a.X), floori(a.Y), floori(a.Z), floori(a.W));
+    }
+
+    inline int ceili(const float a)
+    {
+        return ceilf(a);
+    }
+    inline int2 ceili(const float2& a)
+    {
+        return int2(ceili(a.X), ceili(a.Y));
+    }
+    inline int3 ceili(const float3& a)
+    {
+        return int3(ceili(a.X), ceili(a.Y), ceili(a.Z));
+    }
+    inline int4 ceili(const float4& a)
+    {
+        return int4(ceili(a.X), ceili(a.Y), ceili(a.Z), ceili(a.W));
+    }
+
     inline float min(const float a, const float b)
     {
         return a < b ? a : b;
@@ -329,11 +364,27 @@ namespace math {
         i = int(x_floor);
         return x - x_floor;
     }
+    inline float2 floor_fraction(float2 x, int2& i)
+    {
+        return float2(floor_fraction(x.X, i.X), floor_fraction(x.Y, i.Y));
+    }
+    inline float3 floor_fraction(float3 x, int3& i)
+    {
+        return float3(floor_fraction(x.X, i.X), floor_fraction(x.Y, i.Y), floor_fraction(x.Z, i.Z));
+    }
     inline float fraction(float x)
     {
         return x - floor(x);
     }
-
+    inline float2 fraction(float2 x)
+    {
+        return float2(fraction(x.X), fraction(x.Y));
+    }
+    inline float3 fraction(float3 x)
+    {
+        return float3(fraction(x.X), fraction(x.Y), fraction(x.Z));
+    }
+    
 
     inline float dot(float v1, float v2)
     {

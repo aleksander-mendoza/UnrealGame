@@ -74,14 +74,19 @@ class AGameCharacter : public ACharacter
 	/** Attack Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UClass * WidgetClass;
+	AActor* TargetLockActor = nullptr;
+
 	/** How quickly camera zooms in/out when user scrolls*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	float ZoomSpeed = 20.0;
-
 	float MaxZoomOut = 400.;
 	float MinZoomOut = 120.0;
 	
-	AActor * TargetLockActor = nullptr;
+	/** Attack Combo Animation*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UAnimMontage* AttackComboAnim;
+	bool IsAttacking=false;
+	bool DoNextCombo = false;
 public:
 	AGameCharacter();
 	
@@ -115,6 +120,8 @@ public:
 	void SetCameraDistance(float distance);
 
 	UCameraComponent* GetCurrentCamera();
+
+	void OnComboPartEnd(bool isLast);
 
 protected:
 	// APawn interface

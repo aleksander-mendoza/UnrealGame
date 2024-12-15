@@ -448,13 +448,6 @@ namespace noise {
         const int32 X = x;
         const int32 Y = y;
         
-        //const float v0 = hash_to_float(X, Y);
-        //const float v1 = hash_to_float(X + 1, Y);
-        //const float v2 = hash_to_float(X, Y + 1);
-        //const float v3 = hash_to_float(X + 1, Y + 1);
-        //const float perlin_value = mix(v0,v1,v2,v3,u,v);
-        //float2 gradient = mix_derivative(v0, v1, v2, v3, u, v);
-        //return float3(gradient.X * u_der, gradient.Y * v_der, perlin_value);
 
         const float3 v0 = noise_grad_derivative(hash(X, Y), fx, fy);
         const float3 v1 = noise_grad_derivative(hash(X + 1, Y), fx - 1.0, fy);
@@ -1076,5 +1069,20 @@ namespace noise {
     bool random_bool(float probability, int id, int seed)  {
         return hash_to_float(id, seed) <= probability;
     }
+    float3 morenoise(float2 position, float pointiness, float scalePowerBase, int iterations) {
+        float2 derivative(0., 0.);
+        float3 out(0,0,0);
+        float scale = 1;
+        
+        while (iterations-- > 0) {
+            const float3 perlin_value = perlin_noise_derivative(position);
+            derivative += float2(perlin_value);
+            out += perlin_value / (scale * (1. + pointiness * math::dot(derivative, derivative)));
+            scale *= scalePowerBase;
+            position *= scalePowerBase;
+        }
+        return out;
+    }
+   
 
 }

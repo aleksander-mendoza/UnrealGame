@@ -1,9 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-# include <assert.h>
+
 #include "WorldGen.h"
+#include <assert.h>
 #include "KismetProceduralMeshLibrary.h"
-#include "blender/noise.h"
+#include "../blender/proc_assets.h"
 
 int AWorldGen::getChunkIdx(int chunkX, int chunkY) {
 	int chunkYRelativeToRenderArea = chunkY - this->bottomChunkY;
@@ -78,59 +79,12 @@ void AWorldGen::GenerateChunk(const int x, const int y) {
 	const FVector offset = FVector(x * this->chunkW, y * this->chunkH, this->seaLevel);
 	const int resX = this->resolutionX;
 	const int resY = this->resolutionY;
-	const float spacingX = this->chunkW / (float)(resX - 1);
-	const float spacingY = this->chunkH / (float)(resY - 1);
-	TArray<FVector> vertices;
-	vertices.Reserve(resY* resX);
-	TArray<FVector2D> uvs;
-	TArray<int32> triangles;
-	triangles.Reserve((resY-1) * (resX-1) * 2);
-	TArray<FVector> normals;
-	normals.Reserve(resY * resX);
-	TArray<FProcMeshTangent> tangents;
-	normals.Reserve(resY * resX);
-
-	for (int32 vy = 0; vy < resY; vy++) {
-		for (int32 vx = 0; vx < resX; vx++) {
-			FVector vertex = offset;
-			vertex.X += float(vx) * spacingX;
-			vertex.Y += float(vy) * spacingY;
-			float3 perlin = noise::perlin_noise_derivative(float2(vertex.X / scale, vertex.Y / scale)) * maxHeight;
-			//float perlin = noise::perlin_noise(float2(vertex.X / scale, vertex.Y / scale)) * maxHeight;
-			
-			vertex.Z += perlin.Z;
-			vertices.Add(vertex);
-			FVector2D uv(vertex);
-			uvs.Add(uv);
-			float3 normal = math::normalize(math::normal(float2(perlin)));
-			normals.Add(FVector(normal));
-			float3 tangent = math::normalize(math::tangent(float2(perlin)));
-			tangents.Add(FProcMeshTangent(FVector(tangent), false));
-			//normals.Add(FVector(0,0,1));
-			//tangents.Add(FProcMeshTangent(FVector(1,0,0), false));
-
-		}
-	}
-
-
-	for (int32 vy = 0; vy < resY - 1; vy++) {
-		for (int32 vx = 0; vx < resX - 1; vx++) {
-			const int bottomLeft = vx + vy * resX;
-			const int bottomRight = bottomLeft + 1;
-			const int topLeft = bottomLeft + resX;
-			const int topRight = topLeft + 1;
-			triangles.Add(bottomLeft);
-			triangles.Add(topLeft);
-			triangles.Add(bottomRight);
-
-			triangles.Add(bottomRight);
-			triangles.Add(topLeft);
-			triangles.Add(topRight);
-		}
-	}
+	proc_assets::Mesh mesh;
+	proc_assets::morenoise(offset, resX, resY, float2(this->chunkW, this->chunkH), mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
+	
 
 	int idx = 0;
-	this->TerrainMesh->CreateMeshSection_LinearColor(idx, vertices, triangles, normals, uvs, TArray<FLinearColor>(), tangents, true);
+	this->TerrainMesh->CreateMeshSection_LinearColor(idx, mesh.vertices, mesh.triangles, mesh.normals, mesh.uvs, TArray<FLinearColor>(), mesh.tangents, true);
 	if (this->TerrainMaterial != nullptr) this->TerrainMesh->SetMaterial(idx, this->TerrainMaterial);
 
 }

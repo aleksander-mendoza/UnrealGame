@@ -3,6 +3,7 @@
 
 #include "CoreMinimal.h"
 #include "utildefines.h"
+#include "rand.h"
 
 namespace noise {
     int32 float_as_uint(float f);
@@ -271,7 +272,40 @@ namespace noise {
     float random_float(float min_value, float max_value, int id, int seed);
     int random_int(int min_value, int max_value, int id, int seed);
     bool random_bool(float probability, int id, int seed);
+    float3 morenoise(float2 position, float pointiness, float scalePowerBase, int iterations);
 
 
+
+    template <typename F, typename R>
+    void distribute_points_on_faces(const TArray<double3>& vertices, const TArray<int32>& triangles, F&& densityFunction, R&& resultCollectorFunction, const int seed) {
+
+        for (int tri_i = 0; tri_i < triangles.Num(); tri_i +=3) {
+            const int v0_loop = triangles[tri_i];
+            const int v1_loop = triangles[tri_i +1];
+            const int v2_loop = triangles[tri_i + 2];
+            const float3& v0_pos = float3(vertices[v0_loop]);
+            const float3& v1_pos = float3(vertices[v1_loop]);
+            const float3& v2_pos = float3(vertices[v2_loop]);
+            const float v0_density_factor = math::max(0.0f, densityFunction(v0_pos, v0_loop));
+            const float v1_density_factor = math::max(0.0f, densityFunction(v1_pos, v1_loop));
+            const float v2_density_factor = math::max(0.0f, densityFunction(v2_pos, v2_loop));
+            const float corner_tri_density_factor = (v0_density_factor + v1_density_factor + v2_density_factor) / 3.0f;
+            
+            const float area = math::area_tri(v0_pos, v1_pos, v2_pos);
+
+            const int corner_tri_seed = hash(tri_i, seed);
+            blender::RandomNumberGenerator corner_tri_rng(corner_tri_seed);
+
+            const int point_amount = corner_tri_rng.round_probabilistic(area *
+                corner_tri_density_factor);
+
+            for (int i = 0; i < point_amount; i++) {
+                const float3 bary_coord = corner_tri_rng.get_barycentric_coordinates();
+                
+                const float3 point_pos = math::interp_v3_v3v3v3(v0_pos, v1_pos, v2_pos, bary_coord);
+                resultCollectorFunction(point_pos);
+            }
+        }
+    }
 }
 

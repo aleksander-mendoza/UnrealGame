@@ -472,4 +472,16 @@ namespace math {
     inline float4 normalize(float4 v) {
         return div(v, length(v));
     }
+    inline float3 cross_tri(float3 v1, float3 v2, float3 v3)
+    {
+        return cross(sub(v1, v2), sub(v3, v2));
+    }
+    inline float area_tri(float3 v1, float3 v2, float3 v3)
+    {
+        return length(cross_tri(v1, v2, v3))*0.5f;
+    }
+    inline float3 interp_v3_v3v3v3( const float3 v1, const float3 v2, const float3 v3, const float3 w)
+    {
+        return v1*w.X+ v2 * w.X+ v3 * w.Z;
+    }
 }

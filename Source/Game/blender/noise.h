@@ -191,6 +191,7 @@ namespace noise {
 
     float3 perlin_noise_derivative(float2 position);
     float3 perlin_noise_derivative(float2 position, float scale);
+    float3 perlin_noise_derivative(float2 position, float distanceScale, float heightScale);
 
     float perlin_noise(float position);
     float perlin_noise(float2 position);

@@ -483,15 +483,19 @@ namespace math {
 
     inline float3 cross(float3 v1, float3 v2)
     {
-        return float3(
-            v1.Y * v2.Z - v1.Z * v2.Y,
-            v1.X * v2.Z - v1.Z * v2.X,
-            v1.X * v2.Y - v1.Y * v2.X
-        );
+        return FVector3f::CrossProduct(v1,v2);
     }
     inline float3 normal(float2 gradient)
     {
         return cross(float3(1,0, gradient.X), float3(0, 1, gradient.Y));
+    }
+    inline double3 cross(double3 v1, double3 v2)
+    {
+        return FVector3d::CrossProduct(v1, v2);
+    }
+    inline double3 normal(double2 gradient)
+    {
+        return cross(double3(1, 0, gradient.X), double3(0, 1, gradient.Y));
     }
     inline float3 tangent(float2 gradient)
     {

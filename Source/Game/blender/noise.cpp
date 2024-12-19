@@ -346,6 +346,10 @@ namespace noise {
     {
         return t * t *  (t * (t * 5.0 * 6.0 - 4.0*15.0) + 3.0* 10.0);
     }
+    inline float fade_second_derivative(float t)
+    {
+        return t * (t * (t * 4.0 * 5.0 * 6.0 - 3.0 * 4.0 * 15.0) + 2.0 * 3.0 * 10.0);
+    }
 
     float negate_if(float value, int32 condition)
     {
@@ -433,14 +437,25 @@ namespace noise {
 
         return r;
     }
-
-    float3 perlin_noise_derivative(float2 position, float scale) {
-        float3 der_and_height = perlin_noise_derivative(position / scale);
-        der_and_height.X /= scale;
-        der_and_height.Y /= scale;
+    inline float3 perlin_noise_derivative(float2 position, float distanceScale, float heightScale) {
+        float3 der_and_height = perlin_noise_derivative(position / distanceScale) * heightScale;
+        der_and_height.X /= distanceScale;
+        der_and_height.Y /= distanceScale;
         return der_and_height;
     }
-    float3 perlin_noise_derivative(float2 position)
+    float3 perlin_noise_derivative(float2 position, float scale) {
+        return perlin_noise_derivative(position, scale, scale);
+    }
+    struct PerlinValue{
+        float r;
+        float r_der_x;
+        float r_der_y;
+        float r_der_x_der_x;
+        float r_der_xy;
+        float r_der_y_der_y;
+    };
+
+    inline PerlinValue perlin_noise_derivative2(float2 position)
     {
         const int64 x = int64(position.X);
         const int64 y = int64(position.Y);
@@ -450,6 +465,8 @@ namespace noise {
         const float v = fade(fy);
         const float u_der = fade_derivative(fx);
         const float v_der = fade_derivative(fy);
+        const float u_der_der = fade_second_derivative(fx);
+        const float v_der_der = fade_second_derivative(fy);
         const int32 X = x;
         const int32 Y = y;
         
@@ -458,8 +475,14 @@ namespace noise {
         const float3 v1 = noise_grad_derivative(hash(X + 1, Y), fx - 1.0, fy);
         const float3 v2 = noise_grad_derivative(hash(X, Y + 1), fx, fy - 1.0);
         const float3 v3 = noise_grad_derivative(hash(X + 1, Y + 1), fx - 1.0, fy - 1.0);
-        const float perlin_value = mix(v0.Z, v1.Z, v2.Z, v3.Z, u, v);
+        const float r = mix(v0.Z, v1.Z, v2.Z, v3.Z, u, v);
         
+        const float v1v0 = v1.Z - v0.Z;
+        const float v0v2 = v0.Z - v2.Z;
+        const float v3v1 = v3.Z - v1.Z;
+        const float v3v2 = v3.Z - v2.Z;
+        const float nv = v - 1.;
+        const float nu = u - 1.;
         // we make use of the property that
         // derivative of f(fx) wrt fx = derivative of f(fx) wrt x
         // from which follows
@@ -470,15 +493,31 @@ namespace noise {
         // feeding the above formula to wolfram alpha yeilds
         // (1 - V(y)) (-(U(x) - 1) v0^(1, 0)(x, y) + U'(x) (-v0(x, y)) + U(x) v1^(1, 0)(x, y) + U'(x) v1(x, y)) + V(y) (-(U(x) - 1) v2^(1, 0)(x, y) + U'(x) (-v2(x, y)) + U(x) v3^(1, 0)(x, y) + U'(x) v3(x, y))
         // where v0^(1, 0)(x, y) stands for v0.X and U'(x) = u_der thus giving us
-        float der_x = (1. - v) * (-(u - 1.) * v0.X + u_der * -v0.Z + u * v1.X + u_der * v1.Z) + v * (-(u - 1.) * v2.X + u_der * (-v2.Z) + u * v3.X + u_der * v3.Z);
+        float r_der_x = -nv * (-nu * v0.X + u_der * v1v0 + u * v1.X) + v * (-nu * v2.X + u_der * v3v2 + u * v3.X );
         // now for the y wolfram alpha yields
         // -(V'(y) (U(x) v1(x, y) - (U(x) - 1) v0(x, y))) + V'(y) (U(x) v3(x, y) - (U(x) - 1) v2(x, y)) + (1 - V(y)) (U(x) v1^(0, 1)(x, y) - (U(x) - 1) v0^(0, 1)(x, y)) + V(y) (U(x) v3^(0, 1)(x, y) - (U(x) - 1) v2^(0, 1)(x, y))
-        float der_y = -(v_der* (u* v1.Z - (u - 1.)* v0.Z)) + v_der*(u* v3.Z - (u - 1.) * v2.Z) + (1. - v) * (u * v1.Y - (u - 1.) * v0.Y) + v* (u* v3.Y - (u - 1.)* v2.Y);
+        float r_der_y = v_der * (u * v3v1 + nu * v0v2) + -nv * (u * v1.Y - nu * v0.Y) + v * (u * v3.Y - nu * v2.Y);
 
+        const float v0v2X = v0.X - v2.X;
+        const float v3v1X = v3.X - v1.X;
+        const float v1v0X = v1.X - v0.X;
+        const float v3v2X = v3.X - v2.X; // this is derivative of v3v2 wrt x
+        const float v3v2Y = v3.Y - v2.Y; // this is derivative of v3v2 wrt y
+        const float v1v0Y = v1.Y - v0.Y; // this is derivative of v1v0 wrt y
+        const float v3v1Y = v3.Y - v1.Y;
+        const float v0v2Y = v0.Y - v2.Y;
 
-        return float3(der_x, der_y, perlin_value);
+        // to find the second derivative is easy because v0.X and v0.Y are constants
+        float r_der_x_der_x = -nv * (u_der * 2 * v1v0X + u_der_der * v1v0) + v * (+u_der * 2. * v3v2X + u_der_der * v3v2);
+        // because it's just polynomials, all of its derivatives are continuous, therefore r_der_y_der_x=r_der_x_der_y so we just call it r_der_xy and compute only once
+        float r_der_xy = v_der * (nu * v0v2X + u_der * (v3v2 - v1v0) + u * v3v1X) - nv * u_der * v1v0Y + v * u_der * v3v2Y;
+        float r_der_y_der_y = v_der_der * (u * v3v1 + nu * v0v2) + 2 * v_der * (u * v3v1Y + nu * v0v2Y);
+        return PerlinValue{.r=r,.r_der_x=r_der_x, .r_der_y=r_der_y,.r_der_x_der_x = r_der_x_der_x, .r_der_xy= r_der_xy, .r_der_y_der_y= r_der_y_der_y };
     }
-
+    float3 perlin_noise_derivative(float2 position) {
+        PerlinValue v = perlin_noise_derivative2(position);
+        return float3(v.r_der_x, v.r_der_y, v.r);
+    }
     float perlin_noise(float3 position)
     {
         int X, Y, Z;
@@ -1081,15 +1120,37 @@ namespace noise {
         return der_and_height;
     }
     float3 morenoise(float2 position, float pointiness, float scalePowerBase, int iterations) {
-        float2 derivative(0., 0.);
+        float2 c(0., 0.);//cummulative first order derivative of perlin noise
+        float cX_der_x=0;
+        float cY_der_y=0;
+        float cY_der_x=0;//==cX_der_y
         float3 out(0,0,0);
         float scale = 1;
         
         while (iterations-- > 0) {
-            float3 perlin_value = perlin_noise_derivative(position*scale);
-            derivative += float2(perlin_value);
-            perlin_value.Z /= scale;
-            out += perlin_value /  (1. + pointiness * math::dot(derivative, derivative));
+
+            PerlinValue v = perlin_noise_derivative2(position * scale);
+            v.r /= scale;
+            c += float2(v.r_der_x, v.r_der_y);
+            float erosion = (1. + pointiness * math::dot(c, c));
+            out.Z += v.r / erosion;
+            
+            // derivative of v.r / erosion wrt x = 
+            // (v.r_der_x * erosion - v.r * (derivative of erosion wrt x)) / (erosion*erosion)
+            // where
+            // derivative of erosion wrt x = derivative of pointiness * (c.X*c.X + c.Y*c.Y) wrt x =
+            // pointiness * 2 * (c.X* (der of c.X wrt x) + c.Y* (der of c.Y wrt x)) 
+            // where
+            // der of c.X wrt x = der of (v1.X + v2.X + ... vn.X) wrt x =
+            // = der of v1.X wrt x  +  der of v2.X wrt x  + ... + der of vn.X wrt x =
+            // = der of v1.X wrt x  +  der of v2.X wrt x  + ... + der of vn.X wrt x =
+            cX_der_x += v.r_der_x_der_x;
+            cY_der_x += v.r_der_xy;
+            cY_der_y += v.r_der_y_der_y;
+            float erosion_der_x = 2. * pointiness * (c.X * cX_der_x + c.Y * cY_der_x);
+            float erosion_der_y = 2. * pointiness * (c.X * cY_der_x + c.Y * cY_der_y);
+            out.X += (v.r_der_x * erosion - v.r * erosion_der_x) / (erosion * erosion);
+            out.Y += (v.r_der_y * erosion - v.r * erosion_der_y) / (erosion * erosion);
             scale *= scalePowerBase;
         }
         return out;

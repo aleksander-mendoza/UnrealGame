@@ -85,13 +85,18 @@ void AWorldGen::GenerateChunk(const int x, const int y) {
 	const int resY = this->resolutionY;
 	const float2 size = float2(this->chunkW, this->chunkH);
 	proc_assets::Mesh mesh;
-	proc_assets::morenoise(offset, resX, resY, size, mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
+	//proc_assets::morenoise(offset, resX, resY, size, mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
+	proc_assets::perlin_fbm(offset, resX, resY, size, mesh, scale, scalingPowerBase, 1./scalingPowerBase,numOfScales, maxHeight);
 	//proc_assets::perlin(offset, resX, resY, size, mesh, scale, maxHeight);
+	/**
 	blender::RandomNumberGenerator rng(noise::hash(x,y));
 	for (int i = 0; i < 30; i++) {
 		const float2 position = offsetf + size * rng.get_float2();
-		const float3 gradient_and_height = noise::morenoise(position, scale, pointiness, scalingPowerBase, numOfScales)* maxHeight;
+		//const float3 gradient_and_height = noise::morenoise(position, scale, pointiness, scalingPowerBase, numOfScales)* maxHeight;
+		const float3 gradient_and_height = noise::perlin_fbm_derivative(position, scale, maxHeight, scalingPowerBase, 1./scalingPowerBase, numOfScales);
 		//const float3 gradient_and_height = noise::perlin_noise_derivative(position, scale) * maxHeight;
+	
+		
 		FActorSpawnParameters SpawnInfo;
 		const double3 normal = math::normalize(math::normal(double2(float2(gradient_and_height))));
 		const FRotator3d rot = normal.Rotation();
@@ -110,9 +115,9 @@ void AWorldGen::GenerateChunk(const int x, const int y) {
 		const double3 position3dZ = position3d + double(rockDensity)* normal;
 		ARock* rock3 = GetWorld()->SpawnActor<ARock>(ARock::StaticClass(), position3dZ, rot, SpawnInfo);
 		rock3->SetActorLabel(FString::Printf(TEXT("ARock %d Z"), i));
-	
+		
 	}
-
+	*/
 	int idx = 0;
 	this->TerrainMesh->CreateMeshSection_LinearColor(idx, mesh.vertices, mesh.triangles, mesh.normals, mesh.uvs, TArray<FLinearColor>(), mesh.tangents, true);
 

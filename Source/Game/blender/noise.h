@@ -276,6 +276,7 @@ namespace noise {
     bool random_bool(float probability, int id, int seed);
     float3 morenoise(float2 position, float scale, float pointiness, float scalePowerBase, int iterations);
     float3 morenoise(float2 position, float pointiness, float scalePowerBase, int iterations);
+    float3 perlin_fbm_derivative(float2 position, float fscale, float height, const float heightPowerBase, const float scalePowerBase, int iterations);
 
 
 

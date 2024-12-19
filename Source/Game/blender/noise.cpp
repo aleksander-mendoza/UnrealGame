@@ -437,14 +437,16 @@ namespace noise {
 
         return r;
     }
-    inline float3 perlin_noise_derivative(float2 position, float distanceScale, float heightScale) {
-        float3 der_and_height = perlin_noise_derivative(position / distanceScale) * heightScale;
-        der_and_height.X /= distanceScale;
-        der_and_height.Y /= distanceScale;
+    float3 perlin_noise_derivative(float2 position, float distanceScale, float heightScale) {
+        float3 der_and_height = perlin_noise_derivative(position * distanceScale) * heightScale;
+        der_and_height.X *= distanceScale;
+        der_and_height.Y *= distanceScale;
         return der_and_height;
     }
     float3 perlin_noise_derivative(float2 position, float scale) {
-        return perlin_noise_derivative(position, scale, scale);
+        float3 der_and_height = perlin_noise_derivative(position * scale);
+        der_and_height.Z /= scale;
+        return der_and_height;
     }
     struct PerlinValue{
         float r;
@@ -1130,7 +1132,9 @@ namespace noise {
         while (iterations-- > 0) {
 
             PerlinValue v = perlin_noise_derivative2(position * scale);
+            v.r += 1.;
             v.r /= scale;
+
             c += float2(v.r_der_x, v.r_der_y);
             float erosion = (1. + pointiness * math::dot(c, c));
             out.Z += v.r / erosion;
@@ -1155,6 +1159,16 @@ namespace noise {
         }
         return out;
     }
-   
 
+   
+    float3 perlin_fbm_derivative(float2 position, float fscale, float height, const float heightPowerBase, const float scalePowerBase, int iterations) {
+       float3 sum(0, 0, 0);
+       while (iterations-- > 0) {
+            float3 v = perlin_noise_derivative(position, fscale, height);
+            sum += v;
+            height *= heightPowerBase;
+            fscale *= scalePowerBase;
+       }
+       return sum;
+    }
 }

@@ -73,6 +73,7 @@ namespace proc_assets {
 		
 	}
 
+	void perlin_fbm(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float heightPowerBase, const float scalePowerBase, int iterations, const float height);
 	void perlin(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float height);
 	void morenoise(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float pointiness, const float scalingPowerBase, const int iterations, const float height);
 

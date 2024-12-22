@@ -2,91 +2,171 @@
 
 
 #include "WorldGen.h"
-#include <assert.h>
 #include "KismetProceduralMeshLibrary.h"
 #include "../blender/proc_assets.h"
 #include "../blender/rand.h"
 #include "../blender/noise.h"
 #include "../proc_assets/Rock.h"
 
-int AWorldGen::getChunkIdx(int chunkX, int chunkY) {
-	int chunkYRelativeToRenderArea = chunkY - this->bottomChunkY;
-	int chunkXRelativeToRenderArea = chunkX - this->leftmostChunkX;
-	int diameter = getRenderDiameter();
-	if (chunkYRelativeToRenderArea < 0 || chunkYRelativeToRenderArea >= diameter || chunkXRelativeToRenderArea < 0 || chunkXRelativeToRenderArea >= diameter)return -1;
-	int chunkIdx = chunkXRelativeToRenderArea + diameter * chunkYRelativeToRenderArea;
-	return chunkIdx;
-}
 
-int AWorldGen::getSectionIdx(int chunkX, int chunkY) {
-	int chunkIdx = getChunkIdx(chunkX, chunkY);
-	if (chunkIdx == -1)return -1;
-	return this->surroundingChunks[chunkIdx];
-}
-int AWorldGen::setSectionIdx(int chunkX, int chunkY, int sectionIdx) {
-	int chunkIdx = getChunkIdx(chunkX, chunkY);
-	if (chunkIdx == -1)return -1;
-	int prev = this->surroundingChunks[chunkIdx];
-	this->surroundingChunks[chunkIdx] = sectionIdx;
-	return prev;
-}
-void AWorldGen::shiftSurroundingChunks(int shiftX, int shiftY) {
-	int diamater = getRenderDiameter();
-	int offset = math::sgn(shiftX)+ math::sgn(shiftY)*diamater;
-	for (int x = shiftX>0; x < diamater-(shiftX<0);x++) {
-		for (int y = shiftY>0; y < diamater-(shiftY<0); y++) {
-			int idx = x + y * diamater;
-			surroundingChunks[idx] = surroundingChunks[idx + offset];
+void AWorldGen::shiftSurroundingChunksUp() {
+	int diameter = getRenderDiameter();
+	for (int x = 0; x < diameter; x++) {
+		int i = x;
+		int prev = surroundingChunks[i];
+		for (int y=0; y < diameter - 1; y++) {
+			i += diameter;
+			int next = surroundingChunks[i];
+			surroundingChunks[i] = prev;
+			prev = next;
 		}
+		chunksSectionWentBeyondRenderBoundary(x, prev);
+	}
+	
+}
+void AWorldGen::shiftSurroundingChunksDown() {
+	int diameter = getRenderDiameter();
+	int dd = diameter * (diameter - 1);
+	for (int x = 0; x < diameter; x++) {
+		int i = x + dd;
+		int prev = surroundingChunks[i];
+		for (int y = 0; y < diameter - 1; y++) {
+			i -= diameter;
+			int next = surroundingChunks[i];
+			surroundingChunks[i] = prev;
+			prev = next;
+		}
+		chunksSectionWentBeyondRenderBoundary(x, prev);
 	}
 }
-int AWorldGen::getRenderDiameter() {
-	return 1 + this->renderRadius * 2;
+void AWorldGen::shiftSurroundingChunksRight() {
+	int diameter = getRenderDiameter();
+	for (int i = 0, y = 0; y < diameter; y++) {
+		int j = i;
+		int prev = surroundingChunks[j];
+		for (int x = 0; x < diameter-1; x++) {
+			i++;
+			int next = surroundingChunks[i];
+			surroundingChunks[i] = prev;
+			prev  = next;
+		}
+		chunksSectionWentBeyondRenderBoundary(j, prev);
+		i++;
+	}
 }
-int AWorldGen::getRenderArea() {
-	int randerDiameter = this->getRenderDiameter();
-	return randerDiameter * randerDiameter;
+void AWorldGen::shiftSurroundingChunksLeft() {
+	int diameter = getRenderDiameter();
+	for (int i = diameter*diameter-1, y = diameter-1; y >= 0; y--) {
+		int j = i;
+		int prev = surroundingChunks[j];
+		for (int x = 0; x < diameter - 1; x++) {
+			i--;
+			int next = surroundingChunks[i];
+			surroundingChunks[i] = prev;
+			prev = next;
+		}
+		chunksSectionWentBeyondRenderBoundary(j, prev);
+		i--;
+	}
 }
 // Sets default values
 AWorldGen::AWorldGen(): surroundingChunks()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 	TerrainMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("TerrainMesh"));
 	TerrainMesh->SetupAttachment(GetRootComponent());
 	
 }
-
+void AWorldGen::resetSurroundingChunks() {
+	this->TerrainMesh->ClearAllMeshSections();
+	surroundingChunks.Empty();
+	unusedSectionIndices.Empty();
+	int renderArea = this->getRenderArea();
+	surroundingChunks.Reserve(renderArea);
+	unusedSectionIndices.Reserve(renderArea);
+	while (surroundingChunks.Num() < renderArea) {
+		unusedSectionIndices.Add(surroundingChunks.Num());
+		surroundingChunks.Add(-1);
+		check(unusedSectionIndices.Last()>=0);
+	}
+	check(unusedSectionIndices.Num() == surroundingChunks.Num());
+	check(unusedSectionIndices.Num() == renderArea);
+}
 // Called when the game starts or when spawned
 void AWorldGen::BeginPlay()
 {
 	Super::BeginPlay();
 	UWorld * world = this->GetWorld();
 	APlayerController* player = world->GetFirstPlayerController();
-	APawn* playerPawn = player->GetPawn();
-	int chunkX=0, chunkY=0;
-	if (playerPawn != nullptr) {
-		FVector playerPosition = playerPawn->GetActorLocation();
-		chunkX = floor(playerPosition.X / this->chunkW);
-		chunkY = floor(playerPosition.Y / this->chunkH);
+	PlayerPawn = player->GetPawn();
+	resetCenter();
+	resetSurroundingChunks();
+
+	this->GenerateChunk(int2(renderRadius, renderRadius), unusedSectionIndices.Pop());
+	popMeshStack();
+	for (int dist = 1; dist <= detailedRenderRadius; dist++) {
+		for (int x = renderRadius-dist; x <= renderRadius + dist; x++) {
+			this->GenerateChunk(int2(x, renderRadius + dist), unusedSectionIndices.Pop());
+			popMeshStack();
+			this->GenerateChunk(int2(x, renderRadius - dist), unusedSectionIndices.Pop());
+			popMeshStack();
+		}
+		for (int y = renderRadius - dist + 1; y < renderRadius + dist; y++) {
+			this->GenerateChunk(int2(renderRadius - dist, y), unusedSectionIndices.Pop());
+			popMeshStack();
+			this->GenerateChunk(int2(renderRadius + dist, y), unusedSectionIndices.Pop());
+			popMeshStack();
+		}
 	}
-	this->GenerateChunk(chunkX,chunkY);
-	surroundingChunks.Empty();
-	int renderArea = this->getRenderArea();
-	surroundingChunks.Reserve(renderArea);
-	while (surroundingChunks.Num() < renderArea)surroundingChunks.Add(-1);
+	check(chunksToUpdateQueue.IsEmpty());
+	check(meshStack.IsEmpty());
+	check(!isBusy);
+	
+}
+void AWorldGen::popMeshStack() {
+	if (!meshStack.IsEmpty()) {
+		proc_assets::MeshSection m = meshStack.Pop();
+		addMeshSection(m.sectionIdx, m.mesh);
+	}
+}
+void AWorldGen::addMeshSection(int sectionIdx, proc_assets::Mesh & mesh) {
+	check(getRenderArea() > sectionIdx);
+	check(sectionIdx > 0);
+	this->TerrainMesh->CreateMeshSection_LinearColor(sectionIdx, mesh.vertices, mesh.triangles, mesh.normals, mesh.uvs, TArray<FLinearColor>(), mesh.tangents, true);
+	if (this->TerrainMaterial != nullptr) this->TerrainMesh->SetMaterial(sectionIdx, this->TerrainMaterial);
 }
 
+void AWorldGen::GenerateChunkIfNotExists(const int2 chunkRelPos) {
+	const int chunkIdx = getChunkIdxFromRelPos(chunkRelPos);
+	int sectionIdx = surroundingChunks[chunkIdx];
+	if (sectionIdx == -1) {
+		surroundingChunks[chunkIdx] = sectionIdx = unusedSectionIndices.Pop();
+		check(getRenderArea() > sectionIdx);
+		check(sectionIdx >= 0);
+		chunksToUpdateQueue.Add(int3(chunkRelPos.X, chunkRelPos.Y, sectionIdx));
+	}
 
-void AWorldGen::GenerateChunk(const int x, const int y) {
+}
+void AWorldGen::GenerateChunk(const int2 chunkRelPos, int sectionIdx) {
+	check(getRenderArea() > sectionIdx);
+	check(sectionIdx > 0);
+	const int centerRelX = chunkRelPos.X - renderRadius;
+	const int centerRelY = chunkRelPos.Y - renderRadius;
+	const int x = absChunkOffset.X + centerRelX;
+	const int y = absChunkOffset.Y + centerRelY;
+	
 	const float2 offsetf(x * this->chunkW, y * this->chunkH);
 	const FVector offset = FVector(offsetf.X, offsetf.Y, this->seaLevel);
-	const int resX = this->resolutionX;
-	const int resY = this->resolutionY;
+	const int resX = -detailedRenderRadius < centerRelX && centerRelX < detailedRenderRadius ? this->resolutionX : this->resolutionXDistant;
+	const int resY = -detailedRenderRadius < centerRelY && centerRelY < detailedRenderRadius ? this->resolutionY : this->resolutionYDistant;
+
 	const float2 size = float2(this->chunkW, this->chunkH);
-	proc_assets::Mesh mesh;
+	meshStack.AddDefaulted();
+	proc_assets::MeshSection& s = meshStack.Last();
+	s.sectionIdx = sectionIdx;
 	//proc_assets::morenoise(offset, resX, resY, size, mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
-	proc_assets::perlin_fbm(offset, resX, resY, size, mesh, scale, scalingPowerBase, 1./scalingPowerBase,numOfScales, maxHeight);
+	proc_assets::perlin_fbm(offset, resX, resY, size, s.mesh, scale, scalingPowerBase, 1./scalingPowerBase,numOfScales, maxHeight);
 	//proc_assets::perlin(offset, resX, resY, size, mesh, scale, maxHeight);
 	/**
 	blender::RandomNumberGenerator rng(noise::hash(x,y));
@@ -118,109 +198,78 @@ void AWorldGen::GenerateChunk(const int x, const int y) {
 		
 	}
 	*/
-	int idx = 0;
-	this->TerrainMesh->CreateMeshSection_LinearColor(idx, mesh.vertices, mesh.triangles, mesh.normals, mesh.uvs, TArray<FLinearColor>(), mesh.tangents, true);
-
-	if (this->TerrainMaterial != nullptr) this->TerrainMesh->SetMaterial(idx, this->TerrainMaterial);
+	
 
 }
 
-//void AWorldGen::GenerateChunk(const int x, const int y) {
-//	const float invScale = 1. / scale;
-//	const float chunkWScaled = this->chunkW * invScale;
-//	const float chunkHScaled = this->chunkH * invScale;
-//	const float startX = x * this->chunkW;
-//	const float startY = y * this->chunkH;
-//	const float startXScaled = startX * invScale;
-//	const float startYScaled = startY * invScale;
-//	const float endXScaled = startXScaled + chunkWScaled;
-//	const float endYScaled = startYScaled + chunkHScaled;
-//	const int resX = this->resolutionX;
-//	const int resY = this->resolutionY;
-//	const float spacingX = this->chunkW / (float)(resX-1);
-//	const float spacingY = this->chunkH / (float)(resY-1);;
-//	const int64 startXScaledInt = int64(startXScaled);
-//	const int64 startYScaledInt = int64(startYScaled);
-//	const int64 endXScaledInt = int64(endXScaled) + 1;
-//	const int64 endYScaledInt = int64(endYScaled) + 1;
-//	const int32 widthScaledInt = endXScaledInt - startXScaledInt;
-//	const int32 heightScaledInt = endYScaledInt - startYScaledInt;
-//	const int32 scaledAreaInt = widthScaledInt*heightScaledInt;
-//	float * randomMatrix = new float[scaledAreaInt];
-//	
-//	int32 i = 0;
-//	for (int64 vy = startYScaledInt; vy < endYScaledInt; vy++) {
-//		for (int64 vx = startXScaledInt; vx < endYScaledInt; i++, vx++) {
-//			randomMatrix[i] = noise::hash_to_float(vx, vy) * maxHeight;
-//		}
-//	}
-//	
-//	TArray<FVector> vertices;
-//	TArray<FVector2D> uvs;
-//	TArray<int32> triangles;
-//	TArray<FVector> normals;
-//	TArray<FProcMeshTangent> tangents;
-//	for (int32 vy = 1; vy < resY; vy++) {
-//		const float relativeY = vy * spacingY;
-//		const float vertex_Y = startY + relativeY;
-//		const float relativeYScaled = relativeY * invScale;
-//		const int32 relativeYScaledInt = int32(relativeYScaled);
-//		const float fractionYScaled = relativeYScaled - float(relativeYScaledInt);
-//		
-//		for (int32 vx = 0; vx < resX; vx++) {
-//			const float relativeX = vx * spacingX;
-//			const float vertex_X = startX + relativeX;
-//			const float relativeXScaled = relativeX * invScale;
-//			const int32 relativeXScaledInt = int32(relativeXScaled);
-//			const float fractionXScaled = relativeXScaled - float(relativeXScaledInt);
-//			const int32 idx_bot = relativeXScaledInt + relativeYScaledInt * widthScaledInt;
-//			const float perlin_bot_left = randomMatrix[idx_bot];
-//			const float perlin_bot_right = randomMatrix[idx_bot+1];
-//			const int32 idx_top = idx_bot + widthScaledInt;
-//			const float perlin_top_left = randomMatrix[idx_top];
-//			const float perlin_top_right = randomMatrix[idx_top+1];
-//			float perlin_value = noise::mix(perlin_bot_left, perlin_bot_right, perlin_top_left, perlin_top_right, fractionXScaled, fractionYScaled);
-//			float2 perlin_gradient = noise::mix_derivative(perlin_bot_left, perlin_bot_right, perlin_top_left, perlin_top_right, fractionXScaled, fractionYScaled);
-//
-//			float vertex_Z = seaLevel + perlin_value;
-//			vertices.Add(double3(vertex_X, vertex_Y, vertex_Z));
-//			FVector2D uv(vertex_X, vertex_Y);
-//			uvs.Add(uv);
-//			float3 normal = math::normalize(math::normal(perlin_gradient));
-//			normals.Add(FVector(normal));
-//			float3 tangent = math::normalize(math::tangent(perlin_gradient));
-//			tangents.Add(FProcMeshTangent(FVector(tangent), false));
-//			
-//		}
-//	}
-//	
-//	
-//	for (int32 vy = 0; vy < resY - 1; vy++) {
-//		for (int32 vx = 0; vx < resX-1; vx++) {
-//			const int bottomLeft = vx + vy * resX;
-//			const int bottomRight = bottomLeft + 1;
-//			const int topLeft = bottomLeft + resX;
-//			const int topRight = topLeft + 1;
-//			triangles.Add(bottomLeft);
-//			triangles.Add(topLeft);
-//			triangles.Add(bottomRight);
-//
-//			triangles.Add(bottomRight);
-//			triangles.Add(topLeft);
-//			triangles.Add(topRight);
-//		}
-//	}
-//	
-//	int idx = 0;
-//	this->TerrainMesh->CreateMeshSection_LinearColor(idx, vertices, triangles, normals, uvs, TArray<FLinearColor>(), tangents, true);
-//	if(this->TerrainMaterial!=nullptr) this->TerrainMesh->SetMaterial(idx, this->TerrainMaterial);
-//	
-//}
+void AWorldGen::GenerateChunkAsync()
+{
+	if (!isBusy && !chunksToUpdateQueue.IsEmpty()) {
+		int3 i = chunksToUpdateQueue.Pop();
+		isBusy = true;
+		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [i, this]()
+			{
+				const int2 chunkRelPos = int2(i.X, i.Y);
+				const int sectionIdx = i.Z;
+				GenerateChunk(chunkRelPos, sectionIdx);
+				isBusy = false;
+			}
+		);
+	}
+}
+void AWorldGen::GenerateChunkSync() {
+	if (!chunksToUpdateQueue.IsEmpty()) {
+		int3 i = chunksToUpdateQueue.Pop();
+		const int2 chunkRelPos = int2(i.X, i.Y);
+		const int sectionIdx = i.Z;
+		GenerateChunk(chunkRelPos, sectionIdx);
+		popMeshStack();
+	}
+}
 
 // Called every frame
 void AWorldGen::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+	//Super::Tick(DeltaTime);
+	int2 playerPos = getPlayerAbsChunk();
+	if (playerPos != absChunkOffset) {
+		int yStart = 0, yEnd = -1, xOffset = 0;
+		if (playerPos.X != absChunkOffset.X) {
+			yStart = renderRadius - detailedRenderRadius;
+			yEnd = renderRadius + detailedRenderRadius;
+			if (playerPos.X < absChunkOffset.X) {
+				xOffset = renderRadius - detailedRenderRadius;
+				shiftSurroundingChunksRight();
+			}
+			else {
+				xOffset = renderRadius + detailedRenderRadius;
+				shiftSurroundingChunksLeft();
+			}
+		}
+		
+		int xStart = 0, xEnd = -1, yOffset = 0;
+		if (playerPos.Y != absChunkOffset.Y) {
+			xStart = renderRadius - detailedRenderRadius;
+			xEnd = renderRadius + detailedRenderRadius;
+			if (playerPos.Y < absChunkOffset.Y) {
+				yOffset = renderRadius - detailedRenderRadius;
+				shiftSurroundingChunksUp();
+			}
+			else {
+				yOffset = renderRadius + detailedRenderRadius;
+				shiftSurroundingChunksDown();
+			}
+		}
+		absChunkOffset = playerPos;
+		for (int x = xStart; x <= xEnd; x++) {
+			GenerateChunkIfNotExists(int2(x, yOffset));
+		}
+		for (int y = yStart; y <= yEnd; y++) {
+			GenerateChunkIfNotExists(int2(xOffset, y));
+		}
+	}
+	GenerateChunkAsync();
+	popMeshStack();
+
 
 }
-

@@ -123,6 +123,8 @@ public:
 
 	void OnComboPartEnd(bool isLast);
 
+	void SetSwimming(bool isSwimming);
+
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

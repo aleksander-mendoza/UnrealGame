@@ -79,4 +79,11 @@ namespace proc_assets {
 
 	void cube(double3 offset, int resX, int resY, int resZ, double3 size, Mesh& out);
 	void cube_without_uvs(double3 offset, double3 size, Mesh& out);
+
+
+	struct MeshSection {
+		Mesh mesh;
+		int sectionIdx;
+	};
 }
+

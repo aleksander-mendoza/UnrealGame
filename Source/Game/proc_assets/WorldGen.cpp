@@ -66,11 +66,11 @@ void AWorldGen::shiftSurroundingChunks(int2 shift) {
 		if (shift.X > 0) {
 			dX = -1;
 			sX = diameter - 1;
-			eX = 1;
+			eX = 0;
 		}
 		else {
 			sX = 0;
-			eX = diameter - 2;
+			eX = diameter - 1;
 		}
 		
 		for (int y = 0; y < diameter; y++) {
@@ -81,11 +81,11 @@ void AWorldGen::shiftSurroundingChunks(int2 shift) {
 		if (shift.Y > 0) {
 			dY = -1;
 			sY = diameter - 1;
-			eY = 1;
+			eY = 0;
 		}
 		else {
 			sY = 0;
-			eY = diameter - 2;
+			eY = diameter - 1;
 		}
 
 		for (int x = 0; x < diameter; x++) {
@@ -230,6 +230,7 @@ void AWorldGen::Tick(float DeltaTime)
 		for (int y = yStart; y <= yEnd; y++) {
 			requestChunk(getChunkAbsPosFromRelPos(int2(xOffset, y)), resolutionX, resolutionY, true);
 		}
+		//UE_LOGFMT(LogCore, Warning, "Status=\n{0}", toDebugStr());
 		
 	}
 	if (isBusy) {

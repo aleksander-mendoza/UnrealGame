@@ -190,7 +190,8 @@ private:
 		MeshGenRequest r{.chunkAbsPos=chunkAbsPos, .resX=resX, .resY=resY, .sectionIdx = getSectionIdx(chunkIdx) };
 		if (r.sectionIdx < 0) {
 			r.sectionIdx = unusedSectionIndices.Pop();
-			const int2 relPos = getChunkRelPosFromAbsPos(chunkAbsPos);
+			//const int2 relPos = getChunkRelPosFromAbsPos(chunkAbsPos);
+			//UE_LOGFMT(LogCore, Warning, "Request {0} at {1},{2}", r.sectionIdx, relPos.X, relPos.Y);
 			setSectionIdx(chunkIdx, r.sectionIdx);
 		}
 		else if(dontOverwrite) {

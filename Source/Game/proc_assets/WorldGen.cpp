@@ -166,11 +166,9 @@ void AWorldGen::BeginPlay()
 	check(requestQueue.IsEmpty());
 	check(!isMeshGenResultReady);
 	check(!isBusy);
-	UE_LOGFMT(LogTemp, Warning, "{0}", toDebugStr());
 }
 
 void AWorldGen::generateChunksInRadius(int2 centerPos, int radius, int resX, int resY, bool dontOverwrite) {
-	//UE_LOGFMT(LogCore, Warning, "Player={0},{1}", centerPos.X, centerPos.Y);
 	generateAndAddChunk(centerPos, resX, resY, dontOverwrite);
 	for (int dist = 1; dist <= radius; dist++) {
 		for (int x = centerPos.X - dist; x <= centerPos.X + dist; x++) {
@@ -226,7 +224,6 @@ void AWorldGen::Tick(float DeltaTime)
 			yOffset = renderRadius - shift.Y * detailedRenderRadius;
 		}
 		absChunkOffset = playerPos;
-		UE_LOGFMT(LogTemp, Warning, "{0}", toDebugStr());
 		for (int x = xStart; x <= xEnd; x++) {
 			requestChunk(getChunkAbsPosFromRelPos(int2(x, yOffset)), resolutionX, resolutionY, true);
 		}

@@ -21,7 +21,11 @@ namespace proc_assets {
 	/**plane is just a horizontally aligned grid*/
 	template<typename F>
 	void plane(double3 offset, int resX, int resY, float2 size, Mesh& out, F heightFunction, bool genTriangles) {
-		plane(offset, resX, resY, size, out, heightFunction, [resX, resY](int32 vx, int32 vy, double3 vertex) {return double2(vx / double(resX), vy / double(resY)); }, genTriangles);
+		plane(offset, resX, resY, size, out, heightFunction, [resX, resY](int32 vx, int32 vy, double3 vertex) {return double2(vx / double(resX-1), vy / double(resY-1)); }, genTriangles);
+	}
+	template<typename F>
+	void planeScaledUVs(double3 offset, int resX, int resY, float2 size, Mesh& out, F heightFunction, double uvScale, bool genTriangles) {
+		plane(offset, resX, resY, size, out, heightFunction, [uvScale, resX, resY](int32 vx, int32 vy, double3 vertex) {return double2(vertex)* uvScale; }, genTriangles);
 	}
 	/**plane is just a horizontally aligned grid*/
 	template<typename F, typename UV>
@@ -31,8 +35,8 @@ namespace proc_assets {
 
 	template<typename F, typename UV>
 	void grid(double3 offset, int resX, int resY, double3 width, double3  height, double3 displacementDirection, Mesh & out, F displacementFunction, UV uvTransform, bool genTriangles) {
-		const double3 spacingX = width / (float)(resX - 1);
-		const double3 spacingY = height / (float)(resY - 1);
+		const double3 spacingX = width / (double)(resX - 1);
+		const double3 spacingY = height / (double)(resY - 1);
 		out.vertices.Reserve(out.vertices.Num() + resY * resX);
 		out.uvs.Reserve(out.uvs.Num() + resY * resX);
 		out.normals.Reserve(out.normals.Num() + resY * resX);
@@ -75,9 +79,9 @@ namespace proc_assets {
 		
 	}
 
-	void perlin_fbm(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float heightPowerBase, const float scalePowerBase, int iterations, const float height, bool genTriangles);
-	void perlin(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float height, bool genTriangles);
-	void morenoise(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float pointiness, const float scalingPowerBase, const int iterations, const float height, bool genTriangles);
+	void perlin_fbm(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float heightPowerBase, const float scalePowerBase, int iterations, const float height, double uvScale, bool genTriangles);
+	void perlin(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float height, double uvScale, bool genTriangles);
+	void morenoise(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float pointiness, const float scalingPowerBase, const int iterations, const float height, double uvScale, bool genTriangles);
 
 	void cube(double3 offset, int resX, int resY, int resZ, double3 size, Mesh& out);
 	void cube_without_uvs(double3 offset, double3 size, Mesh& out);

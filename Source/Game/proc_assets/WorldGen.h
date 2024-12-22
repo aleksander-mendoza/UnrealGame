@@ -43,6 +43,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float chunkH = 100;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	double uvScale = 1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int renderRadius = 8; // chunks within this radius will be rendered but not necessarily generated if not present
@@ -128,7 +131,6 @@ private:
 		int sectionIdx = this->surroundingChunks[chunkIdx];
 		if (sectionIdx >= 0) {
 			this->surroundingChunks[chunkIdx] = -1;
-			UE_LOGFMT(LogCore, Warning, "Removed section {0}", sectionIdx);
 			removeMeshSection(sectionIdx);
 			unusedSectionIndices.Add(sectionIdx);
 		}
@@ -179,7 +181,7 @@ private:
 		const float2 size = float2(this->chunkW, this->chunkH);
 		s.sectionIdx = r.sectionIdx;
 		//proc_assets::morenoise(offset, resX, resY, size, mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
-		proc_assets::perlin_fbm(offset, r.resX, r.resY, size, s.mesh, scale, scalingPowerBase, 1. / scalingPowerBase, numOfScales, maxHeight, true);
+		proc_assets::perlin_fbm(offset, r.resX, r.resY, size, s.mesh, scale, scalingPowerBase, 1. / scalingPowerBase, numOfScales, maxHeight, uvScale, true);
 		s.mesh.hasTriangles = true;
 	}
 	inline MeshGenRequest makeChunkRequest(const int2 chunkAbsPos, const int resX, const int resY, bool dontOverwrite) {
@@ -189,7 +191,6 @@ private:
 		if (r.sectionIdx < 0) {
 			r.sectionIdx = unusedSectionIndices.Pop();
 			const int2 relPos = getChunkRelPosFromAbsPos(chunkAbsPos);
-			UE_LOGFMT(LogCore, Warning, "Requesting section {0} at {1}, {2}", r.sectionIdx, relPos.X, relPos.Y);
 			setSectionIdx(chunkIdx, r.sectionIdx);
 		}
 		else if(dontOverwrite) {

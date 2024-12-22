@@ -459,18 +459,15 @@ namespace noise {
 
     inline PerlinValue perlin_noise_derivative2(float2 position)
     {
-        const int64 x = int64(position.X);
-        const int64 y = int64(position.Y);
-        const float fx = position.X - float(x);
-        const float fy = position.Y - float(y);
+        int32 X, Y;
+        const float fx = math::floor_fraction(position.X, X);
+        const float fy = math::floor_fraction(position.Y, Y);
         const float u = fade(fx);
         const float v = fade(fy);
         const float u_der = fade_derivative(fx);
         const float v_der = fade_derivative(fy);
         const float u_der_der = fade_second_derivative(fx);
         const float v_der_der = fade_second_derivative(fy);
-        const int32 X = x;
-        const int32 Y = y;
         
 
         const float3 v0 = noise_grad_derivative(hash(X, Y), fx, fy);

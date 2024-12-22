@@ -13,8 +13,10 @@ namespace proc_assets {
 		TArray<int32> triangles;
 		TArray<FVector> normals;
 		TArray<FProcMeshTangent> tangents;
+		bool hasTriangles=false;
 		Mesh() :vertices(), uvs(), triangles(), normals(), tangents(){}
-	
+		void clearEverythingButTriangles();
+		void clear();
 	};
 	/**plane is just a horizontally aligned grid*/
 	template<typename F>
@@ -33,7 +35,6 @@ namespace proc_assets {
 		const double3 spacingY = height / (float)(resY - 1);
 		out.vertices.Reserve(out.vertices.Num() + resY * resX);
 		out.uvs.Reserve(out.uvs.Num() + resY * resX);
-		out.triangles.Reserve(out.triangles.Num() + (resY - 1) * (resX - 1) * 2);
 		out.normals.Reserve(out.normals.Num() + resY * resX);
 		out.tangents.Reserve(out.normals.Num() + resY * resX);
 
@@ -53,7 +54,8 @@ namespace proc_assets {
 			}
 		}
 
-		if (genTriangles) {
+		if (genTriangles && !out.hasTriangles) {
+			out.triangles.Reserve(out.triangles.Num() + (resY - 1) * (resX - 1) * 2);
 			for (int32 vy = 0; vy < resY - 1; vy++) {
 				for (int32 vx = 0; vx < resX - 1; vx++) {
 					const int bottomLeft = vx + vy * resX;

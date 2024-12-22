@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Logging/StructuredLog.h"
 #include "ProceduralMeshComponent.h"
 #include "../blender/proc_assets.h"
 #include "WorldGenUtils.h"
@@ -14,8 +15,8 @@ UCLASS()
 class GAME_API AWorldGen : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	// Sets default values for this actor's properties
 	AWorldGen();
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -30,18 +31,18 @@ public:
 	float scalingPowerBase = 2;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int resolutionY = 32;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly) 
-	int resolutionX=32;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int resolutionX = 32;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int resolutionYDistant = 4;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int resolutionXDistant = 4;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly) 
-	float  chunkW=100;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly) 
-	float chunkH=100;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float  chunkW = 100;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float chunkH = 100;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int renderRadius = 8; // chunks within this radius will be rendered but not necessarily generated if not present
@@ -50,125 +51,179 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int lowResRenderRadius = 3; // chunks within this radius will be generated (in low-res) if not present
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly) 
-	float seaLevel=-10;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float seaLevel = -10;
 
-	UPROPERTY(BlueprintReadOnly) 
+	UPROPERTY(BlueprintReadOnly)
 	UProceduralMeshComponent* TerrainMesh;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite) 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UMaterialInterface* TerrainMaterial = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float  rockDensity = 100;
-	
-	
-	
+
+
+
 private:
-	APawn* PlayerPawn;
-	int2 currentPlayerChunkPos;
-	int sectionCount = 0;
-	bool isBusy;
-	TArray<MeshGenResult> resultStack;
-	TMap<int2, int> generatedChunks;
+	APawn* PlayerPawn=nullptr;
+	int2 absChunkOffset;
+	TArray<int> unusedSectionIndices;
+	bool isBusy = false;
+	bool isMeshGenResultReady=false;
+	MeshGenResult meshGenResult;
+	TArray<int> surroundingChunks;
 	TQueue<MeshGenRequest> requestQueue;
-	
-	inline const int * getSectionIdx(int2 chunkPos) {
-		return generatedChunks.Find(chunkPos);
+	inline const int getChunkIdxFromRelPos(int2 chunkRelPos) {
+		int diameter = getRenderDiameter();
+		if (chunkRelPos.Y < 0 || chunkRelPos.Y >= diameter || chunkRelPos.X < 0 || chunkRelPos.X >= diameter)return -1;
+		int chunkIdx = chunkRelPos.X + diameter * chunkRelPos.Y;
+		return chunkIdx;
 	}
-	inline const bool hasChunk(int2 chunkPos) {
-		return generatedChunks.Contains(chunkPos);
+	inline const int getChunkIdxFromAbsPos(int2 chunkAbsPos) {
+		return getChunkIdxFromRelPos(getChunkRelPosFromAbsPos(chunkAbsPos));
 	}
-	inline int setSectionIdx(int2 chunkPos, int sectionIdx) {
-		check(!hasChunk(chunkPos));
-		return generatedChunks.Add(chunkPos, sectionIdx);
+	inline const int2 getAbsOffsetToBottomLeftmostChunk() {
+		return int2(this->absChunkOffset.X - renderRadius, this->absChunkOffset.Y - renderRadius);
 	}
-	inline bool removeSectionIdx(int2 chunkPos, int & sectionIdx) {
-		return generatedChunks.RemoveAndCopyValue(chunkPos, sectionIdx);
+	inline const int2 getChunkRelPosFromAbsPos(int2 chunkAbsPos) {
+		return chunkAbsPos - getAbsOffsetToBottomLeftmostChunk();
 	}
-	inline const int2 getChunkPos(double posX, double posY) {
+	inline const int2 getChunkAbsPos(int chunkIdx) {
+		return getChunkAbsPosFromRelPos(getChunkRelPos(chunkIdx));
+	}
+	inline const int2 getChunkAbsPosFromRelPos(int2 chunkRelPos) {
+		return chunkRelPos + getAbsOffsetToBottomLeftmostChunk();
+	}
+	inline const int2 getChunkAbsPosFromWorldPos(double posX, double posY) {
 		return int2(floor(posX / this->chunkW), floor(posY / this->chunkH));
 	}
-	inline const int2 getChunkPos(FVector pos) {
-		return getChunkPos(pos.X, pos.Y);
+	inline const int2 getChunkAbsPosFromWorldPos(FVector pos) {
+		return getChunkAbsPosFromWorldPos(pos.X, pos.Y);
 	}
-	inline const int2 getPlayerChunkPos() {
+	inline const int2 getChunkRelPos(int chunkIdx) {
+		int diameter = getRenderDiameter();
+		int chunkX = chunkIdx % diameter;
+		int chunkY = chunkIdx / diameter;
+		return int2(chunkX, chunkY);
+	}
+
+	inline const int getSectionIdx(int chunkIdx) {
+		if (chunkIdx < 0) return -1;
+		return this->surroundingChunks[chunkIdx];
+	}
+	inline const int getSectionIdx(int2 chunkRelPos) {
+		return getSectionIdx(getChunkIdxFromRelPos(chunkRelPos));
+	}
+	inline const int setSectionIdx(int2 chunkRelPos, int sectionIdx) {
+		return setSectionIdx(getChunkIdxFromRelPos(chunkRelPos), sectionIdx);
+	}
+	inline const int setSectionIdx(int chunkIdx, int sectionIdx) {
+		if (chunkIdx == -1)return -1;
+		int prev = this->surroundingChunks[chunkIdx];
+		this->surroundingChunks[chunkIdx] = sectionIdx;
+		return prev;
+	}
+	inline const void dropChunk(int chunkIdx) {
+		int sectionIdx = this->surroundingChunks[chunkIdx];
+		if (sectionIdx >= 0) {
+			this->surroundingChunks[chunkIdx] = -1;
+			UE_LOGFMT(LogCore, Warning, "Removed section {0}", sectionIdx);
+			removeMeshSection(sectionIdx);
+			unusedSectionIndices.Add(sectionIdx);
+		}
+	}
+
+	//void shiftSurroundingChunksUp();
+	//void shiftSurroundingChunksDown();
+	//void shiftSurroundingChunksLeft();
+	//void shiftSurroundingChunksRight();
+	void shiftSurroundingChunks(int2 shift);
+	const FString toDebugStr();
+	inline const int getRenderDiameter() {
+		return 1 + this->renderRadius * 2;
+	}
+	inline const int getRenderArea() {
+		int randerDiameter = this->getRenderDiameter();
+		return randerDiameter * randerDiameter;
+	}
+	void resetSurroundingChunks();
+	
+	inline const int2 getPlayerAbsChunk() {
 		if (PlayerPawn == nullptr)return int2(0, 0);
 		FVector playerPosition = PlayerPawn->GetActorLocation();
-		int2 chunkPos = getChunkPos(playerPosition);
+		int2 chunkPos = getChunkAbsPosFromWorldPos(playerPosition);
 		return chunkPos;
 	}
-
-	void popGenResult();
-	inline void addMeshSection(MeshGenResult& mesh) {
-		addMeshSection(mesh.sectionIdx, mesh.mesh);
+	inline void resetCenter() {
+		absChunkOffset = getPlayerAbsChunk();
 	}
-	inline void addMeshSection(int sectionIdx, proc_assets::Mesh & mesh){
-		this->TerrainMesh->CreateMeshSection_LinearColor(sectionIdx, mesh.vertices, mesh.triangles, mesh.normals, mesh.uvs, TArray<FLinearColor>(), mesh.tangents, true);
-		if (this->TerrainMaterial != nullptr) this->TerrainMesh->SetMaterial(sectionIdx, this->TerrainMaterial);
+	inline void addMeshSection(MeshGenResult& r) {
+		check(getRenderArea() > r.sectionIdx);
+		check(r.sectionIdx >= 0);
+		this->TerrainMesh->CreateMeshSection_LinearColor(r.sectionIdx, r.mesh.vertices, r.mesh.triangles, r.mesh.normals, r.mesh.uvs, TArray<FLinearColor>(), r.mesh.tangents, true);
+		if (this->TerrainMaterial != nullptr) this->TerrainMesh->SetMaterial(r.sectionIdx, this->TerrainMaterial);
 	}
-	inline void updateMeshSection(MeshGenResult& mesh) {
-		updateMeshSection(mesh.sectionIdx, mesh.mesh);
+	inline void updateMeshSection(MeshGenResult& r) {
+		check(getRenderArea() > r.sectionIdx);
+		check(r.sectionIdx >= 0);
+		this->TerrainMesh->UpdateMeshSection_LinearColor(r.sectionIdx, r.mesh.vertices, r.mesh.normals, r.mesh.uvs, TArray<FLinearColor>(), r.mesh.tangents);
 	}
-	inline void updateMeshSection(int sectionIdx, proc_assets::Mesh& mesh) {
-		this->TerrainMesh->UpdateMeshSection_LinearColor(sectionIdx, mesh.vertices, mesh.normals, mesh.uvs, TArray<FLinearColor>(), mesh.tangents);
-	}
-	inline void removeMeshSection(int sectionIdx){
+	inline void removeMeshSection(int sectionIdx) {
+		check(getRenderArea() > sectionIdx);
+		check(sectionIdx >= 0);
 		this->TerrainMesh->ClearMeshSection(sectionIdx);
 	}
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-	void requestAddOrUpdateChunksInRadius(int2 centerPos, int radius, int resX, int resY, TArray<ChunkDist>& existingChunks);
-	inline void requestAddOrUpdateChunksAroundPlayer(TArray<ChunkDist>& existingChunks) {
-		requestAddOrUpdateChunksInRadius(currentPlayerChunkPos, detailedRenderRadius, resolutionX, resolutionY, existingChunks);
-	}
-	inline void generateAndAddChunk(const int2 chunkPos, int resX, int resY) {
-		check(!hasChunk(chunkPos));
-		generateAndAddChunk(chunkPos, resX, resY, sectionCount++, true);
-	}
-	inline void generateAndAddChunk(const int2 chunkPos, int resX, int resY, int sectionIdx, bool createNew) {
-		MeshGenResult m;
-		m.createNew = createNew;
-		setSectionIdx(chunkPos, sectionIdx);
-		generateChunk(chunkPos, resX, resY, sectionIdx, m, createNew);
-		if (createNew)addMeshSection(m);
-		else updateMeshSection(m);
-	}
-	void requestAddOrUpdateChunk(const int2 chunkPos, int resX, int resY, TArray<ChunkDist>& existingChunks);
-	inline void generateAndAddChunk(const MeshGenRequest& r) {
-		generateAndAddChunk(r.chunkPos, r.resX, r.resY, r.sectionIdx, r.createNew);
-	}
-	inline void generateChunk(const MeshGenRequest &r, MeshGenResult& s) {
-		s.createNew = r.createNew;
-		generateChunk(r.chunkPos,r.resX,r.resY,r.sectionIdx,s,r.createNew);
-	}
-	inline void generateChunk(const int2 chunkPos, int resX, int resY, int sectionIdx, MeshGenResult& s, bool genTriangles) {
-		const FVector offset = FVector(chunkPos.X * this->chunkW, chunkPos.Y * this->chunkH, this->seaLevel);
+	inline void generateChunk(const MeshGenRequest& r, MeshGenResult& s) {
+		const FVector offset = FVector(r.chunkAbsPos.X * this->chunkW, r.chunkAbsPos.Y * this->chunkH, this->seaLevel);
 		const float2 size = float2(this->chunkW, this->chunkH);
-		check(s.createNew == genTriangles);
-		s.sectionIdx = sectionIdx;
+		s.sectionIdx = r.sectionIdx;
 		//proc_assets::morenoise(offset, resX, resY, size, mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
-		proc_assets::perlin_fbm(offset, resX, resY, size, s.mesh, scale, scalingPowerBase, 1. / scalingPowerBase, numOfScales, maxHeight, genTriangles);
+		proc_assets::perlin_fbm(offset, r.resX, r.resY, size, s.mesh, scale, scalingPowerBase, 1. / scalingPowerBase, numOfScales, maxHeight, true);
+		s.mesh.hasTriangles = true;
 	}
-	inline void requestChunkIfNotExists(const int2 chunkPos, int resX, int resY){
-		if (getSectionIdx(chunkPos) ==nullptr) {
-			requestQueue.Enqueue(MeshGenRequest{ .chunkPos = chunkPos, .resX=resX,.resY=resY,.sectionIdx= sectionCount,.createNew=true});
-			setSectionIdx(chunkPos, sectionCount++);
+	inline MeshGenRequest makeChunkRequest(const int2 chunkAbsPos, const int resX, const int resY, bool dontOverwrite) {
+		const int chunkIdx = getChunkIdxFromAbsPos(chunkAbsPos);
+		check(chunkIdx >= 0);
+		MeshGenRequest r{.chunkAbsPos=chunkAbsPos, .resX=resX, .resY=resY, .sectionIdx = getSectionIdx(chunkIdx) };
+		if (r.sectionIdx < 0) {
+			r.sectionIdx = unusedSectionIndices.Pop();
+			const int2 relPos = getChunkRelPosFromAbsPos(chunkAbsPos);
+			UE_LOGFMT(LogCore, Warning, "Requesting section {0} at {1}, {2}", r.sectionIdx, relPos.X, relPos.Y);
+			setSectionIdx(chunkIdx, r.sectionIdx);
+		}
+		else if(dontOverwrite) {
+			r.sectionIdx = -1;
+		}
+		return r;
+	}
+	inline void generateAndAddChunk(const int2 chunkAbsPos, const int resX, const int resY, bool dontOverwrite) {
+		MeshGenRequest r = makeChunkRequest(chunkAbsPos, resX, resY, dontOverwrite);
+		generateAndAddChunk(r);
+	}
+	inline void generateAndAddChunk(MeshGenRequest & r) {
+		if (r.sectionIdx >= 0) {
+			MeshGenResult s;
+			generateChunk(r, s);
+			addMeshSection(s);
 		}
 	}
-	inline void requestChunkOrUpdate(const int2 chunkPos, int resX, int resY) {
-		const int* sectionIdx = getSectionIdx(chunkPos);
-		if (sectionIdx) {
-			requestQueue.Enqueue(MeshGenRequest{ .chunkPos= chunkPos, .resX = resX,.resY = resY,.sectionIdx = *sectionIdx,.createNew = false});
-		}else{
-			requestQueue.Enqueue(MeshGenRequest{ .chunkPos= chunkPos, .resX = resX,.resY = resY,.sectionIdx = sectionCount,.createNew = true });
-			setSectionIdx(chunkPos, sectionCount++);
+	inline void generateAndPushChunk(const int2 chunkAbsPos, const int resX, const int resY, bool dontOverwrite) {
+		MeshGenRequest r = makeChunkRequest(chunkAbsPos, resX, resY, dontOverwrite);
+		generateAndPushChunk(r);
+	}
+	inline void generateAndPushChunk(MeshGenRequest& r) {
+		if (r.sectionIdx >= 0) {
+			meshGenResult.mesh.clearEverythingButTriangles();
+			generateChunk(r, meshGenResult);
 		}
+	}
+	void generateChunksInRadius(int2 centerPos, int radius, int resX, int resY, bool dontOverwrite);
+	inline void requestChunk(const int2 chunkAbsPos, int resX, int resY, bool dontOverwrite) {
+		requestChunk(makeChunkRequest(chunkAbsPos, resX, resY, dontOverwrite));
+	}
+	inline void requestChunk(MeshGenRequest r) {
+		if(r.sectionIdx>=0)requestQueue.Enqueue(r);
 	}
 	void dequeueRequestAsync();
 	void dequeueRequestSync() {
@@ -177,5 +232,13 @@ public:
 			generateAndAddChunk(i);
 		}
 	}
+protected:
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
+
+public:
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+
 
 };

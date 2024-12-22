@@ -79,4 +79,16 @@ namespace proc_assets {
 
 
 	}
+    void Mesh::clearEverythingButTriangles()
+    {
+        vertices.Empty();
+        uvs.Empty();
+        normals.Empty();
+        tangents.Empty();  
+    }
+    void Mesh::clear() {
+        clearEverythingButTriangles();
+        triangles.Empty();
+        hasTriangles = false;
+    }
 }

@@ -6,12 +6,10 @@ struct ChunkDist {
 };
 struct MeshGenResult {
 	proc_assets::Mesh mesh;
-	int sectionIdx;
-	bool createNew;
+	int sectionIdx=-1;
 };
 struct MeshGenRequest {
-	int2 chunkPos;
-	int resX, resY;
-	int sectionIdx;
-	bool createNew;
+	int2 chunkAbsPos;
+	int resX=-1, resY=-1;
+	int sectionIdx=-1;
 };

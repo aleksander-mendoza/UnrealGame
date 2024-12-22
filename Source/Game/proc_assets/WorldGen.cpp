@@ -6,92 +6,31 @@
 #include "../blender/proc_assets.h"
 #include "../blender/rand.h"
 #include "../blender/noise.h"
+#include "Logging/StructuredLog.h"
 #include "../proc_assets/Rock.h"
 
 
-void AWorldGen::shiftSurroundingChunksUp() {
-	int diameter = getRenderDiameter();
-	for (int x = 0; x < diameter; x++) {
-		int i = x;
-		int prev = surroundingChunks[i];
-		for (int y=0; y < diameter - 1; y++) {
-			i += diameter;
-			int next = surroundingChunks[i];
-			surroundingChunks[i] = prev;
-			prev = next;
-		}
-		chunksSectionWentBeyondRenderBoundary(x, prev);
-	}
-	
-}
-void AWorldGen::shiftSurroundingChunksDown() {
-	int diameter = getRenderDiameter();
-	int dd = diameter * (diameter - 1);
-	for (int x = 0; x < diameter; x++) {
-		int i = x + dd;
-		int prev = surroundingChunks[i];
-		for (int y = 0; y < diameter - 1; y++) {
-			i -= diameter;
-			int next = surroundingChunks[i];
-			surroundingChunks[i] = prev;
-			prev = next;
-		}
-		chunksSectionWentBeyondRenderBoundary(x, prev);
-	}
-}
-void AWorldGen::shiftSurroundingChunksRight() {
-	int diameter = getRenderDiameter();
-	for (int i = 0, y = 0; y < diameter; y++) {
-		int j = i;
-		int prev = surroundingChunks[j];
-		for (int x = 0; x < diameter-1; x++) {
-			i++;
-			int next = surroundingChunks[i];
-			surroundingChunks[i] = prev;
-			prev  = next;
-		}
-		chunksSectionWentBeyondRenderBoundary(j, prev);
-		i++;
-	}
-}
-void AWorldGen::shiftSurroundingChunksLeft() {
-	int diameter = getRenderDiameter();
-	for (int i = diameter*diameter-1, y = diameter-1; y >= 0; y--) {
-		int j = i;
-		int prev = surroundingChunks[j];
-		for (int x = 0; x < diameter - 1; x++) {
-			i--;
-			int next = surroundingChunks[i];
-			surroundingChunks[i] = prev;
-			prev = next;
-		}
-		chunksSectionWentBeyondRenderBoundary(j, prev);
-		i--;
-	}
-}
 // Sets default values
-AWorldGen::AWorldGen(): surroundingChunks()
+AWorldGen::AWorldGen():currentPlayerChunkPos(0xFFFFFFFF, 0xFFFFFFFF)
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 	TerrainMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("TerrainMesh"));
 	TerrainMesh->SetupAttachment(GetRootComponent());
+	TerrainMesh->bUseAsyncCooking = true;
 	
 }
-void AWorldGen::resetSurroundingChunks() {
-	this->TerrainMesh->ClearAllMeshSections();
-	surroundingChunks.Empty();
-	unusedSectionIndices.Empty();
-	int renderArea = this->getRenderArea();
-	surroundingChunks.Reserve(renderArea);
-	unusedSectionIndices.Reserve(renderArea);
-	while (surroundingChunks.Num() < renderArea) {
-		unusedSectionIndices.Add(surroundingChunks.Num());
-		surroundingChunks.Add(-1);
-		check(unusedSectionIndices.Last()>=0);
+void AWorldGen::popGenResult()
+{
+	if (!resultStack.IsEmpty()) {
+		MeshGenResult m = resultStack.Pop();		
+		if (m.createNew) {
+			addMeshSection(m);
+		}
+		else {
+			updateMeshSection(m);
+		}
 	}
-	check(unusedSectionIndices.Num() == surroundingChunks.Num());
-	check(unusedSectionIndices.Num() == renderArea);
 }
 // Called when the game starts or when spawned
 void AWorldGen::BeginPlay()
@@ -100,73 +39,44 @@ void AWorldGen::BeginPlay()
 	UWorld * world = this->GetWorld();
 	APlayerController* player = world->GetFirstPlayerController();
 	PlayerPawn = player->GetPawn();
-	resetCenter();
-	resetSurroundingChunks();
+}
 
-	this->GenerateChunk(int2(renderRadius, renderRadius), unusedSectionIndices.Pop());
-	popMeshStack();
-	for (int dist = 1; dist <= detailedRenderRadius; dist++) {
-		for (int x = renderRadius-dist; x <= renderRadius + dist; x++) {
-			this->GenerateChunk(int2(x, renderRadius + dist), unusedSectionIndices.Pop());
-			popMeshStack();
-			this->GenerateChunk(int2(x, renderRadius - dist), unusedSectionIndices.Pop());
-			popMeshStack();
+void AWorldGen::requestAddOrUpdateChunksInRadius(int2 centerPos, int radius, int resX, int resY, TArray<ChunkDist> & existingChunks) {
+	UE_LOGFMT(LogCore, Warning, "Player={0},{1}", centerPos.X, centerPos.Y);
+	requestAddOrUpdateChunk(centerPos, resX, resY, existingChunks);
+	for (int dist = 1; dist <= radius; dist++) {
+		for (int x = centerPos.X - dist; x <= centerPos.X + dist; x++) {
+			requestAddOrUpdateChunk(int2(x, centerPos.Y + dist), resX, resY, existingChunks);
+			requestAddOrUpdateChunk(int2(x, centerPos.Y - dist), resX, resY, existingChunks);
 		}
-		for (int y = renderRadius - dist + 1; y < renderRadius + dist; y++) {
-			this->GenerateChunk(int2(renderRadius - dist, y), unusedSectionIndices.Pop());
-			popMeshStack();
-			this->GenerateChunk(int2(renderRadius + dist, y), unusedSectionIndices.Pop());
-			popMeshStack();
+		for (int y = centerPos.Y - dist + 1; y < centerPos.Y + dist; y++) {
+			requestAddOrUpdateChunk(int2(centerPos.X - dist, y), resX, resY, existingChunks);
+			requestAddOrUpdateChunk(int2(centerPos.X + dist, y), resX, resY, existingChunks);
 		}
 	}
-	check(chunksToUpdateQueue.IsEmpty());
-	check(meshStack.IsEmpty());
-	check(!isBusy);
-	
 }
-void AWorldGen::popMeshStack() {
-	if (!meshStack.IsEmpty()) {
-		proc_assets::MeshSection m = meshStack.Pop();
-		addMeshSection(m.sectionIdx, m.mesh);
+
+void AWorldGen::requestAddOrUpdateChunk(const int2 chunkPos, int resX, int resY, TArray<ChunkDist>& existingChunks)
+{
+	if (hasChunk(chunkPos))return;
+	int sectionIdx;
+	const bool createNew = existingChunks.IsEmpty();
+	if (createNew) {
+		sectionIdx = sectionCount++;
+		UE_LOGFMT(LogCore, Warning, "create new {0},{1}", chunkPos.X, chunkPos.Y);
 	}
-}
-void AWorldGen::addMeshSection(int sectionIdx, proc_assets::Mesh & mesh) {
-	check(getRenderArea() > sectionIdx);
-	check(sectionIdx > 0);
-	this->TerrainMesh->CreateMeshSection_LinearColor(sectionIdx, mesh.vertices, mesh.triangles, mesh.normals, mesh.uvs, TArray<FLinearColor>(), mesh.tangents, true);
-	if (this->TerrainMaterial != nullptr) this->TerrainMesh->SetMaterial(sectionIdx, this->TerrainMaterial);
-}
-
-void AWorldGen::GenerateChunkIfNotExists(const int2 chunkRelPos) {
-	const int chunkIdx = getChunkIdxFromRelPos(chunkRelPos);
-	int sectionIdx = surroundingChunks[chunkIdx];
-	if (sectionIdx == -1) {
-		surroundingChunks[chunkIdx] = sectionIdx = unusedSectionIndices.Pop();
-		check(getRenderArea() > sectionIdx);
-		check(sectionIdx >= 0);
-		chunksToUpdateQueue.Add(int3(chunkRelPos.X, chunkRelPos.Y, sectionIdx));
+	else {
+		const ChunkDist mostDistantChunk = existingChunks.Pop();
+		const bool success = removeSectionIdx(mostDistantChunk.chunkPos, sectionIdx);
+		UE_LOGFMT(LogCore, Warning, "replace {0},{1} with {2}, {3}", chunkPos.X, chunkPos.Y, mostDistantChunk.chunkPos.X, mostDistantChunk.chunkPos.Y);
+		check(success);
 	}
-
+	requestQueue.Enqueue(MeshGenRequest{ .chunkPos = chunkPos, .resX = resX,.resY = resY,.sectionIdx = sectionIdx,.createNew = createNew });
+	setSectionIdx(chunkPos, sectionIdx);
 }
-void AWorldGen::GenerateChunk(const int2 chunkRelPos, int sectionIdx) {
-	check(getRenderArea() > sectionIdx);
-	check(sectionIdx > 0);
-	const int centerRelX = chunkRelPos.X - renderRadius;
-	const int centerRelY = chunkRelPos.Y - renderRadius;
-	const int x = absChunkOffset.X + centerRelX;
-	const int y = absChunkOffset.Y + centerRelY;
-	
-	const float2 offsetf(x * this->chunkW, y * this->chunkH);
-	const FVector offset = FVector(offsetf.X, offsetf.Y, this->seaLevel);
-	const int resX = -detailedRenderRadius < centerRelX && centerRelX < detailedRenderRadius ? this->resolutionX : this->resolutionXDistant;
-	const int resY = -detailedRenderRadius < centerRelY && centerRelY < detailedRenderRadius ? this->resolutionY : this->resolutionYDistant;
 
-	const float2 size = float2(this->chunkW, this->chunkH);
-	meshStack.AddDefaulted();
-	proc_assets::MeshSection& s = meshStack.Last();
-	s.sectionIdx = sectionIdx;
 	//proc_assets::morenoise(offset, resX, resY, size, mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
-	proc_assets::perlin_fbm(offset, resX, resY, size, s.mesh, scale, scalingPowerBase, 1./scalingPowerBase,numOfScales, maxHeight);
+	
 	//proc_assets::perlin(offset, resX, resY, size, mesh, scale, maxHeight);
 	/**
 	blender::RandomNumberGenerator rng(noise::hash(x,y));
@@ -200,30 +110,22 @@ void AWorldGen::GenerateChunk(const int2 chunkRelPos, int sectionIdx) {
 	*/
 	
 
-}
-
-void AWorldGen::GenerateChunkAsync()
+void AWorldGen::dequeueRequestAsync()
 {
-	if (!isBusy && !chunksToUpdateQueue.IsEmpty()) {
-		int3 i = chunksToUpdateQueue.Pop();
+	MeshGenRequest i;
+	check(!isBusy);
+	if (requestQueue.Dequeue(i)) {
 		isBusy = true;
+		check(hasChunk(i.chunkPos));
+		check(*getSectionIdx(i.chunkPos) == i.sectionIdx);
+		UE_LOGFMT(LogCore, Warning, "Generating chunk {0},{1} new={2}", i.chunkPos.X, i.chunkPos.Y, i.createNew);
 		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [i, this]()
 			{
-				const int2 chunkRelPos = int2(i.X, i.Y);
-				const int sectionIdx = i.Z;
-				GenerateChunk(chunkRelPos, sectionIdx);
+				resultStack.AddDefaulted();
+				generateChunk(i, resultStack.Last());
 				isBusy = false;
 			}
 		);
-	}
-}
-void AWorldGen::GenerateChunkSync() {
-	if (!chunksToUpdateQueue.IsEmpty()) {
-		int3 i = chunksToUpdateQueue.Pop();
-		const int2 chunkRelPos = int2(i.X, i.Y);
-		const int sectionIdx = i.Z;
-		GenerateChunk(chunkRelPos, sectionIdx);
-		popMeshStack();
 	}
 }
 
@@ -231,45 +133,26 @@ void AWorldGen::GenerateChunkSync() {
 void AWorldGen::Tick(float DeltaTime)
 {
 	//Super::Tick(DeltaTime);
-	int2 playerPos = getPlayerAbsChunk();
-	if (playerPos != absChunkOffset) {
-		int yStart = 0, yEnd = -1, xOffset = 0;
-		if (playerPos.X != absChunkOffset.X) {
-			yStart = renderRadius - detailedRenderRadius;
-			yEnd = renderRadius + detailedRenderRadius;
-			if (playerPos.X < absChunkOffset.X) {
-				xOffset = renderRadius - detailedRenderRadius;
-				shiftSurroundingChunksRight();
-			}
-			else {
-				xOffset = renderRadius + detailedRenderRadius;
-				shiftSurroundingChunksLeft();
-			}
-		}
+	int2 playerPos = getPlayerChunkPos();
+	if (playerPos != currentPlayerChunkPos) {
+		currentPlayerChunkPos = playerPos;
 		
-		int xStart = 0, xEnd = -1, yOffset = 0;
-		if (playerPos.Y != absChunkOffset.Y) {
-			xStart = renderRadius - detailedRenderRadius;
-			xEnd = renderRadius + detailedRenderRadius;
-			if (playerPos.Y < absChunkOffset.Y) {
-				yOffset = renderRadius - detailedRenderRadius;
-				shiftSurroundingChunksUp();
-			}
-			else {
-				yOffset = renderRadius + detailedRenderRadius;
-				shiftSurroundingChunksDown();
+		TArray<ChunkDist> distances;
+		distances.Reserve(generatedChunks.Num());
+		for (TPair<int2, int> chunk : generatedChunks) {
+			const int dX = math::abs(chunk.Key.X - playerPos.X);
+			const int dY = math::abs(chunk.Key.Y - playerPos.Y);
+			if (dX > renderRadius || dY > renderRadius) {
+				distances.Add(ChunkDist{ .dist = dX + dY, .chunkPos = chunk.Key });
 			}
 		}
-		absChunkOffset = playerPos;
-		for (int x = xStart; x <= xEnd; x++) {
-			GenerateChunkIfNotExists(int2(x, yOffset));
-		}
-		for (int y = yStart; y <= yEnd; y++) {
-			GenerateChunkIfNotExists(int2(xOffset, y));
-		}
-	}
-	GenerateChunkAsync();
-	popMeshStack();
 
+		distances.Sort([](const ChunkDist& a, const ChunkDist& b) {return a.dist < b.dist; });
+		requestAddOrUpdateChunksInRadius(playerPos,detailedRenderRadius,resolutionX,resolutionY,distances);
+	}
+	if (!isBusy) {
+		popGenResult();
+		dequeueRequestAsync();
+	}
 
 }

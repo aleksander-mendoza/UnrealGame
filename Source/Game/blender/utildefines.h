@@ -222,6 +222,28 @@ namespace math {
         return float4(mod(a.X, b), mod(a.Y, b), mod(a.Z, b), mod(a.W, b));
     }
 
+    inline int abs(const int a)
+    {
+        return a>0?a:-a;
+    }
+    inline int2 abs(const int2& a)
+    {
+        return int2(abs(a.X), abs(a.Y));
+    }
+    inline int3 abs(const int3& a)
+    {
+        return int3(abs(a.X), abs(a.Y), abs(a.Z));
+    }
+    inline int4 abs(const int4& a)
+    {
+        return int4(abs(a.X), abs(a.Y), abs(a.Z), abs(a.W));
+    }
+
+
+    inline double abs(const double a)
+    {
+        return fabs(a);
+    }
     inline float abs(const float a)
     {
         return fabsf(a);
@@ -239,6 +261,22 @@ namespace math {
         return float4(abs(a.X), abs(a.Y), abs(a.Z), abs(a.W));
     }
 
+    inline int sum(const int a)
+    {
+        return a;
+    }
+    inline int sum(const int2& a)
+    {
+        return a.X + a.Y;
+    }
+    inline int sum(const int3& a)
+    {
+        return a.X + a.Y + a.Z;
+    }
+    inline int sum(const int4& a)
+    {
+        return a.X + a.Y + a.Z + a.W;
+    }
     inline float sum(const float a)
     {
         return a;
@@ -386,6 +424,28 @@ namespace math {
     }
     
 
+    inline int dot(int v1, int v2)
+    {
+        return v1 * v2;
+    }
+    inline int dot(int2 v1, int2 v2)
+    {
+        return v1.X * v2.X
+            + v1.Y * v2.Y;
+    }
+    inline int dot(int3 v1, int3 v2)
+    {
+        return v1.X * v2.X
+            + v1.Y * v2.Y
+            + v1.Z * v2.Z;
+    }
+    inline int dot(int4 v1, int4 v2)
+    {
+        return v1.X * v2.X
+            + v1.Y * v2.Y
+            + v1.Z * v2.Z
+            + v1.W * v2.W;
+    }
     inline float dot(float v1, float v2)
     {
         return v1 * v2;
@@ -431,6 +491,22 @@ namespace math {
             + v1.W * v2.W;
     }
 
+    inline int lengthSquare(int v1)
+    {
+        return dot(v1, v1);
+    }
+    inline int lengthSquare(int2 v1)
+    {
+        return dot(v1, v1);
+    }
+    inline int lengthSquare(int3 v1)
+    {
+        return dot(v1, v1);
+    }
+    inline int lengthSquare(int4 v1)
+    {
+        return dot(v1, v1);
+    }
     inline float length(float v1)
     {
         return abs(v1);
@@ -464,23 +540,71 @@ namespace math {
         return sqrt(dot(v1, v1));
     }
 
+    inline int l1Dist(int v1, int v2)
+    {
+        return sum(abs(v1-v2));
+    }
+    inline int l1Dist(int2 v1, int2 v2)
+    {
+        return sum(abs(v1-v2));
+    }
+    inline int l1Dist(int3 v1, int3 v2)
+    {
+        return sum(abs(v1-v2));
+    }
+    inline int l1Dist(int4 v1, int4 v2)
+    {
+        return sum(abs(v1-v2));
+    }
+    inline int l1Dist(float v1, float v2)
+    {
+        return sum(abs(v1-v2));
+    }
+    inline float l1Dist(float2 v1, float2 v2)
+    {
+        return sum(abs(v1-v2));
+    }
+    inline float l1Dist(float3 v1, float3 v2)
+    {
+        return sum(abs(v1-v2));
+    }
+    inline float l1Dist(float4 v1, float4 v2)
+    {
+        return sum(abs(v1-v2));
+    }
     inline float dist(float v1, float v2)
     {
         return length(sub(v1,v2));
     }
     inline float dist(float2 v1, float2 v2)
     {
-        return length(sub(v1, v2));
+        return length(v1-v2);
     }
     inline float dist(float3 v1, float3 v2)
     {
-        return length(sub(v1, v2));
+        return length(v1-v2);
     }
     inline float dist(float4 v1, float4 v2)
     {
-        return length(sub(v1, v2));
+        return length(v1-v2);
     }
 
+    inline int distSquare(int v1, int v2)
+    {
+        return lengthSquare(v1-v2);
+    }
+    inline int distSquare(int2 v1, int2 v2)
+    {
+        return lengthSquare(v1 - v2);
+    }
+    inline int distSquare(int3 v1, int3 v2)
+    {
+        return lengthSquare(v1 - v2);
+    }
+    inline int distSquare(int4 v1, int4 v2)
+    {
+        return lengthSquare(v1 - v2);
+    }
     inline float3 cross(float3 v1, float3 v2)
     {
         return FVector3f::CrossProduct(v1,v2);
@@ -527,7 +651,7 @@ namespace math {
     }
     inline float3 cross_tri(float3 v1, float3 v2, float3 v3)
     {
-        return cross(sub(v1, v2), sub(v3, v2));
+        return cross(v1-v2, sub(v3, v2));
     }
     inline float area_tri(float3 v1, float3 v2, float3 v3)
     {

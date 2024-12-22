@@ -2,14 +2,14 @@
 #include "noise.h"
 
 namespace proc_assets {
-	void perlin(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float height) {
-		plane(offset, resX, resY, size, out, [scale, height](FVector& vertex) {return noise::perlin_noise_derivative(float2(double2(vertex)), scale) * height; });
+	void perlin(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float height, bool genTriangles) {
+		plane(offset, resX, resY, size, out, [scale, height](FVector& vertex) {return noise::perlin_noise_derivative(float2(double2(vertex)), scale) * height; }, genTriangles);
 	}
-    void perlin_fbm(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float heightPowerBase, const float scalePowerBase, int iterations, const float height) {
-        plane(offset, resX, resY, size, out, [scale, height, heightPowerBase, scalePowerBase, iterations](FVector& vertex) {return noise::perlin_fbm_derivative(float2(double2(vertex)), scale, height, heightPowerBase, scalePowerBase, iterations); });
+    void perlin_fbm(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float heightPowerBase, const float scalePowerBase, int iterations, const float height, bool genTriangles) {
+        plane(offset, resX, resY, size, out, [scale, height, heightPowerBase, scalePowerBase, iterations](FVector& vertex) {return noise::perlin_fbm_derivative(float2(double2(vertex)), scale, height, heightPowerBase, scalePowerBase, iterations); }, genTriangles);
     }
-	void morenoise(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float pointiness, const float scalingPowerBase, const int iterations, const float height) {
-		plane(offset, resX, resY, size, out, [scale, height, pointiness, scalingPowerBase, iterations](FVector& vertex) {return noise::morenoise(float2(double2(vertex)), scale, pointiness, scalingPowerBase, iterations) * height; });
+	void morenoise(double3 offset, int resX, int resY, float2 size, Mesh& out, const float scale, const float pointiness, const float scalingPowerBase, const int iterations, const float height, bool genTriangles) {
+		plane(offset, resX, resY, size, out, [scale, height, pointiness, scalingPowerBase, iterations](FVector& vertex) {return noise::morenoise(float2(double2(vertex)), scale, pointiness, scalingPowerBase, iterations) * height; }, genTriangles);
 	}
     void cube(double3 offset, int resX, int resY, int resZ, double3 size, Mesh& out) {
     }

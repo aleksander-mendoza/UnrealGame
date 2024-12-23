@@ -6,7 +6,9 @@
 #include "GameFramework/Actor.h"
 #include "Logging/StructuredLog.h"
 #include "ProceduralMeshComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "../blender/proc_assets.h"
+#include "FoliageParams.h"
 #include "WorldGenUtils.h"
 #include "WorldGen.generated.h"
 
@@ -58,6 +60,9 @@ public:
 	float seaLevel = -10;
 
 	UPROPERTY(BlueprintReadOnly)
+	UInstancedStaticMeshComponent* FoliageMesh;
+
+	UPROPERTY(BlueprintReadOnly)
 	UProceduralMeshComponent* TerrainMesh;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -65,6 +70,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float  rockDensity = 100;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FFoliageParams> FoliageParams;
 
 
 

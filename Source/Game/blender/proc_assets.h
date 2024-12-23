@@ -86,5 +86,12 @@ namespace proc_assets {
 	void cube(double3 offset, int resX, int resY, int resZ, double3 size, Mesh& out);
 	void cube_without_uvs(double3 offset, double3 size, Mesh& out);
 
+	void grass(int numBlades, double minHeight, double maxHeight, double maxAngle, double area);
+
+	void tree(int branchings);
+
+	void rock(double size);
+
+	void wall(double size);
 }
 

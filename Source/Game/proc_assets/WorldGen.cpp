@@ -9,51 +9,6 @@
 #include "Logging/StructuredLog.h"
 #include "../proc_assets/Rock.h"
 
-//void AWorldGen::shiftSurroundingChunksUp() {
-//	int diameter = getRenderDiameter();
-//	for (int x = 0; x < diameter; x++) {
-//		int i = x;
-//		int prev = surroundingChunks[i];
-//		for (int y = 0; y < diameter - 1; y++) {
-//			i += diameter;
-//			int next = surroundingChunks[i];
-//			surroundingChunks[i] = prev;
-//			prev = next;
-//		}
-//		chunksSectionWentBeyondRenderBoundary(x, prev);
-//	}
-//
-//}
-//void AWorldGen::shiftSurroundingChunksDown() {
-//	int diameter = getRenderDiameter();
-//	int dd = diameter * (diameter - 1);
-//	for (int x = 0; x < diameter; x++) {
-//		int i = x + dd;
-//		int prev = surroundingChunks[i];
-//		for (int y = 0; y < diameter - 1; y++) {
-//			i -= diameter;
-//			int next = surroundingChunks[i];
-//			surroundingChunks[i] = prev;
-//			prev = next;
-//		}
-//		chunksSectionWentBeyondRenderBoundary(x, prev);
-//	}
-//}
-//void AWorldGen::shiftSurroundingChunksRight() {
-//	int diameter = getRenderDiameter();
-//	for (int i = 0, y = 0; y < diameter; y++) {
-//		int j = i;
-//		int prev = surroundingChunks[j];
-//		for (int x = 0; x < diameter - 1; x++) {
-//			i++;
-//			int next = surroundingChunks[i];
-//			surroundingChunks[i] = prev;
-//			prev = next;
-//		}
-//		chunksSectionWentBeyondRenderBoundary(j, prev);
-//		i++;
-//	}
-//}
 void AWorldGen::shiftSurroundingChunks(int2 shift) {
 	
 	int diameter = getRenderDiameter();
@@ -129,13 +84,16 @@ const FString AWorldGen::toDebugStr()
 	return s;
 }
 // Sets default values
-AWorldGen::AWorldGen() : surroundingChunks(), unusedSectionIndices(), meshGenResult(), requestQueue()
+AWorldGen::AWorldGen() : unusedSectionIndices(), surroundingChunks(), meshGenResult(), requestQueue()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 	TerrainMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("TerrainMesh"));
 	TerrainMesh->SetupAttachment(GetRootComponent());
 	TerrainMesh->bUseAsyncCooking = true;
+
+	FoliageMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("FoliageMesh"));
+	TerrainMesh->SetupAttachment(TerrainMesh);
 
 }
 void AWorldGen::resetSurroundingChunks() {

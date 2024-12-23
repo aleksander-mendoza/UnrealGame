@@ -60,7 +60,7 @@ public:
 	float seaLevel = -10;
 
 	UPROPERTY(BlueprintReadOnly)
-	UInstancedStaticMeshComponent* FoliageMesh;
+	TArray<UInstancedStaticMeshComponent*> FoliageMeshes;
 
 	UPROPERTY(BlueprintReadOnly)
 	UProceduralMeshComponent* TerrainMesh;
@@ -68,8 +68,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UMaterialInterface* TerrainMaterial = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float  rockDensity = 100;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<FFoliageParams> FoliageParams;

@@ -12,6 +12,14 @@ struct GAME_API FFoliageParams
 {
 	GENERATED_BODY()
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool alignToNormal;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float maxRotation;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float density;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	UStaticMesh * Mesh;

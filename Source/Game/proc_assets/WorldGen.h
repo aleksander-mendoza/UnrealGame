@@ -73,7 +73,7 @@ public:
 	TArray<FFoliageParams> FoliageParams;
 
 
-
+	void PostInitializeComponents() override;
 private:
 	APawn* PlayerPawn=nullptr;
 	int2 absChunkOffset;
@@ -190,6 +190,10 @@ private:
 		proc_assets::perlin_fbm(offset, r.resX, r.resY, size, s.mesh, scale, scalingPowerBase, 1. / scalingPowerBase, numOfScales, maxHeight, uvScale, true);
 		s.mesh.hasTriangles = true;
 	}
+	inline void distributeFoliage(const int2 chunkAbsPos) {
+		for (int i = 0; i < FoliageParams.Num(); i++)distributeFoliage(chunkAbsPos, i);
+	}
+	void distributeFoliage(const int2 chunkAbsPos, const int foliageIdx);
 	inline MeshGenRequest makeChunkRequest(const int2 chunkAbsPos, const int resX, const int resY, bool dontOverwrite) {
 		const int chunkIdx = getChunkIdxFromAbsPos(chunkAbsPos);
 		check(chunkIdx >= 0);

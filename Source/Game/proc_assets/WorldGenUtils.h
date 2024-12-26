@@ -1,4 +1,6 @@
 #pragma once
+#include "../blender/proc_assets.h"
+#include "../blender/utildefines.h"
 
 struct ChunkDist {
 	int dist;

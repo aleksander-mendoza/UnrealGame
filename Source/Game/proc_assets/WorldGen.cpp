@@ -84,7 +84,7 @@ const FString AWorldGen::toDebugStr()
 	return s;
 }
 // Sets default values
-AWorldGen::AWorldGen() : unusedSectionIndices(), surroundingChunks(), meshGenResult(), requestQueue()
+AWorldGen::AWorldGen() : unusedSectionIndices(), meshGenResult(), surroundingChunks(), requestQueue()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -92,9 +92,18 @@ AWorldGen::AWorldGen() : unusedSectionIndices(), surroundingChunks(), meshGenRes
 	TerrainMesh->SetupAttachment(GetRootComponent());
 	TerrainMesh->bUseAsyncCooking = true;
 
-	FoliageMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("FoliageMesh"));
-	TerrainMesh->SetupAttachment(TerrainMesh);
+	
 
+}
+void AWorldGen::PostInitializeComponents()
+{
+	for (FFoliageParams params: FoliageParams) {
+		UInstancedStaticMeshComponent * foliageMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("FoliageMesh"));
+		FoliageMeshes.Add(foliageMesh);
+		foliageMesh->SetStaticMesh(params.Mesh);
+		TerrainMesh->SetupAttachment(foliageMesh);
+	}
+	
 }
 void AWorldGen::resetSurroundingChunks() {
 	this->TerrainMesh->ClearAllMeshSections();
@@ -124,6 +133,28 @@ void AWorldGen::BeginPlay()
 	check(requestQueue.IsEmpty());
 	check(!isMeshGenResultReady);
 	check(!isBusy);
+}
+
+void AWorldGen::distributeFoliage(const int2 chunkAbsPos, const int foliageIdx)
+{
+	const FFoliageParams& params = FoliageParams[foliageIdx];
+	const UInstancedStaticMeshComponent* instances = FoliageMeshes[foliageIdx];
+	const FVector offset = FVector(chunkAbsPos.X * this->chunkW, chunkAbsPos.Y * this->chunkH, this->seaLevel);
+	const int count = int(params.density * chunkW * chunkH);
+	const int seed = noise::hash(chunkAbsPos.X, chunkAbsPos.Y);
+	blender::RandomNumberGenerator rng(seed);
+	for (int i = 0; i < count; i++) {
+		if (params.alignToNormal) {
+			//const float2 position = offsetf + size * rng.get_float2();
+			//const float3 gradient_and_height = noise::morenoise(position, scale, pointiness, scalingPowerBase, numOfScales) * maxHeight;
+			//const float3 gradient_and_height = noise::perlin_noise_derivative(position, scale) * maxHeight;
+
+		}
+		else {
+
+		}
+	}
+
 }
 
 void AWorldGen::generateChunksInRadius(int2 centerPos, int radius, int resX, int resY, bool dontOverwrite) {

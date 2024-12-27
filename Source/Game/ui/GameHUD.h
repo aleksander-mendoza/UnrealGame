@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
 #include "Inventory.h"
+#include "RaceMenu.h"
+#include "../GameCharacter.h"
 #include "GameHUD.generated.h"
 
 /**
@@ -16,12 +18,33 @@ class GAME_API AGameHUD : public AHUD
 	GENERATED_BODY()
 
 public:
+
+	UPROPERTY(EditDefaultsOnly, Category = "User Interface")
+	TSubclassOf<URaceMenu> RaceMenuWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<URaceMenu> RaceMenuInterface;
+
 	UPROPERTY(EditDefaultsOnly, Category = "User Interface")
 	TSubclassOf<UInventory> InventoryWidgetClass;
 
 	UPROPERTY()
-	TObjectPtr<UUserWidget> InventoryInterface;
+	TObjectPtr<UInventory> InventoryInterface;
 
-	void showInventory();
-	void hideInventory();
+	inline TObjectPtr<UInventory> showInventory(AGameCharacter* GameCharacter) {
+		InventoryInterface = CreateWidget<UInventory>(GetWorld(), InventoryWidgetClass);
+		InventoryInterface->setInventory(GameCharacter->Inventory);
+		InventoryInterface->AddToViewport(9999); // Z-order, this just makes it render on the very top.
+		return InventoryInterface;
+	}
+	inline void hideInventory() {
+		InventoryInterface->RemoveFromParent();
+		InventoryInterface = nullptr;
+	}
+	inline bool isInventoryOpen() const {
+		return InventoryInterface != nullptr;
+	}
+	inline bool canOpenInventory() const {
+		return IsValid(InventoryWidgetClass);
+	}
 };

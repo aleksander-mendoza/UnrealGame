@@ -83,7 +83,7 @@ void AGameCharacter::ResetClothes()
 			clothingComp->RegisterComponent();
 			clothingComp->AttachToComponent(playerMesh, FAttachmentTransformRules::SnapToTargetIncludingScale);
 			clothingComp->SetSkeletalMesh(clothingMesh);
-			clothingComp->SetAnimClass(playerMesh->AnimClass);
+			clothingComp->SetAnimInstanceClass(playerMesh->AnimClass);
 			clothingComp->SetLeaderPoseComponent(playerMesh, true);
 			Clothes.Add(clothingComp);
 		}
@@ -111,45 +111,6 @@ void AGameCharacter::BeginPlay()
 //////////////////////////////////////////////////////////////////////////
 // Input
 
-void AGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	// Add Input Mapping Context
-	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
-	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
-		{
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
-		}
-	}
-	
-	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
-		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
-
-		// Moving
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AGameCharacter::Move);
-
-		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AGameCharacter::Look);
-
-		// Zoom in/out
-		EnhancedInputComponent->BindAction(ZoomInAction, ETriggerEvent::Triggered, this, &AGameCharacter::CameraZoomIn);
-		EnhancedInputComponent->BindAction(ZoomOutAction, ETriggerEvent::Triggered, this, &AGameCharacter::CameraZoomOut);
-		EnhancedInputComponent->BindAction(LockAction, ETriggerEvent::Started, this, &AGameCharacter::LockOntoEnemy);
-		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AGameCharacter::Interact);
-		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &AGameCharacter::Attack);
-
-		EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &AGameCharacter::TriggerInventory);
-		
-	}
-	else
-	{
-		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
-	}
-}
 void AGameCharacter::ToggleCamera(bool firstPersonView) {
 	FollowCamera->SetActive(!firstPersonView);
 	FirstPersonCamera->SetActive(firstPersonView);
@@ -162,7 +123,21 @@ void AGameCharacter::SetCameraDistance(float distance) {
 		this->GetCameraBoom()->TargetArmLength = math::min(MaxZoomOut, distance);
 	}
 }
+void AGameCharacter::CameraZoomOut(const FInputActionValue& Value) {
+	if (this->FirstPersonCamera->IsActive()) {
+		ToggleCamera(false);
+	}
+	else { // in third person view
+		this->GetCameraBoom()->TargetArmLength = math::min(this->GetCameraBoom()->TargetArmLength + ZoomSpeed, MaxZoomOut);
+	}
+}
+void AGameCharacter::CameraZoom(const FInputActionValue& Value) {
+	float zoom = Value.Get<FInputActionValue::Axis1D>();
+	if (zoom > 0)CameraZoomIn(Value);
+	else CameraZoomOut(Value);
+}
 void AGameCharacter::CameraZoomIn(const FInputActionValue& Value) {
+	
 	if (this->FollowCamera->IsActive()) { // in third person view
 		float arm = this->GetCameraBoom()->TargetArmLength;
 		if (arm <= MinZoomOut) {
@@ -202,14 +177,6 @@ void AGameCharacter::ToggleDirectionalMovement(bool trueDirectionalMovement) {
 	UCharacterMovementComponent * mov = this->GetCharacterMovement();
 	mov->bOrientRotationToMovement = trueDirectionalMovement;
 	mov->bUseControllerDesiredRotation = !trueDirectionalMovement;
-}
-void AGameCharacter::CameraZoomOut(const FInputActionValue& Value) {
-	if (this->FirstPersonCamera->IsActive()) {
-		ToggleCamera(false);
-	}
-	else { // in third person view
-		this->GetCameraBoom()->TargetArmLength = math::min(this->GetCameraBoom()->TargetArmLength+ZoomSpeed, MaxZoomOut);
-	}
 }
 UCameraComponent* AGameCharacter::GetCurrentCamera() {
 	return FollowCamera->IsActive() ? FollowCamera : FirstPersonCamera;
@@ -296,34 +263,6 @@ void AGameCharacter::Move(const FInputActionValue& Value)
 	}
 }
 void AGameCharacter::SetSwimming(bool isSwimming) {
-	
-}
-void AGameCharacter::TriggerInventory(const FInputActionValue& Value)
-{
-	if (IsValid(InventoryWidgetClass)) {
-		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
-		{
-			const bool openInv = InventoryInterface == nullptr;
-			PlayerController->SetShowMouseCursor(openInv);
-			PlayerController->SetPause(openInv);
-			if (openInv) {
-				FInputModeGameAndUI Mode;
-				Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
-				Mode.SetHideCursorDuringCapture(false);
-				InventoryInterface = CreateWidget<UInventory>(GetWorld(), InventoryWidgetClass);
-				InventoryInterface->setInventory(Inventory);
-				Mode.SetWidgetToFocus(InventoryInterface->TakeWidget());
-				InventoryInterface->AddToViewport(9999); // Z-order, this just makes it render on the very top.
-			}
-			else {
-				InventoryInterface->RemoveFromParent();
-				InventoryInterface = nullptr;
-				FInputModeGameOnly Mode;
-				PlayerController->SetInputMode(Mode);
-			}
-			
-		}
-	}
 	
 }
 

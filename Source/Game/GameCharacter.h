@@ -12,8 +12,6 @@
 
 class USpringArmComponent;
 class UCameraComponent;
-class UInputMappingContext;
-class UInputAction;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -37,52 +35,9 @@ class AGameCharacter : public ACharacter
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCamera;
 
-	/** Player Inventory */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UActorInventory * Inventory;
+	
 
-	/** MappingContext */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputMappingContext* DefaultMappingContext;
 
-	/** Jump Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* JumpAction;
-
-	/** Move Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* MoveAction;
-
-	/** Look Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* LookAction;
-
-	/** Lock Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* LockAction;
-
-	/** Zoom In Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* ZoomInAction;
-
-	/** Zoom Out Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* ZoomOutAction;
-
-	/** Attack Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* AttackAction;
-
-	/** Attack Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* InteractAction;
-
-	/** Lock Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* OpenInventoryAction;
-
-	UPROPERTY(EditDefaultsOnly, Category = "User Interface")
-	TSubclassOf<UInventory> InventoryWidgetClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UClass * WidgetClass;
@@ -100,37 +55,34 @@ class AGameCharacter : public ACharacter
 	bool IsAttacking=false;
 	bool DoNextCombo = false;
 
-	UPROPERTY()
-	TObjectPtr<UInventory> InventoryInterface;
 
 	UPROPERTY()
 	TArray<USkeletalMeshComponent*> Clothes;
 public:
+	/** Player Inventory */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+	UActorInventory* Inventory;
+
 	AGameCharacter();
 	
 	void ResetClothes();
 
-protected:
 	/** Called for attack input */
 	void Attack(const FInputActionValue& Value);
 	/** Called for lock-on input */
 	void LockOntoEnemy(const FInputActionValue& Value);
 	/** Called for interaction input */
 	void Interact(const FInputActionValue& Value);
-	/** Called for camera zoom in input */
+	/** Called for camera zoom input */
 	void CameraZoomIn(const FInputActionValue& Value);
-	/** Called for camera zoom out input */
 	void CameraZoomOut(const FInputActionValue& Value);
-
+	void CameraZoom(const FInputActionValue& Value);
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
 
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 
-	/** Called on open/close inventory input */
-	void TriggerInventory(const FInputActionValue& Value);
-public:
 	/**If actor is null pinter then it clears the lock*/
 	void LockOntoTarget(AActor * target);
 	/**Toggle between first person camera and third person camera.*/
@@ -150,9 +102,6 @@ public:
 	
 
 protected:
-	// APawn interface
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-	
 	// To add mapping context
 	virtual void BeginPlay();
 	virtual void Tick(float DeltaTime) override;

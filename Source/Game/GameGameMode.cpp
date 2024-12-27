@@ -3,6 +3,8 @@
 #include "GameGameMode.h"
 #include "GameCharacter.h"
 #include "UObject/ConstructorHelpers.h"
+#include "ui/GameHUD.h"
+#include "GamePlayerController.h"
 
 AGameGameMode::AGameGameMode()
 {
@@ -12,4 +14,6 @@ AGameGameMode::AGameGameMode()
 	{
 		DefaultPawnClass = PlayerPawnBPClass.Class;
 	}
+	HUDClass = AGameHUD::StaticClass();
+	PlayerControllerClass = AGamePlayerController::StaticClass();
 }

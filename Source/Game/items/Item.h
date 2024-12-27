@@ -93,6 +93,7 @@ struct GAME_API FItem : public FTableRowBase
 	// 3 = bow
 	// 4 = spear/staff
 	// 5 = single handed quiet weapon (for sneaking)
+	// 6 = shield
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 Class;
 
@@ -100,8 +101,8 @@ struct GAME_API FItem : public FTableRowBase
 	float Weight;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	UStaticMesh* Mesh;
+	TSoftObjectPtr<UStaticMesh> Mesh;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	USkeletalMesh* WearableMesh;
+	TSoftObjectPtr<USkeletalMesh> WearableMesh;
 };

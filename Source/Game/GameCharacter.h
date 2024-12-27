@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
 #include "ui/TargetLockWidgetActor.h"
+#include "ui/Inventory.h"
+#include "items/ActorInventory.h" 
 #include "GameCharacter.generated.h"
 
 class USpringArmComponent;
@@ -34,6 +36,10 @@ class AGameCharacter : public ACharacter
 	/** First Person camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCamera;
+
+	/** Player Inventory */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UActorInventory * Inventory;
 
 	/** MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -71,7 +77,13 @@ class AGameCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* InteractAction;
 
-	/** Attack Input Action */
+	/** Lock Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* OpenInventoryAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "User Interface")
+	TSubclassOf<UInventory> InventoryWidgetClass;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UClass * WidgetClass;
 	AActor* TargetLockActor = nullptr;
@@ -87,9 +99,16 @@ class AGameCharacter : public ACharacter
 	UAnimMontage* AttackComboAnim;
 	bool IsAttacking=false;
 	bool DoNextCombo = false;
+
+	UPROPERTY()
+	TObjectPtr<UInventory> InventoryInterface;
+
+	UPROPERTY()
+	TArray<USkeletalMeshComponent*> Clothes;
 public:
 	AGameCharacter();
 	
+	void ResetClothes();
 
 protected:
 	/** Called for attack input */
@@ -108,6 +127,9 @@ protected:
 
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
+
+	/** Called on open/close inventory input */
+	void TriggerInventory(const FInputActionValue& Value);
 public:
 	/**If actor is null pinter then it clears the lock*/
 	void LockOntoTarget(AActor * target);
@@ -124,6 +146,8 @@ public:
 	void OnComboPartEnd(bool isLast);
 
 	void SetSwimming(bool isSwimming);
+
+	
 
 protected:
 	// APawn interface

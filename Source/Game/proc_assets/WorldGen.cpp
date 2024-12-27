@@ -97,6 +97,7 @@ AWorldGen::AWorldGen() : unusedSectionIndices(), meshGenResult(), surroundingChu
 }
 void AWorldGen::PostInitializeComponents()
 {
+	Super::PostInitializeComponents();
 	for (FFoliageParams params: FoliageParams) {
 		UInstancedStaticMeshComponent * foliageMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("FoliageMesh"));
 		FoliageMeshes.Add(foliageMesh);

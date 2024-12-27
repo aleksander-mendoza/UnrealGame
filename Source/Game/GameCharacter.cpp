@@ -64,8 +64,30 @@ AGameCharacter::AGameCharacter()
 	FirstPersonCamera->bUsePawnControlRotation = true; // Camera rotates relative to head
 	FirstPersonCamera->SetActive(false);
 
+
+	Inventory = CreateDefaultSubobject<UActorInventory>(TEXT("PlayerInventory"));
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+
+}
+
+void AGameCharacter::ResetClothes()
+{
+	USkeletalMeshComponent * playerMesh = GetMesh();
+	for (int i = 0; i < Inventory->Clothes.Num(); i++) { 
+		const UItemObject * clothingItem = Inventory->Clothes[i];
+		const FItem * row = clothingItem->Instance.getRow();
+		if (row->WearableMesh) {
+			USkeletalMesh* clothingMesh = row->WearableMesh.Get();
+			USkeletalMeshComponent* clothingComp = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass());
+			clothingComp->RegisterComponent();
+			clothingComp->AttachToComponent(playerMesh, FAttachmentTransformRules::SnapToTargetIncludingScale);
+			clothingComp->SetSkeletalMesh(clothingMesh);
+			clothingComp->SetAnimClass(playerMesh->AnimClass);
+			clothingComp->SetLeaderPoseComponent(playerMesh, true);
+			Clothes.Add(clothingComp);
+		}
+	}
 }
 
 void AGameCharacter::BeginPlay()
@@ -74,7 +96,7 @@ void AGameCharacter::BeginPlay()
 	Super::BeginPlay();
 	if (AttackComboAnim != nullptr) {
 		int n = AttackComboAnim->Notifies.Num();
-		for (int i = 0; i < n; i++) {
+		for (int i = 0; i < n; i++) { 
 			if (UNotifyCombo* notify = Cast<UNotifyCombo>(AttackComboAnim->Notifies[i].Notify)) {
 				notify->Owner = this;
 				notify->IsLast = i+1==n;
@@ -82,6 +104,8 @@ void AGameCharacter::BeginPlay()
 		}
 	}
 	ToggleDirectionalMovement(true);
+	Inventory->ResetToDefault();
+	ResetClothes();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -117,6 +141,9 @@ void AGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 		EnhancedInputComponent->BindAction(LockAction, ETriggerEvent::Started, this, &AGameCharacter::LockOntoEnemy);
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AGameCharacter::Interact);
 		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &AGameCharacter::Attack);
+
+		EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &AGameCharacter::TriggerInventory);
+		
 	}
 	else
 	{
@@ -271,6 +298,35 @@ void AGameCharacter::Move(const FInputActionValue& Value)
 void AGameCharacter::SetSwimming(bool isSwimming) {
 	
 }
+void AGameCharacter::TriggerInventory(const FInputActionValue& Value)
+{
+	if (IsValid(InventoryWidgetClass)) {
+		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+		{
+			const bool openInv = InventoryInterface == nullptr;
+			PlayerController->SetShowMouseCursor(openInv);
+			PlayerController->SetPause(openInv);
+			if (openInv) {
+				FInputModeGameAndUI Mode;
+				Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+				Mode.SetHideCursorDuringCapture(false);
+				InventoryInterface = CreateWidget<UInventory>(GetWorld(), InventoryWidgetClass);
+				InventoryInterface->setInventory(Inventory);
+				Mode.SetWidgetToFocus(InventoryInterface->TakeWidget());
+				InventoryInterface->AddToViewport(9999); // Z-order, this just makes it render on the very top.
+			}
+			else {
+				InventoryInterface->RemoveFromParent();
+				InventoryInterface = nullptr;
+				FInputModeGameOnly Mode;
+				PlayerController->SetInputMode(Mode);
+			}
+			
+		}
+	}
+	
+}
+
 void AGameCharacter::Look(const FInputActionValue& Value)
 {
 	// input is a Vector2D

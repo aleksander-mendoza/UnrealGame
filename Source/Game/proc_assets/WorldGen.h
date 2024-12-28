@@ -59,8 +59,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float seaLevel = -10;
 
-	UPROPERTY(BlueprintReadOnly)
-	TArray<UInstancedStaticMeshComponent*> FoliageMeshes;
 
 	UPROPERTY(BlueprintReadOnly)
 	UProceduralMeshComponent* TerrainMesh;
@@ -69,8 +67,12 @@ public:
 	UMaterialInterface* TerrainMaterial = nullptr;
 
 
+	
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<FFoliageParams> FoliageParams;
+
+	
 
 
 	void PostInitializeComponents() override;
@@ -83,6 +85,7 @@ private:
 	MeshGenResult meshGenResult;
 	TArray<int> surroundingChunks;
 	TQueue<MeshGenRequest> requestQueue;
+
 	inline const int getChunkIdxFromRelPos(int2 chunkRelPos) {
 		int diameter = getRenderDiameter();
 		if (chunkRelPos.Y < 0 || chunkRelPos.Y >= diameter || chunkRelPos.X < 0 || chunkRelPos.X >= diameter)return -1;
@@ -116,7 +119,17 @@ private:
 		int chunkY = chunkIdx / diameter;
 		return int2(chunkX, chunkY);
 	}
-
+	inline FoliageChunk * getFoliageChunkAtAbsPos(int foliageIdx, int2 chunkAbsPos) {
+		return getFoliageChunk(foliageIdx,getChunkIdxFromAbsPos(chunkAbsPos));
+	}
+	inline FoliageChunk * getFoliageChunkAtRelPos(int foliageIdx, int2 chunkRelPos) {
+		return getFoliageChunk(foliageIdx, getChunkIdxFromRelPos(chunkRelPos));
+	}
+	inline FoliageChunk * getFoliageChunk(int foliageIdx, int chunkIdx) {
+		if (chunkIdx < 0)return nullptr;
+		check(chunkIdx < getRenderArea());
+		return &FoliageParams[foliageIdx].cache.chunks[chunkIdx];
+	}
 	inline const int getSectionIdx(int chunkIdx) {
 		if (chunkIdx < 0) return -1;
 		return this->surroundingChunks[chunkIdx];
@@ -190,8 +203,8 @@ private:
 		proc_assets::perlin_fbm(offset, r.resX, r.resY, size, s.mesh, scale, scalingPowerBase, 1. / scalingPowerBase, numOfScales, maxHeight, uvScale, true);
 		s.mesh.hasTriangles = true;
 	}
-	inline void distributeFoliage(const int2 chunkAbsPos) {
-		for (int i = 0; i < FoliageParams.Num(); i++)distributeFoliage(chunkAbsPos, i);
+	inline void generateFoliage(const int2 chunkAbsPos, const int foliageRadius) {
+		for (int i = 0; i < FoliageParams.Num() && FoliageParams[i].spawnRadius >= foliageRadius; i++)distributeFoliage(chunkAbsPos, i);
 	}
 	void distributeFoliage(const int2 chunkAbsPos, const int foliageIdx);
 	inline MeshGenRequest makeChunkRequest(const int2 chunkAbsPos, const int resX, const int resY, bool dontOverwrite) {
@@ -209,9 +222,10 @@ private:
 		}
 		return r;
 	}
-	inline void generateAndAddChunk(const int2 chunkAbsPos, const int resX, const int resY, bool dontOverwrite) {
+	inline void generateAndAddChunk(const int2 chunkAbsPos, const int resX, const int resY, bool dontOverwrite, int foliageRadius) {
 		MeshGenRequest r = makeChunkRequest(chunkAbsPos, resX, resY, dontOverwrite);
 		generateAndAddChunk(r);
+		generateFoliage(chunkAbsPos, foliageRadius);
 	}
 	inline void generateAndAddChunk(MeshGenRequest & r) {
 		if (r.sectionIdx >= 0) {
@@ -230,7 +244,7 @@ private:
 			generateChunk(r, meshGenResult);
 		}
 	}
-	void generateChunksInRadius(int2 centerPos, int radius, int resX, int resY, bool dontOverwrite);
+	void generateChunksInRadius(int2 centerPos, int radius, int resX, int resY, bool dontOverwrite, bool genFoliage);
 	inline void requestChunk(const int2 chunkAbsPos, int resX, int resY, bool dontOverwrite) {
 		requestChunk(makeChunkRequest(chunkAbsPos, resX, resY, dontOverwrite));
 	}

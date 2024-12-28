@@ -96,13 +96,18 @@ AWorldGen::AWorldGen() : unusedSectionIndices(), meshGenResult(), surroundingChu
 
 }
 void AWorldGen::PostInitializeComponents()
-{
+{ 
 	Super::PostInitializeComponents();
-	for (FFoliageParams params: FoliageParams) {
-		UInstancedStaticMeshComponent * foliageMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("FoliageMesh"));
-		FoliageMeshes.Add(foliageMesh);
-		foliageMesh->SetStaticMesh(params.Mesh);
-		TerrainMesh->SetupAttachment(foliageMesh);
+	FoliageParams.Sort([](const FFoliageParams& ip1, const FFoliageParams& ip2) {
+		return  ip1.spawnRadius > ip2.spawnRadius;
+	});
+	for (FFoliageParams & params: FoliageParams) {
+		params.InstancedMesh = NewObject<UInstancedStaticMeshComponent>(this,UInstancedStaticMeshComponent::StaticClass(), TEXT("FoliageMesh"));
+		params.InstancedMesh->bDisableCollision = !params.hasCollisions;
+		params.InstancedMesh->SetRemoveSwap();
+		params.InstancedMesh->SetStaticMesh(params.Mesh);
+		params.InstancedMesh->RegisterComponent();
+		params.InstancedMesh->AttachToComponent(TerrainMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 	}
 	
 }
@@ -113,13 +118,17 @@ void AWorldGen::resetSurroundingChunks() {
 	int renderArea = this->getRenderArea();
 	surroundingChunks.Reserve(renderArea);
 	unusedSectionIndices.Reserve(renderArea);
+	for (FFoliageParams& params : FoliageParams) {
+		params.resetCache(renderArea);
+	}
 	while (surroundingChunks.Num() < renderArea) {
 		unusedSectionIndices.Add(surroundingChunks.Num());
 		surroundingChunks.Add(-1);
 		check(unusedSectionIndices.Last() >= 0);
 	}
-	check(unusedSectionIndices.Num() == surroundingChunks.Num());
+	check(surroundingChunks.Num() == renderArea);
 	check(unusedSectionIndices.Num() == renderArea);
+	
 }
 // Called when the game starts or when spawned
 void AWorldGen::BeginPlay()
@@ -130,7 +139,7 @@ void AWorldGen::BeginPlay()
 	PlayerPawn = player->GetPawn();
 	resetCenter();
 	resetSurroundingChunks();
-	generateChunksInRadius(absChunkOffset, detailedRenderRadius, resolutionX, resolutionY, true);
+	generateChunksInRadius(absChunkOffset, detailedRenderRadius, resolutionX, resolutionY, true, true);
 	check(requestQueue.IsEmpty());
 	check(!isMeshGenResultReady);
 	check(!isBusy);
@@ -139,11 +148,11 @@ void AWorldGen::BeginPlay()
 void AWorldGen::distributeFoliage(const int2 chunkAbsPos, const int foliageIdx)
 {
 	const FFoliageParams& params = FoliageParams[foliageIdx];
-	const UInstancedStaticMeshComponent* instances = FoliageMeshes[foliageIdx];
 	const FVector offset = FVector(chunkAbsPos.X * this->chunkW, chunkAbsPos.Y * this->chunkH, this->seaLevel);
 	const int count = int(params.density * chunkW * chunkH);
 	const int seed = noise::hash(chunkAbsPos.X, chunkAbsPos.Y);
 	blender::RandomNumberGenerator rng(seed);
+	
 	for (int i = 0; i < count; i++) {
 		if (params.alignToNormal) {
 			//const float2 position = offsetf + size * rng.get_float2();
@@ -158,16 +167,17 @@ void AWorldGen::distributeFoliage(const int2 chunkAbsPos, const int foliageIdx)
 
 }
 
-void AWorldGen::generateChunksInRadius(int2 centerPos, int radius, int resX, int resY, bool dontOverwrite) {
-	generateAndAddChunk(centerPos, resX, resY, dontOverwrite);
+void AWorldGen::generateChunksInRadius(int2 centerPos, int radius, int resX, int resY, bool dontOverwrite, bool genFoliage) {
+	generateAndAddChunk(centerPos, resX, resY, dontOverwrite, genFoliage ? radius : 0);
 	for (int dist = 1; dist <= radius; dist++) {
+		const int foliageRadius = genFoliage?radius:-1;
 		for (int x = centerPos.X - dist; x <= centerPos.X + dist; x++) {
-			generateAndAddChunk(int2(x, centerPos.Y + dist), resX, resY, dontOverwrite);
-			generateAndAddChunk(int2(x, centerPos.Y - dist), resX, resY, dontOverwrite);
+			generateAndAddChunk(int2(x, centerPos.Y + dist), resX, resY, dontOverwrite, foliageRadius);
+			generateAndAddChunk(int2(x, centerPos.Y - dist), resX, resY, dontOverwrite, foliageRadius);
 		}
 		for (int y = centerPos.Y - dist + 1; y < centerPos.Y + dist; y++) {
-			generateAndAddChunk(int2(centerPos.X - dist, y), resX, resY, dontOverwrite);
-			generateAndAddChunk(int2(centerPos.X + dist, y), resX, resY, dontOverwrite);
+			generateAndAddChunk(int2(centerPos.X - dist, y), resX, resY, dontOverwrite, foliageRadius);
+			generateAndAddChunk(int2(centerPos.X + dist, y), resX, resY, dontOverwrite, foliageRadius);
 		}
 	}
 }

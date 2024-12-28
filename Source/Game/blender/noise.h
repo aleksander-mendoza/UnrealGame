@@ -188,15 +188,39 @@ namespace noise {
             mix(v8, v9, v10, v11, v12, v13, v14, v15, x, y, z),
             w);
     }
-
-    float3 perlin_noise_derivative(float2 position);
-    float3 perlin_noise_derivative(float2 position, float scale);
-    float3 perlin_noise_derivative(float2 position, float distanceScale, float heightScale);
+    
 
     float perlin_noise(float position);
     float perlin_noise(float2 position);
     float perlin_noise(float3 position);
     float perlin_noise(float4 position);
+
+    float3 perlin_noise_derivative(float2 position);
+    //float3 perlin_noise_derivative(float2 position, float scale);
+    //float perlin_noise(float2 position, float scale);
+    //float3 perlin_noise_derivative(float2 position, float distanceScale, float heightScale);
+
+
+    inline float3 perlin_noise_derivative(float2 position, float distanceScale, float heightScale) {
+        float3 der_and_height = perlin_noise_derivative(position * distanceScale) * heightScale;
+        der_and_height.X *= distanceScale;
+        der_and_height.Y *= distanceScale;
+        return der_and_height;
+    }
+    inline float perlin_noise(float2 position, float distanceScale, float heightScale) {
+        return perlin_noise(position * distanceScale) * heightScale;
+    }
+    inline float3 perlin_noise_derivative(float2 position, float scale) {
+        float3 der_and_height = perlin_noise_derivative(position * scale);
+        der_and_height.Z /= scale;
+        return der_and_height;
+    }
+    inline float perlin_noise(float2 position, float scale) {
+        float height = perlin_noise(position * scale);
+        height /= scale;
+        return height;
+    }
+
 
 	/* Perlin noise in the range [-1, 1]. */
 
@@ -213,62 +237,8 @@ namespace noise {
 	float perlin(float4 position);
 
 
-    /* Perlin fractal Brownian motion. */
-
-    template<typename T>
-    float perlin_fbm(T p, float detail, float roughness, float lacunarity, bool normalize);
-
-    /* Distorted fractal perlin noise. */
-
-    template<typename T>
-    float perlin_fractal_distorted(T position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize);
-
-    /* Distorted fractal perlin noise that outputs a float3. */
-
-    float3 perlin_float3_fractal_distorted(float position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize);
-    float3 perlin_float3_fractal_distorted(float2 position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize);
-    float3 perlin_float3_fractal_distorted(float3 position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize);
-    float3 perlin_float3_fractal_distorted(float4 position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize);
+    
+    /* white noise */
 
     float3 random_vector(float3& min_value, float3& max_value, int id, int seed);
     float random_float(float min_value, float max_value, int id, int seed);
@@ -276,9 +246,28 @@ namespace noise {
     bool random_bool(float probability, int id, int seed);
     float3 morenoise(float2 position, float scale, float pointiness, float scalePowerBase, int iterations);
     float3 morenoise(float2 position, float pointiness, float scalePowerBase, int iterations);
-    float3 perlin_fbm_derivative(float2 position, float fscale, float height, const float heightPowerBase, const float scalePowerBase, int iterations);
+    /* Perlin fractal Brownian motion. */
 
-
+    inline float perlin_fbm(float2 position, float fscale, float height, const float heightPowerBase, const float scalePowerBase, int iterations) {
+        float sum = 0;
+        while (iterations-- > 0) {
+            float v = perlin_noise(position, fscale, height);
+            sum += v;
+            height *= heightPowerBase;
+            fscale *= scalePowerBase;
+        }
+        return sum;
+    }
+    inline float3 perlin_fbm_derivative(float2 position, float fscale, float height, const float heightPowerBase, const float scalePowerBase, int iterations) {
+        float3 sum(0, 0, 0);
+        while (iterations-- > 0) {
+            float3 v = perlin_noise_derivative(position, fscale, height);
+            sum += v;
+            height *= heightPowerBase;
+            fscale *= scalePowerBase;
+        }
+        return sum;
+    }
 
     template <typename F, typename R>
     void distribute_points_on_faces(const TArray<double3>& vertices, const TArray<int32>& triangles, F&& densityFunction, R&& resultCollectorFunction, const int seed) {

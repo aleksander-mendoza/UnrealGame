@@ -437,17 +437,6 @@ namespace noise {
 
         return r;
     }
-    float3 perlin_noise_derivative(float2 position, float distanceScale, float heightScale) {
-        float3 der_and_height = perlin_noise_derivative(position * distanceScale) * heightScale;
-        der_and_height.X *= distanceScale;
-        der_and_height.Y *= distanceScale;
-        return der_and_height;
-    }
-    float3 perlin_noise_derivative(float2 position, float scale) {
-        float3 der_and_height = perlin_noise_derivative(position * scale);
-        der_and_height.Z /= scale;
-        return der_and_height;
-    }
     struct PerlinValue{
         float r;
         float r_der_x;
@@ -661,45 +650,7 @@ namespace noise {
 
     /* Fractal perlin noise. */
 
-    /* fBM = Fractal Brownian Motion */
-    template<typename T>
-    float perlin_fbm(
-        T p, const float detail, const float roughness, const float lacunarity, const bool normalize)
-    {
-        float fscale = 1.0f;
-        float amp = 1.0f;
-        float maxamp = 0.0f;
-        float sum = 0.0f;
-
-        for (int i = 0; i <= int(detail); i++) {
-            float t = perlin_signed(fscale * p);
-            sum += t * amp;
-            maxamp += amp;
-            amp *= roughness;
-            fscale *= lacunarity;
-        }
-        float rmd = detail - math::floor(detail);
-        if (rmd != 0.0f) {
-            float t = perlin_signed(fscale * p);
-            float sum2 = sum + t * amp;
-            return normalize ? mix(0.5f * sum / maxamp + 0.5f, 0.5f * sum2 / (maxamp + amp) + 0.5f, rmd) :
-                mix(sum, sum2, rmd);
-        }
-        return normalize ? 0.5f * sum / maxamp + 0.5f : sum;
-    }
-
-    /* Explicit instantiation for Wave Texture. */
-    template float perlin_fbm<float3>(float3 p,
-        const float detail,
-        const float roughness,
-        const float lacunarity,
-        const bool normalize);
-
-    template float perlin_fbm<float2>(float2 p,
-        const float detail,
-        const float roughness,
-        const float lacunarity,
-        const bool normalize);
+  
 
     template<typename T>
     float perlin_multi_fractal(T p, const float detail, const float roughness, const float lacunarity)
@@ -811,45 +762,6 @@ namespace noise {
         return value;
     }
 
-    enum {
-        NOISE_SHD_PERLIN_MULTIFRACTAL = 0,
-        NOISE_SHD_PERLIN_FBM = 1,
-        NOISE_SHD_PERLIN_HYBRID_MULTIFRACTAL = 2,
-        NOISE_SHD_PERLIN_RIDGED_MULTIFRACTAL = 3,
-        NOISE_SHD_PERLIN_HETERO_TERRAIN = 4,
-    };
-
-    template<typename T>
-    float perlin_select(T p,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        int type,
-        bool normalize)
-    {
-        switch (type) {
-        case NOISE_SHD_PERLIN_MULTIFRACTAL: {
-            return perlin_multi_fractal<T>(p, detail, roughness, lacunarity);
-        }
-        case NOISE_SHD_PERLIN_FBM: {
-            return perlin_fbm<T>(p, detail, roughness, lacunarity, normalize);
-        }
-        case NOISE_SHD_PERLIN_HYBRID_MULTIFRACTAL: {
-            return perlin_hybrid_multi_fractal<T>(p, detail, roughness, lacunarity, offset, gain);
-        }
-        case NOISE_SHD_PERLIN_RIDGED_MULTIFRACTAL: {
-            return perlin_ridged_multi_fractal<T>(p, detail, roughness, lacunarity, offset, gain);
-        }
-        case NOISE_SHD_PERLIN_HETERO_TERRAIN: {
-            return perlin_hetero_terrain<T>(p, detail, roughness, lacunarity, offset);
-        }
-        default: {
-            return 0.0;
-        }
-        }
-    }
 
     /* The following offset functions generate random offsets to be added to
      * positions to act as a seed since the noise functions don't have seed values.
@@ -929,169 +841,6 @@ namespace noise {
         return perlin_select<T>(position, detail, roughness, lacunarity, offset, gain, type, normalize);
     }
 
-    template float perlin_fractal_distorted<float>(float position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize);
-    template float perlin_fractal_distorted<float2>(float2 position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize);
-    template float perlin_fractal_distorted<float3>(float3 position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize);
-    template float perlin_fractal_distorted<float4>(float4 position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize);
-
-    /* Distorted fractal perlin noise that outputs a float3. The arbitrary seeds are for
-     * compatibility with shading functions. */
-
-    float3 perlin_float3_fractal_distorted(float position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize)
-    {
-        position += perlin_distortion(position, distortion);
-        return float3(
-            perlin_select<float>(position, detail, roughness, lacunarity, offset, gain, type, normalize),
-            perlin_select<float>(position + random_float_offset(1.0f),
-                detail,
-                roughness,
-                lacunarity,
-                offset,
-                gain,
-                type,
-                normalize),
-            perlin_select<float>(position + random_float_offset(2.0f),
-                detail,
-                roughness,
-                lacunarity,
-                offset,
-                gain,
-                type,
-                normalize));
-    }
-
-    float3 perlin_float3_fractal_distorted(float2 position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize)
-    {
-        position += perlin_distortion(position, distortion);
-        return float3(perlin_select<float2>(
-            position, detail, roughness, lacunarity, offset, gain, type, normalize),
-            perlin_select<float2>(position + random_float2_offset(2.0f),
-                detail,
-                roughness,
-                lacunarity,
-                offset,
-                gain,
-                type,
-                normalize),
-            perlin_select<float2>(position + random_float2_offset(3.0f),
-                detail,
-                roughness,
-                lacunarity,
-                offset,
-                gain,
-                type,
-                normalize));
-    }
-
-    float3 perlin_float3_fractal_distorted(float3 position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize)
-    {
-        position += perlin_distortion(position, distortion);
-        return float3(perlin_select<float3>(
-            position, detail, roughness, lacunarity, offset, gain, type, normalize),
-            perlin_select<float3>(position + random_float3_offset(3.0f),
-                detail,
-                roughness,
-                lacunarity,
-                offset,
-                gain,
-                type,
-                normalize),
-            perlin_select<float3>(position + random_float3_offset(4.0f),
-                detail,
-                roughness,
-                lacunarity,
-                offset,
-                gain,
-                type,
-                normalize));
-    }
-
-    float3 perlin_float3_fractal_distorted(float4 position,
-        float detail,
-        float roughness,
-        float lacunarity,
-        float offset,
-        float gain,
-        float distortion,
-        int type,
-        bool normalize)
-    {
-        position += perlin_distortion(position, distortion);
-        return float3(perlin_select<float4>(
-            position, detail, roughness, lacunarity, offset, gain, type, normalize),
-            perlin_select<float4>(position + random_float4_offset(4.0f),
-                detail,
-                roughness,
-                lacunarity,
-                offset,
-                gain,
-                type,
-                normalize),
-            perlin_select<float4>(position + random_float4_offset(5.0f),
-                detail,
-                roughness,
-                lacunarity,
-                offset,
-                gain,
-                type,
-                normalize));
-    }
 
     float3 random_vector(float3& min_value, float3& max_value, int id, int seed) {
         const float x = hash_to_float(seed, id, 0);
@@ -1157,15 +906,6 @@ namespace noise {
         return out;
     }
 
-   
-    float3 perlin_fbm_derivative(float2 position, float fscale, float height, const float heightPowerBase, const float scalePowerBase, int iterations) {
-       float3 sum(0, 0, 0);
-       while (iterations-- > 0) {
-            float3 v = perlin_noise_derivative(position, fscale, height);
-            sum += v;
-            height *= heightPowerBase;
-            fscale *= scalePowerBase;
-       }
-       return sum;
-    }
+
+
 }

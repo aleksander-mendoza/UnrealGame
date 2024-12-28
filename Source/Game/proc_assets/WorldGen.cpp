@@ -102,6 +102,7 @@ void AWorldGen::PostInitializeComponents()
 		return  ip1.spawnRadius > ip2.spawnRadius;
 	});
 	for (FFoliageParams & params: FoliageParams) {
+		params.spawnRadius = math::min(params.spawnRadius, renderRadius-1);
 		params.InstancedMesh = NewObject<UInstancedStaticMeshComponent>(this,UInstancedStaticMeshComponent::StaticClass(), TEXT("FoliageMesh"));
 		params.InstancedMesh->bDisableCollision = !params.hasCollisions;
 		params.InstancedMesh->SetRemoveSwap();
@@ -139,45 +140,57 @@ void AWorldGen::BeginPlay()
 	PlayerPawn = player->GetPawn();
 	resetCenter();
 	resetSurroundingChunks();
-	generateChunksInRadius(absChunkOffset, detailedRenderRadius, resolutionX, resolutionY, true, true);
+	generateChunksAroundPlayer(false);
 	check(requestQueue.IsEmpty());
 	check(!isMeshGenResultReady);
 	check(!isBusy);
 }
 
-void AWorldGen::distributeFoliage(const int2 chunkAbsPos, const int foliageIdx)
+void AWorldGen::distributeFoliage(const MeshGenRequest& r, const int foliageIdx)
 {
-	const FFoliageParams& params = FoliageParams[foliageIdx];
-	const FVector offset = FVector(chunkAbsPos.X * this->chunkW, chunkAbsPos.Y * this->chunkH, this->seaLevel);
-	const int count = int(params.density * chunkW * chunkH);
-	const int seed = noise::hash(chunkAbsPos.X, chunkAbsPos.Y);
+	FFoliageParams& params = FoliageParams[foliageIdx];
+	FoliageChunk & chunk = params.cache.sections[r.sectionIdx];
+	if (chunk.isPopulated) {
+		return;
+	}
+	const float2 size = float2(this->chunkW, this->chunkH);
+	const float2 offset = float2(r.chunkAbsPos.X * this->chunkW, r.chunkAbsPos.Y * this->chunkH);
+	const int count = math::min(int(params.density * chunkW * chunkH), 1000);
+	const int seed = noise::hash(r.chunkAbsPos.X, r.chunkAbsPos.Y);
 	blender::RandomNumberGenerator rng(seed);
 	
 	for (int i = 0; i < count; i++) {
+		const float2 position = offset + size * rng.get_float2();
+		float3 position3d = float3(position.X, position.Y, seaLevel);
+		FRotator3d rot;
 		if (params.alignToNormal) {
-			//const float2 position = offsetf + size * rng.get_float2();
-			//const float3 gradient_and_height = noise::morenoise(position, scale, pointiness, scalingPowerBase, numOfScales) * maxHeight;
-			//const float3 gradient_and_height = noise::perlin_noise_derivative(position, scale) * maxHeight;
-
+			const float3 gradient_and_height = get_height_with_derivative(position);
+			const double3 normal = math::normalize(math::normal(double2(float2(gradient_and_height))));
+			rot = normal.Rotation();
+			position3d.Z += gradient_and_height.Z;
 		}
 		else {
-
+			position3d.Z += get_height(position);
 		}
+		if (params.maxRotation > 0) {
+			rot.Roll = rng.get_float() * params.maxRotation ;
+		}
+		params.addInstance(r.sectionIdx, FTransform(rot, double3(position3d)));
 	}
+	chunk.isPopulated = true;
 
 }
 
-void AWorldGen::generateChunksInRadius(int2 centerPos, int radius, int resX, int resY, bool dontOverwrite, bool genFoliage) {
-	generateAndAddChunk(centerPos, resX, resY, dontOverwrite, genFoliage ? radius : 0);
+void AWorldGen::generateChunksInRadius(int2 chunkAbsPos, int radius, int resX, int resY, bool async) {
+	generateChunk(chunkAbsPos, resX, resY, async, 0);
 	for (int dist = 1; dist <= radius; dist++) {
-		const int foliageRadius = genFoliage?radius:-1;
-		for (int x = centerPos.X - dist; x <= centerPos.X + dist; x++) {
-			generateAndAddChunk(int2(x, centerPos.Y + dist), resX, resY, dontOverwrite, foliageRadius);
-			generateAndAddChunk(int2(x, centerPos.Y - dist), resX, resY, dontOverwrite, foliageRadius);
+		for (int x = chunkAbsPos.X - dist; x <= chunkAbsPos.X + dist; x++) {
+			generateChunk(int2(x, chunkAbsPos.Y + dist), resX, resY, async, dist);
+			generateChunk(int2(x, chunkAbsPos.Y - dist), resX, resY, async, dist);
 		}
-		for (int y = centerPos.Y - dist + 1; y < centerPos.Y + dist; y++) {
-			generateAndAddChunk(int2(centerPos.X - dist, y), resX, resY, dontOverwrite, foliageRadius);
-			generateAndAddChunk(int2(centerPos.X + dist, y), resX, resY, dontOverwrite, foliageRadius);
+		for (int y = chunkAbsPos.Y - dist + 1; y < chunkAbsPos.Y + dist; y++) {
+			generateChunk(int2(chunkAbsPos.X - dist, y), resX, resY, async, dist);
+			generateChunk(int2(chunkAbsPos.X + dist, y), resX, resY, async, dist);
 		}
 	}
 }
@@ -193,8 +206,9 @@ void AWorldGen::dequeueRequestAsync()
 		check(i.sectionIdx >= 0);
 		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [i, this]()
 			{
-				MeshGenRequest j = i;
-				generateAndPushChunk(j);
+				MeshGenRequest r = i;
+				meshGenResult.mesh.clearEverythingButTriangles();
+				generateChunk(r, meshGenResult);
 				check(meshGenResult.sectionIdx == i.sectionIdx);
 				isMeshGenResultReady = true;
 			}
@@ -211,26 +225,9 @@ void AWorldGen::Tick(float DeltaTime)
 	if (playerPos != absChunkOffset) {
 		const int2 shift = absChunkOffset - playerPos;
 		shiftSurroundingChunks(shift);
-		int yStart = 0, yEnd = -1, xOffset = 0;
-		if (playerPos.X != absChunkOffset.X) {
-			yStart = renderRadius - detailedRenderRadius;
-			yEnd = renderRadius + detailedRenderRadius;
-			xOffset = renderRadius - shift.X * detailedRenderRadius;
-		}
-		int xStart = 0, xEnd = -1, yOffset = 0;
-		if (playerPos.Y != absChunkOffset.Y) {
-			xStart = renderRadius - detailedRenderRadius;
-			xEnd = renderRadius + detailedRenderRadius;
-			yOffset = renderRadius - shift.Y * detailedRenderRadius;
-		}
 		absChunkOffset = playerPos;
-		for (int x = xStart; x <= xEnd; x++) {
-			requestChunk(getChunkAbsPosFromRelPos(int2(x, yOffset)), resolutionX, resolutionY, true);
-		}
-		for (int y = yStart; y <= yEnd; y++) {
-			requestChunk(getChunkAbsPosFromRelPos(int2(xOffset, y)), resolutionX, resolutionY, true);
-		}
-		//UE_LOGFMT(LogCore, Warning, "Status=\n{0}", toDebugStr());
+		generateChunksAroundPlayer(true);
+		UE_LOGFMT(LogCore, Warning, "Status=\n{0}", toDebugStr());
 		
 	}
 	if (isBusy) {

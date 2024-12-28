@@ -74,6 +74,15 @@ typedef FVector2d double2;
 typedef FIntVector4 int4;
 typedef FIntVector3 int3;
 typedef FIntVector2 int2;
+typedef FIntVector4 int4;
+typedef FIntVector3 int3;
+struct short2 {
+    short x;
+    short y;
+    short2(short x, short y) :x(x), y(y) {}
+    short2(short x) :x(x), y(x) {}
+    short2() :x(0), y(0) {}
+};
 
 namespace math {
     inline float add(const float a, float b)
@@ -362,6 +371,14 @@ namespace math {
         return int4(ceili(a.X), ceili(a.Y), ceili(a.Z), ceili(a.W));
     }
 
+    inline int min(const int a, const int b)
+    {
+        return a < b ? a : b;
+    }
+    inline int max(const int a, const int b)
+    {
+        return a > b ? a : b;
+    }
     inline float min(const float a, const float b)
     {
         return a < b ? a : b;

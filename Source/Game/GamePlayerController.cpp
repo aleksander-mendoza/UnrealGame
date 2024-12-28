@@ -65,6 +65,7 @@ void AGamePlayerController::SetupInputComponent()
 	LockAction = MapKey(EKeys::MiddleMouseButton);
 	ZoomAction = MapKey(EKeys::MouseWheelAxis, EInputActionValueType::Axis1D);
 	OpenInventoryAction = MapKey(EKeys::C, EInputActionValueType::Boolean, true);
+	OpenRaceMenuAction = MapKey(EKeys::R, EInputActionValueType::Boolean);
 
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
@@ -92,7 +93,7 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 			EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::Move);
 
 			// Looking
-			EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::Look);
+			EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AGamePlayerController::Look);
 
 			// Zoom in/out
 			EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::CameraZoom);
@@ -101,11 +102,26 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 			EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::Attack);
 
 			EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &AGamePlayerController::TriggerInventory);
+			EnhancedInputComponent->BindAction(OpenRaceMenuAction, ETriggerEvent::Started, this, &AGamePlayerController::TriggerRaceMenu);
 
 		}
 	}
 }
 
+void AGamePlayerController::Look(const FInputActionValue& Value)
+{
+	// input is a Vector2D
+	FVector2D LookAxisVector = Value.Get<FVector2D>();
+	
+	if (LookAxisVector.X != 0.f )
+	{
+		AddYawInput(LookAxisVector.X);
+	}
+	if (LookAxisVector.Y != 0.f)
+	{
+		AddPitchInput(LookAxisVector.Y);
+	}
+}
 
 void AGamePlayerController::TriggerInventory(const FInputActionValue& Value)
 {
@@ -127,6 +143,30 @@ void AGamePlayerController::TriggerInventory(const FInputActionValue& Value)
 			}
 			SetShowMouseCursor(!openInv);
 			SetPause(!openInv);
+		}
+	}
+
+}
+
+void AGamePlayerController::TriggerRaceMenu(const FInputActionValue& Value)
+{
+	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
+		if (hud->canOpenRaceMenu()) {
+			const bool openInv = hud->isRaceMenuOpen();
+			if (openInv) {
+				hud->hideRaceMenu();
+				FInputModeGameOnly Mode;
+				SetInputMode(Mode);
+			}
+			else {
+				FInputModeGameAndUI Mode;
+				Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+				Mode.SetHideCursorDuringCapture(false);
+				Mode.SetWidgetToFocus(hud->showRaceMenu(GameCharacter)->TakeWidget());
+				SetInputMode(Mode);
+
+			} 
+			SetShowMouseCursor(!openInv);
 		}
 	}
 

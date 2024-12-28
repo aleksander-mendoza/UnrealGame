@@ -80,8 +80,6 @@ public:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
 
-	/** Called for looking input */
-	void Look(const FInputActionValue& Value);
 
 	/**If actor is null pinter then it clears the lock*/
 	void LockOntoTarget(AActor * target);

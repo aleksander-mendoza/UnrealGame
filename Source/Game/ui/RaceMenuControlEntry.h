@@ -7,6 +7,7 @@
 #include "Components/TextBlock.h"
 #include "Components/Slider.h"
 #include "Blueprint/IUserObjectListEntry.h"
+#include "RaceMenuEntryObject.h"
 #include "RaceMenuControlEntry.generated.h"
 
 /**
@@ -19,8 +20,8 @@ class GAME_API URaceMenuControlEntry : public UUserWidget, public IUserObjectLis
 
 
 protected:
+	virtual void NativeConstruct() override;
 	virtual void NativeOnListItemObjectSet(UObject* ListItemObject) override;
-
 
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* NameLabel;
@@ -28,4 +29,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	USlider* ValueSlider;
+
+	URaceMenuEntryObject* EntryObject;
+
+	UFUNCTION()
+	void OnValueChange(float v);
 };

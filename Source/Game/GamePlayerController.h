@@ -50,16 +50,24 @@ class GAME_API AGamePlayerController : public APlayerController
 	UPROPERTY()
 	UInputAction* InteractAction;
 
-	/** Lock Input Action */
+	/** Open/Close Inventory Input Action */
 	UPROPERTY()
 	UInputAction* OpenInventoryAction;
+
+
+	/** Open/Close Race Menu Input Action */
+	UPROPERTY()
+	UInputAction* OpenRaceMenuAction;
 
 
 
 	virtual void SetupInputComponent() override;
 	virtual void SetPawn(APawn * pawn) override;
 
+	void Look(const FInputActionValue& Value);
+
 	void TriggerInventory(const FInputActionValue& Value);
+	void TriggerRaceMenu(const FInputActionValue& Value);
 private:
 	AGameCharacter* GameCharacter;
 	UInputAction* MapKey(FKey key, EInputActionValueType type = EInputActionValueType::Boolean, bool triggerWhenPaused=false);

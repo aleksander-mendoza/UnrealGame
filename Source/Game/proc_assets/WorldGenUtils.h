@@ -3,17 +3,19 @@
 #include "../blender/utildefines.h"
 
 struct ChunkDist {
-	int dist;
+	/**distance under l2 norm*/
+	float distL2;
+	/**distance under l-infinity norm*/
+	int distLinf;
+	int chunkIdx;
 	int2 chunkPos;
-};
-struct MeshGenResult {
-	proc_assets::Mesh mesh;
-	int sectionIdx=-1;
+	
 };
 struct MeshGenRequest {
 	int2 chunkAbsPos;
 	int resX=-1, resY=-1;
 	int sectionIdx=-1;
+	int chunkDistance=9999;
 	bool chunkMissing = false;
 };
 struct FoliageGenResult {
@@ -26,20 +28,25 @@ struct FoliageGenRequest {
 };
 
 struct FoliageChunk {
-	TArray<int> instanceIndices;
-
-	/**This flag is used to prevent a chunk from being populated twice.
-	We have this flag because checking whether instanceIndices is empty
-	or not is not a good indicator. A chunk might be populated with zero instances
-	(for example a an water-filled ocean chunk will have no trees in it.
-	This flag will prevent the generator from trying and failing to spawn
-	trees in such chunk at each frame). */
-	bool isPopulated = false;
+	TArray<FPrimitiveInstanceId> instanceIndices;
+	TArray< FTransform> instanceTransforms;
+	bool isLoaded = false;
 };
 
 struct FoliageChunks {
 
 	TArray<FoliageChunk> sections;
 
-	TArray<short2> inverseLookup;
+};
+
+struct SectionStatus {
+	bool wentOutOfBounds = false;
+	bool newlyAdded = false;
+	bool hasContent = false;
+};
+
+enum GenStatus {
+	IDLE,
+	MESH_GEN_RESULT_IS_READY,
+	FOLIAGE_UPDATE_IS_NEEDED,
 };

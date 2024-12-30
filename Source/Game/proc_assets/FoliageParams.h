@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "WorldGenUtils.h"
+#include "Logging/StructuredLog.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "FoliageParams.generated.h"
 
@@ -31,7 +32,7 @@ struct GAME_API FFoliageParams
 	UStaticMesh * Mesh;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int spawnRadius;
+	float spawnRadius;
 
 	UPROPERTY()
 	UInstancedStaticMeshComponent* InstancedMesh=nullptr;
@@ -39,7 +40,17 @@ struct GAME_API FFoliageParams
 	
 	FoliageChunks cache;
 
-
+	inline void initMesh(UObject* owner, USceneComponent* parent) {
+		InstancedMesh = NewObject<UInstancedStaticMeshComponent>(owner, UInstancedStaticMeshComponent::StaticClass(), TEXT("FoliageMesh"));
+		InstancedMesh->bDisableCollision = !hasCollisions;
+		InstancedMesh->SetRemoveSwap();
+		InstancedMesh->SetStaticMesh(Mesh);
+		InstancedMesh->RegisterComponent();
+		InstancedMesh->AttachToComponent(parent, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	}
+	inline void addInstance(int sectionIdx, FTransform t) {
+		cache.sections[sectionIdx].instanceTransforms.Add(t);
+	}
 	inline void resetCache(int renderArea)
 	{
 		cache.sections.Empty();
@@ -49,71 +60,62 @@ struct GAME_API FFoliageParams
 		}
 		check(cache.sections.Num() == renderArea);
 	}
-	inline bool validateCache() const{
-		for (int instanceIdx = 0; instanceIdx < cache.inverseLookup.Num(); instanceIdx++) {
-			const short2 s = cache.inverseLookup[instanceIdx];
-			const int i = cache.sections[s.x].instanceIndices[s.y];
-			check(i == instanceIdx);
-		}
-		int sum = 0;
-		for (int i = 0; i < cache.sections.Num(); i++) {
-			sum += cache.sections[i].instanceIndices.Num();
-		}
-		return sum == cache.inverseLookup.Num();
-	}
-	inline int addInstance(int sectionIdx, FTransform transform)
+	inline void loadUnloadSection(int sectionIdxToLoad, int sectionIdxToUnload)
 	{
-		check(InstancedMesh != nullptr);
-		check(sectionIdx >= 0);
-		check(sectionIdx < cache.sections.Num());
-		const int instanceIdx = InstancedMesh->AddInstance(transform);
-		const int idxWithinChunk = cache.sections[sectionIdx].instanceIndices.Add(instanceIdx);
-		cache.inverseLookup.Add(short2(sectionIdx, idxWithinChunk));
-		//check(validateCache()); // this should always be true but it's a quite heavy check. Use only when debugging
-		return instanceIdx;
-
+		FoliageChunk& chunkToUnload = cache.sections[sectionIdxToUnload];
+		FoliageChunk& chunkToLoad = cache.sections[sectionIdxToLoad];
+		check(chunkToUnload.isLoaded);
+		check(!chunkToLoad.isLoaded);
+		UE_LOGFMT(LogCore, Warning, "Loaded {0} unloaded {1}", sectionIdxToLoad, sectionIdxToUnload);
+		std::swap(chunkToLoad.instanceIndices, chunkToUnload.instanceIndices);
+		const int numToUpdate = math::min(chunkToUnload.instanceTransforms.Num(), chunkToLoad.instanceTransforms.Num());
+		for (int i = 0; i < numToUpdate;i++) {
+			InstancedMesh->UpdateInstanceTransformById(chunkToLoad.instanceIndices[i],chunkToLoad.instanceTransforms[i]);
+		}
+		if (chunkToLoad.instanceIndices.Num() > chunkToLoad.instanceTransforms.Num()) {
+			TArrayView<FPrimitiveInstanceId> view = chunkToLoad.instanceIndices;
+			view.RightChopInline(chunkToLoad.instanceTransforms.Num());
+			InstancedMesh->RemoveInstancesById(view, false);
+			chunkToLoad.instanceIndices.SetNum(chunkToLoad.instanceTransforms.Num());
+		}
+		else if (chunkToLoad.instanceIndices.Num() < chunkToLoad.instanceTransforms.Num()) {
+			TArrayView<FTransform> view = chunkToLoad.instanceTransforms;
+			view.RightChopInline(chunkToLoad.instanceIndices.Num());
+			chunkToLoad.instanceIndices += InstancedMesh->AddInstancesById(view, false);
+		}
+		chunkToUnload.isLoaded = false;
+		chunkToLoad.isLoaded = true;
 	}
 	
-	inline void removeInstanceSwap(int sectionIdx, int idxWithinChunk)
-	{
-		check(validateCache());
-		check(InstancedMesh != nullptr);
-		check(sectionIdx >= 0);
-		check(sectionIdx < cache.sections.Num());
-		FoliageChunk& chunk = cache.sections[sectionIdx];
-		const int instanceIdx = chunk.instanceIndices[idxWithinChunk];
-		const short2 mostRecentInstanceInverseIdx = cache.inverseLookup.Last();
-		cache.inverseLookup[instanceIdx] = mostRecentInstanceInverseIdx;
-		int & mostRecentlyAddedInstanceIdx = cache.sections[mostRecentInstanceInverseIdx.x].instanceIndices[mostRecentInstanceInverseIdx.y];
-		//check(mostRecentlyAddedInstanceIdx != instanceIdx);
-		mostRecentlyAddedInstanceIdx = instanceIdx;
-		cache.inverseLookup.Pop();
-		InstancedMesh->RemoveInstance(instanceIdx);
-		chunk.instanceIndices.RemoveAtSwap(idxWithinChunk);
-		check(validateCache());
-	}
-	inline void clearSection(int sectionIdx)
+	inline bool loadSection(int sectionIdx)
 	{
 		FoliageChunk& chunk = cache.sections[sectionIdx];
-		if (chunk.isPopulated) {
-			for (int idxWithinChunk = chunk.instanceIndices.Num() - 1; idxWithinChunk >= 0; idxWithinChunk--) {
-				removeInstanceSwap(sectionIdx, idxWithinChunk);
-			}
-			/*
-			for (int idxWithinChunk = chunk.instanceIndices.Num() - 1; idxWithinChunk >= 0; idxWithinChunk--) {
-				const int instanceIdx = chunk.instanceIndices[idxWithinChunk];
-				const short2 mostRecentInstanceInverseIdx = cache.inverseLookup.Last();
-				cache.inverseLookup[instanceIdx] = mostRecentInstanceInverseIdx;
-				int& mostRecentlyAddedInstanceIdx = cache.sections[mostRecentInstanceInverseIdx.x].instanceIndices[mostRecentInstanceInverseIdx.y];
-				//check(mostRecentlyAddedInstanceIdx != instanceIdx);
-				mostRecentlyAddedInstanceIdx = instanceIdx;
-				InstancedMesh->RemoveInstance(instanceIdx);
-			}
-			cache.inverseLookup.SetNum(cache.inverseLookup.Num()- chunk.instanceIndices.Num());
-			chunk.instanceIndices.Empty();
-			*/
-			check(validateCache());
-			chunk.isPopulated = false;
+		if (!chunk.isLoaded) {
+			UE_LOGFMT(LogCore, Warning, "Loaded {0}", sectionIdx);
+			chunk.instanceIndices = InstancedMesh->AddInstancesById(chunk.instanceTransforms, false);
+			chunk.isLoaded = true;
+			return true;
 		}
+		return false;
+	}
+
+	
+	inline bool unloadSection(int sectionIdx)
+	{
+		FoliageChunk& chunk = cache.sections[sectionIdx];
+		if (chunk.isLoaded) {
+			UE_LOGFMT(LogCore, Warning, "Unloaded {0}", sectionIdx);
+			InstancedMesh->RemoveInstancesById(chunk.instanceIndices, false);
+			chunk.instanceIndices.Empty();
+			chunk.isLoaded = false;
+			return true;
+		}
+		return false;
+	}
+	inline FoliageChunk& clearSection(int sectionIdx)
+	{
+		FoliageChunk& chunk = cache.sections[sectionIdx];
+		chunk.instanceTransforms.Empty();
+		return chunk;
 	}
 };

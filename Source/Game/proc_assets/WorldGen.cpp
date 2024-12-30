@@ -24,10 +24,13 @@ void AWorldGen::PostInitializeComponents()
 	Super::PostInitializeComponents();
 	FoliageParams.Sort([](const FFoliageParams& ip1, const FFoliageParams& ip2) {
 		return  ip1.spawnRadius > ip2.spawnRadius;
-		});
+	});
 	check(FoliageParams.Num() == 0 || FoliageParams[0].spawnRadius >= FoliageParams.Last().spawnRadius);
-	for (FFoliageParams& params : FoliageParams) {
+	for (int i = 0; i < FoliageParams.Num();i++) {
+		FFoliageParams& params = FoliageParams[i];
 		params.spawnRadius = math::min(params.spawnRadius, float(TerrainGrid.radius - 1));
+		params.density = math::min(params.density, 0.01);
+		if (params.seed == -1)params.seed = i;
 		params.initMesh(this, TerrainMesh);
 	}
 	

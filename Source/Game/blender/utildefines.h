@@ -642,6 +642,10 @@ namespace math {
     {
         return float3(1, 1, gradient.X+ gradient.Y);
     }
+    inline double3 tangent(double2 gradient)
+    {
+        return double3(1, 1, gradient.X + gradient.Y);
+    }
     inline float normalize(float v) {
         return 1;
     }

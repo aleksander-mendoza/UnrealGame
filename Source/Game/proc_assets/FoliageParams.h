@@ -34,6 +34,9 @@ struct GAME_API FFoliageParams
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float spawnRadius;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int seed=-1;
+
 	UPROPERTY()
 	UInstancedStaticMeshComponent* InstancedMesh=nullptr;
 
@@ -41,7 +44,7 @@ struct GAME_API FFoliageParams
 	FoliageChunks cache;
 
 	inline void initMesh(UObject* owner, USceneComponent* parent) {
-		InstancedMesh = NewObject<UInstancedStaticMeshComponent>(owner, UInstancedStaticMeshComponent::StaticClass(), TEXT("FoliageMesh"));
+		InstancedMesh = NewObject<UInstancedStaticMeshComponent>(owner, UInstancedStaticMeshComponent::StaticClass());
 		InstancedMesh->bDisableCollision = !hasCollisions;
 		InstancedMesh->SetRemoveSwap();
 		InstancedMesh->SetStaticMesh(Mesh);
@@ -66,7 +69,7 @@ struct GAME_API FFoliageParams
 		FoliageChunk& chunkToLoad = cache.sections[sectionIdxToLoad];
 		check(chunkToUnload.isLoaded);
 		check(!chunkToLoad.isLoaded);
-		UE_LOGFMT(LogCore, Warning, "Loaded {0} unloaded {1}", sectionIdxToLoad, sectionIdxToUnload);
+		UE_LOGFMT(LogCore, Warning, "Loaded {0} unloaded {1} (seed={2})", sectionIdxToLoad, sectionIdxToUnload, seed);
 		std::swap(chunkToLoad.instanceIndices, chunkToUnload.instanceIndices);
 		const int numToUpdate = math::min(chunkToUnload.instanceTransforms.Num(), chunkToLoad.instanceTransforms.Num());
 		for (int i = 0; i < numToUpdate;i++) {
@@ -91,7 +94,7 @@ struct GAME_API FFoliageParams
 	{
 		FoliageChunk& chunk = cache.sections[sectionIdx];
 		if (!chunk.isLoaded) {
-			UE_LOGFMT(LogCore, Warning, "Loaded {0}", sectionIdx);
+			UE_LOGFMT(LogCore, Warning, "Loaded {0} (seed={1})", sectionIdx, seed);
 			chunk.instanceIndices = InstancedMesh->AddInstancesById(chunk.instanceTransforms, false);
 			chunk.isLoaded = true;
 			return true;
@@ -104,7 +107,7 @@ struct GAME_API FFoliageParams
 	{
 		FoliageChunk& chunk = cache.sections[sectionIdx];
 		if (chunk.isLoaded) {
-			UE_LOGFMT(LogCore, Warning, "Unloaded {0}", sectionIdx);
+			UE_LOGFMT(LogCore, Warning, "Unloaded {0} (seed={1})", sectionIdx, seed);
 			InstancedMesh->RemoveInstancesById(chunk.instanceIndices, false);
 			chunk.instanceIndices.Empty();
 			chunk.isLoaded = false;

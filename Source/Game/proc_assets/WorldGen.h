@@ -131,8 +131,8 @@ private:
 			FoliageChunk& chunk = params.clearSection(sectionIdx);
 			
 			
-			const int count = math::min(int(params.density * TerrainGrid.chunkSize * TerrainGrid.chunkSize), 1000);
-			const int seed = noise::hash(chunkAbsPos.X, chunkAbsPos.Y);
+			const int count = int(params.density * TerrainGrid.chunkSize * TerrainGrid.chunkSize);
+			const int seed = noise::hash(chunkAbsPos.X, chunkAbsPos.Y, params.seed);
 			blender::RandomNumberGenerator rng(seed);
 
 			for (int i = 0; i < count; i++) {
@@ -141,7 +141,7 @@ private:
 				FRotator3d rot;
 				if (params.alignToNormal) {
 					const float3 gradient_and_height = get_height_with_derivative(position);
-					const double3 normal = math::normalize(math::normal(double2(float2(gradient_and_height))));
+					const double3 normal = math::normalize(math::tangent(double2(float2(gradient_and_height))));
 					rot = normal.Rotation();
 					position3d.Z += gradient_and_height.Z;
 				}
@@ -210,24 +210,37 @@ private:
 				if (sectionIdx > -1) {
 					if (params.spawnRadius >= chunk.distL2) {
 						if (!params.cache.sections[sectionIdx].isLoaded) {
-							UE_LOGFMT(LogCore, Warning, "Load {0} at {1},{2}", sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
-							check(!foliageSectionsToLoad.Contains(sectionIdx));
-							foliageSectionsToLoad.Add(sectionIdx);
+							if (async) {
+								UE_LOGFMT(LogCore, Warning, "Load {0} at {1},{2}", sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
+								check(!foliageSectionsToLoad.Contains(sectionIdx));
+								foliageSectionsToLoad.Add(sectionIdx);
+							}
+							else {
+								params.loadSection(sectionIdx);
+							}
 						}
 					}
 					else if (params.spawnRadius + 1 < chunk.distL2) {
 						if (params.cache.sections[sectionIdx].isLoaded) {
-							UE_LOGFMT(LogCore, Warning, "Unload {0} at {1},{2}", sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
-							check(!foliageSectionsToUnload.Contains(sectionIdx));
-							foliageSectionsToUnload.Add(sectionIdx);
+							if (async) {
+								UE_LOGFMT(LogCore, Warning, "Unload {0} at {1},{2}", sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
+								check(!foliageSectionsToUnload.Contains(sectionIdx));
+								foliageSectionsToUnload.Add(sectionIdx);
+							}
+							else {
+								params.unloadSection(sectionIdx);
+							}
 						}
+						
 					}
 				}
 			}
-			if (!foliageSectionsToLoad.IsEmpty() || !foliageSectionsToUnload.IsEmpty()) {
-				resultFoliageIdx = j;
-				genStatus = GenStatus::FOLIAGE_UPDATE_IS_NEEDED;
-				return true;
+			if (async) {
+				if (!foliageSectionsToLoad.IsEmpty() || !foliageSectionsToUnload.IsEmpty()) {
+					resultFoliageIdx = j;
+					genStatus = GenStatus::FOLIAGE_UPDATE_IS_NEEDED;
+					return true;
+				}
 			}
 		}
 		return false;

@@ -40,6 +40,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")
 	FItemInstanceList DefaultClothes;
 
+	int32 occupiedClothingSlots = 0;
+
 	virtual void PostInitProperties() override;
 protected:
 	// Called when the game starts
@@ -54,5 +56,53 @@ public:
 		ResetToDefaultItems();
 		ResetToDefaultClothes();
 	}
-		
+	inline FItem * getClothesAt(int clothesIdx) {
+		return Clothes[clothesIdx]->Instance.getRow();
+	}
+	inline FItem* getItemAt(int itemIdx) {
+		return Items[itemIdx]->Instance.getRow();
+	}
+	inline FItem* getLefHand() {
+		return LeftHand->Instance.getRow();
+	}
+	inline FItem* getRightHand() {
+		return RightHand->Instance.getRow();
+	}
+	/**returns true if the clothing item is not in conflicts with the currently worn items*/
+	inline bool canPutOn(const FItem& item) const {
+		return (occupiedClothingSlots & item.ClothingSlots) == 0;
+	}
+
+	/**returns true if there are no equipped devious clothes that conflict with this item*/
+	inline bool canMakeSpaceFor(const FItem& item) {
+		for (int i = 0; i < Clothes.Num(); i++) {
+			if (getClothesAt(i)->hardConflictsWith(item))return false;
+		}
+		return true;
+	}
+	template<bool onlyIfNotDevious>
+	inline bool removeClothingItem(UItemObject * item) {
+		if (item->equippedAt < Clothes.Num() && Clothes[item->equippedAt]==item) {
+			const FItem& i = *item->Instance.getRow();
+			if (onlyIfNotDevious && i.isDevious()) return false;
+			Clothes.Last()->equippedAt = item->equippedAt;
+			Clothes.RemoveAtSwap(item->equippedAt);
+			item->equippedAt = -1;
+			occupiedClothingSlots &= ~i.ClothingSlots;
+			return true;
+		}
+		return false;
+	}
+	template<bool onlyIfNotConflicting>
+	inline bool addClothingItem(UItemObject* item) {
+		if (item->equippedAt < 0) {
+			const FItem & i = *item->Instance.getRow();
+			if (onlyIfNotConflicting && !canPutOn(i))return false;
+			item->equippedAt = Clothes.Add(item);
+			occupiedClothingSlots |= i.ClothingSlots;
+			check(Items.Contains(item));
+			return true;
+		}
+		return false;
+	}
 };

@@ -25,6 +25,13 @@ class GAME_API AGamePlayerController : public APlayerController
 	/** Jump Input Action */
 	UPROPERTY()
 	UInputAction* JumpAction;
+	/** Slow walk Input Action */
+	UPROPERTY()
+	UInputAction* SlowWalkAction;
+
+	/** Run Input Action */
+	UPROPERTY()
+	UInputAction* RunAction;
 
 	/** Move Input Action */
 	UPROPERTY()

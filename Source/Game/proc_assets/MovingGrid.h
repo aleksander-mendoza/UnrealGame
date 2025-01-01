@@ -22,6 +22,9 @@ struct GAME_API FMovingGrid
 	TArray<int> chunkToSection;
 	TArray<SectionStatus> sections;
 	TArray<ChunkDist> chunkDistances;
+	int2 absChunkOffset;
+	bool playerCrossedChunkBoundary;
+	bool couldHaveMoreChunksToLoad = false;
 
 	inline const int getRadius() {
 		return radius;
@@ -35,7 +38,14 @@ struct GAME_API FMovingGrid
 	inline void setChunkSize(float cs) {
 		this->chunkSize = cs;
 	}
-	inline void resetGridSize() {
+	inline void setCenterPos(const double3 playerPosition) {
+		absChunkOffset = getChunkAbsPosFromWorldPos(playerPosition);
+	}
+	inline void reset(const double3 playerPosition) {
+		setCenterPos(playerPosition);
+		reset();
+	}
+	inline void reset() {
 		setGridSize(radius);
 	}
 	inline void setGridSize(int distance) {
@@ -124,6 +134,17 @@ struct GAME_API FMovingGrid
 	inline const int2 getChunkAbsPosFromWorldPos(FVector pos) const {
 		return getChunkAbsPosFromWorldPos(pos.X, pos.Y);
 	}
+
+	inline const int2 getAbsOffsetToBottomLeftmostChunk() {
+		return int2(this->absChunkOffset.X - radius, this->absChunkOffset.Y - radius);
+	}
+	inline const int2 absToRelPos(int2 chunkAbsPos) {
+		return chunkAbsPos - getAbsOffsetToBottomLeftmostChunk();
+	}
+	inline const int2 relToAbsPos(int2 chunkRelPos) {
+		return chunkRelPos + getAbsOffsetToBottomLeftmostChunk();
+	}
+
 
 	void shiftSurroundingChunks(int2 shift) {
 		if (diameter <= 1)return;
@@ -224,5 +245,17 @@ struct GAME_API FMovingGrid
 			s += '\n';
 		}
 		return s;
+	}
+	inline bool update(const double3 playerPos, const float spawnRadius) {
+		const int2 pos = getChunkAbsPosFromWorldPos(playerPos);
+		if (pos != absChunkOffset) {
+			const int2 shift = absChunkOffset - pos;
+			shiftSurroundingChunks(shift);
+			absChunkOffset = pos;
+			addChunksWithinRadius<false>(spawnRadius);
+			playerCrossedChunkBoundary = true;
+			return true;
+		}
+		return false;
 	}
 };

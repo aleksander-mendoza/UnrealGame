@@ -29,6 +29,8 @@ struct GAME_API FItemInstance : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int EnchantmentLevel;
 
+	
+
 
 	inline FItem* getRow() const{
 		return Item.GetRow<FItem>("");

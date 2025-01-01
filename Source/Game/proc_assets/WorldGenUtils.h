@@ -18,24 +18,25 @@ struct MeshGenRequest {
 	int chunkDistance=9999;
 	bool chunkMissing = false;
 };
-struct FoliageGenResult {
+struct EntityGenResult {
 	TArray<FTransform> instances;
 	int sectionIdx = -1;
 };
-struct FoliageGenRequest {
+struct EntityGenRequest {
 	int2 chunkAbsPos;
 	int sectionIdx = -1;
 };
 
-struct FoliageChunk {
+struct EntityChunk {
 	TArray<FPrimitiveInstanceId> instanceIndices;
-	TArray< FTransform> instanceTransforms;
+	TArray<FTransform> instanceTransforms;
 	bool isLoaded = false;
+	bool isDirty = false;
 };
 
-struct FoliageChunks {
+struct EntityChunks {
 
-	TArray<FoliageChunk> sections;
+	TArray<EntityChunk> sections;
 
 };
 

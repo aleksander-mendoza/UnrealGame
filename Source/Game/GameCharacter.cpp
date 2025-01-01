@@ -68,27 +68,35 @@ AGameCharacter::AGameCharacter()
 	Inventory = CreateDefaultSubobject<UActorInventory>(TEXT("PlayerInventory"));
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+	SetGender(IsFemale);
+	
 
 }
 
-void AGameCharacter::ResetClothes()
+bool AGameCharacter::putOnClothingItem(UItemObject* item, bool unequipClothesWithOverlappingSlots)
 {
-	USkeletalMeshComponent * playerMesh = GetMesh();
-	for (int i = 0; i < Inventory->Clothes.Num(); i++) { 
-		const UItemObject * clothingItem = Inventory->Clothes[i];
-		const FItem * row = clothingItem->Instance.getRow();
-		if (row->WearableMesh) {
-			USkeletalMesh* clothingMesh = row->WearableMesh.Get();
-			USkeletalMeshComponent* clothingComp = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass());
-			clothingComp->RegisterComponent();
-			clothingComp->AttachToComponent(playerMesh, FAttachmentTransformRules::SnapToTargetIncludingScale);
-			clothingComp->SetSkeletalMesh(clothingMesh);
-			clothingComp->SetAnimInstanceClass(playerMesh->AnimClass);
-			clothingComp->SetLeaderPoseComponent(playerMesh, true);
-			Clothes.Add(clothingComp);
+	const FItem* meta = item->Instance.getRow();
+	if (!canWear(*meta)) return false;
+	if (!Inventory->canPutOn(*meta)) {
+		if (unequipClothesWithOverlappingSlots && Inventory->canMakeSpaceFor(*meta)) {
+			const bool r = makeSpaceFor<true>(*meta);
+			check(r);
+		}
+		else {
+			return false;
 		}
 	}
+	const bool r = addClothingItem<true>(item);
+	check(r);
+	return true;
 }
+
+bool AGameCharacter::takeOffClothingItem(UItemObject* item, bool force)
+{
+	if(force)return removeClothingItem<false>(item);
+	else return removeClothingItem<true>(item);
+}
+
 
 void AGameCharacter::BeginPlay()
 {
@@ -105,7 +113,7 @@ void AGameCharacter::BeginPlay()
 	}
 	ToggleDirectionalMovement(true);
 	Inventory->ResetToDefault();
-	ResetClothes();
+	resetClothes();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -182,7 +190,7 @@ UCameraComponent* AGameCharacter::GetCurrentCamera() {
 	return FollowCamera->IsActive() ? FollowCamera : FirstPersonCamera;
 }
 void AGameCharacter::LockOntoEnemy(const FInputActionValue& Value) {
-	const float TargetLockDistance = 1000;
+	
 	
 	if (TargetLockActor==nullptr) {
 
@@ -217,7 +225,19 @@ void AGameCharacter::OnComboPartEnd(bool isLast) {
 	}
 }
 void AGameCharacter::Interact(const FInputActionValue& Value) {
-
+	FTransform transform = GetCurrentCamera()->GetComponentTransform();
+	double3 start = transform.GetLocation();
+	start.Z += 20.;
+	double3 forward = transform.GetRotation().GetForwardVector();
+	double3 end = start + forward * InteractDistance;
+	TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
+	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_WorldDynamic));
+	TArray<AActor*> actorsToIgnore;
+	actorsToIgnore.Add(this);
+	FHitResult OutHit;
+	if (UKismetSystemLibrary::LineTraceSingleForObjects(GetWorld(), start, end, objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true)) {
+		OutHit.GetActor();
+	}
 }
 void AGameCharacter::Attack(const FInputActionValue& Value) {
 	if (IsAttacking) {
@@ -261,6 +281,24 @@ void AGameCharacter::Move(const FInputActionValue& Value)
 			
 		}
 	}
+}
+void AGameCharacter::ToggleSlowWalk(const FInputActionValue& Value)
+{
+	UCharacterMovementComponent * m = GetCharacterMovement();
+	if (m->MaxWalkSpeed <= SlowWalkSpeed) {
+		m->MaxWalkSpeed = WalkSpeed;
+	}
+	else {
+		m->MaxWalkSpeed = SlowWalkSpeed;
+	}
+}
+void AGameCharacter::StartRun(const FInputActionValue& Value)
+{
+	GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
+}
+void AGameCharacter::EndRun(const FInputActionValue& Value)
+{
+	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 }
 void AGameCharacter::SetSwimming(bool isSwimming) {
 	

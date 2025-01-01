@@ -6,13 +6,13 @@
 #include "WorldGenUtils.h"
 #include "Logging/StructuredLog.h"
 #include "Components/InstancedStaticMeshComponent.h"
-#include "FoliageParams.generated.h"
+#include "EntityType.generated.h"
 
 /**
  * 
  */
 USTRUCT(BlueprintType)
-struct GAME_API FFoliageParams
+struct GAME_API FEntityType
 {
 	GENERATED_BODY()
 
@@ -32,8 +32,10 @@ struct GAME_API FFoliageParams
 	UStaticMesh * Mesh;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float spawnRadius;
+	float loadRadius=-1;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float unloadRadius = -1;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int seed=-1;
 
@@ -41,9 +43,10 @@ struct GAME_API FFoliageParams
 	UInstancedStaticMeshComponent* InstancedMesh=nullptr;
 
 	
-	FoliageChunks cache;
+	EntityChunks cache;
 
 	inline void initMesh(UObject* owner, USceneComponent* parent) {
+		unloadRadius = math::max(loadRadius + 1, unloadRadius);
 		InstancedMesh = NewObject<UInstancedStaticMeshComponent>(owner, UInstancedStaticMeshComponent::StaticClass());
 		InstancedMesh->bDisableCollision = !hasCollisions;
 		InstancedMesh->SetRemoveSwap();
@@ -63,62 +66,80 @@ struct GAME_API FFoliageParams
 		}
 		check(cache.sections.Num() == renderArea);
 	}
+	inline void reload(int sectionIdx)
+	{
+		reload(cache.sections[sectionIdx]);
+	}
+	inline void reload(EntityChunk& chunk)
+	{
+		const int numToUpdate = math::min(chunk.instanceIndices.Num(), chunk.instanceTransforms.Num());
+		for (int i = 0; i < numToUpdate; i++) {
+			InstancedMesh->UpdateInstanceTransformById(chunk.instanceIndices[i], chunk.instanceTransforms[i]);
+		}
+		if (chunk.instanceIndices.Num() > chunk.instanceTransforms.Num()) {
+			TArrayView<FPrimitiveInstanceId> view = chunk.instanceIndices;
+			view.RightChopInline(chunk.instanceTransforms.Num());
+			InstancedMesh->RemoveInstancesById(view, false);
+			chunk.instanceIndices.SetNum(chunk.instanceTransforms.Num());
+		}
+		else if (chunk.instanceIndices.Num() < chunk.instanceTransforms.Num()) {
+			TArrayView<FTransform> view = chunk.instanceTransforms;
+			view.RightChopInline(chunk.instanceIndices.Num());
+			chunk.instanceIndices += InstancedMesh->AddInstancesById(view, false);
+		}
+		chunk.isDirty = false;
+	}
 	inline void loadUnloadSection(int sectionIdxToLoad, int sectionIdxToUnload)
 	{
-		FoliageChunk& chunkToUnload = cache.sections[sectionIdxToUnload];
-		FoliageChunk& chunkToLoad = cache.sections[sectionIdxToLoad];
+		EntityChunk& chunkToUnload = cache.sections[sectionIdxToUnload];
+		EntityChunk& chunkToLoad = cache.sections[sectionIdxToLoad];
 		check(chunkToUnload.isLoaded);
 		check(!chunkToLoad.isLoaded);
 		UE_LOGFMT(LogCore, Warning, "Loaded {0} unloaded {1} (seed={2})", sectionIdxToLoad, sectionIdxToUnload, seed);
+		check(chunkToLoad.instanceIndices.IsEmpty());
 		std::swap(chunkToLoad.instanceIndices, chunkToUnload.instanceIndices);
-		const int numToUpdate = math::min(chunkToUnload.instanceTransforms.Num(), chunkToLoad.instanceTransforms.Num());
-		for (int i = 0; i < numToUpdate;i++) {
-			InstancedMesh->UpdateInstanceTransformById(chunkToLoad.instanceIndices[i],chunkToLoad.instanceTransforms[i]);
-		}
-		if (chunkToLoad.instanceIndices.Num() > chunkToLoad.instanceTransforms.Num()) {
-			TArrayView<FPrimitiveInstanceId> view = chunkToLoad.instanceIndices;
-			view.RightChopInline(chunkToLoad.instanceTransforms.Num());
-			InstancedMesh->RemoveInstancesById(view, false);
-			chunkToLoad.instanceIndices.SetNum(chunkToLoad.instanceTransforms.Num());
-		}
-		else if (chunkToLoad.instanceIndices.Num() < chunkToLoad.instanceTransforms.Num()) {
-			TArrayView<FTransform> view = chunkToLoad.instanceTransforms;
-			view.RightChopInline(chunkToLoad.instanceIndices.Num());
-			chunkToLoad.instanceIndices += InstancedMesh->AddInstancesById(view, false);
-		}
+		reload(chunkToLoad);
 		chunkToUnload.isLoaded = false;
+		chunkToUnload.isDirty = false;
 		chunkToLoad.isLoaded = true;
 	}
 	
 	inline bool loadSection(int sectionIdx)
 	{
-		FoliageChunk& chunk = cache.sections[sectionIdx];
-		if (!chunk.isLoaded) {
+		EntityChunk& chunk = cache.sections[sectionIdx];
+		if (chunk.isDirty) {
+			reload(chunk);
+		}
+		else if (!chunk.isLoaded) {
 			UE_LOGFMT(LogCore, Warning, "Loaded {0} (seed={1})", sectionIdx, seed);
+			check(chunk.instanceIndices.IsEmpty());
 			chunk.instanceIndices = InstancedMesh->AddInstancesById(chunk.instanceTransforms, false);
 			chunk.isLoaded = true;
 			return true;
 		}
+		check(chunk.instanceIndices.Num() == chunk.instanceTransforms.Num());
 		return false;
 	}
 
 	
 	inline bool unloadSection(int sectionIdx)
 	{
-		FoliageChunk& chunk = cache.sections[sectionIdx];
+		EntityChunk& chunk = cache.sections[sectionIdx];
 		if (chunk.isLoaded) {
 			UE_LOGFMT(LogCore, Warning, "Unloaded {0} (seed={1})", sectionIdx, seed);
 			InstancedMesh->RemoveInstancesById(chunk.instanceIndices, false);
 			chunk.instanceIndices.Empty();
 			chunk.isLoaded = false;
+			chunk.isDirty = false;
 			return true;
 		}
 		return false;
 	}
-	inline FoliageChunk& clearSection(int sectionIdx)
+	inline EntityChunk& clearSection(int sectionIdx)
 	{
-		FoliageChunk& chunk = cache.sections[sectionIdx];
+		EntityChunk& chunk = cache.sections[sectionIdx];
 		chunk.instanceTransforms.Empty();
+		chunk.isDirty = chunk.isLoaded;
 		return chunk;
 	}
 };

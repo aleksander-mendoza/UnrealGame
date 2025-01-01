@@ -51,7 +51,8 @@ void UActorInventory::ResetToDefaultClothes()
 		UItemObject* item = NewObject<UItemObject>();
 		item->Instance = DefaultClothes.Instances[i];
 		Items.Add(item);
-		Clothes.Add(item);
+		const bool b = addClothingItem<true>(item);
+		check(b);
 	}
 }
 

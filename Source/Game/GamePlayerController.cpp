@@ -59,6 +59,8 @@ void AGamePlayerController::SetupInputComponent()
 	LookAction->ValueType = EInputActionValueType::Axis2D;
 	MapKey(LookAction, EKeys::Mouse2D, false, true, false);
 
+	SlowWalkAction = MapKey(EKeys::LeftControl);
+	RunAction = MapKey(EKeys::LeftShift);
 	JumpAction = MapKey(EKeys::SpaceBar);
 	AttackAction = MapKey(EKeys::LeftMouseButton);
 	InteractAction = MapKey(EKeys::E);
@@ -96,6 +98,9 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 			EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AGamePlayerController::Look);
 
 			// Zoom in/out
+			EnhancedInputComponent->BindAction(SlowWalkAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::ToggleSlowWalk);
+			EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::StartRun);
+			EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::EndRun);
 			EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::CameraZoom);
 			EnhancedInputComponent->BindAction(LockAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::LockOntoEnemy);
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::Interact);

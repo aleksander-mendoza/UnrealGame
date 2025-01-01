@@ -22,16 +22,11 @@ AWorldGen::AWorldGen() :  meshGenResult()
 void AWorldGen::PostInitializeComponents()
 { 
 	Super::PostInitializeComponents();
-	FoliageParams.Sort([](const FFoliageParams& ip1, const FFoliageParams& ip2) {
-		return  ip1.spawnRadius > ip2.spawnRadius;
-	});
-	check(FoliageParams.Num() == 0 || FoliageParams[0].spawnRadius >= FoliageParams.Last().spawnRadius);
-	for (int i = 0; i < FoliageParams.Num();i++) {
-		FFoliageParams& params = FoliageParams[i];
-		params.spawnRadius = math::min(params.spawnRadius, float(TerrainGrid.radius - 1));
-		params.density = math::min(params.density, 0.01);
-		if (params.seed == -1)params.seed = i;
-		params.initMesh(this, TerrainMesh);
+	
+	for (int i = 0; i < EntityParams.Num();i++) {
+		FEntityParams& params = EntityParams[i];
+		
+		params.initMesh(this, TerrainMesh, i);
 	}
 	
 }
@@ -51,15 +46,7 @@ void AWorldGen::BeginPlay()
 void AWorldGen::Tick(float DeltaTime)
 {
 	//Super::Tick(DeltaTime);
-	int2 playerPos = getPlayerAbsChunk();
-	if (playerPos != absChunkOffset) {
-		const int2 shift = absChunkOffset - playerPos;
-		TerrainGrid.shiftSurroundingChunks(shift);
-		absChunkOffset = playerPos;
-		addChunksAroundPlayer<false>();
-		playerCrossedChunkBoundary = true;
-		UE_LOGFMT(LogCore, Warning, "Status=\n{0}", TerrainGrid.toDebugStr());
-	}
+	update();
 	if (!isBusy) {
 		if (applyResults() && (couldHaveMoreChunksToLoad || playerCrossedChunkBoundary)) {
 			isBusy = true;
@@ -69,7 +56,7 @@ void AWorldGen::Tick(float DeltaTime)
 					isBusy = false;
 				}
 			);
-			playerCrossedChunkBoundary = false;
+			
 		}
 	}
 	

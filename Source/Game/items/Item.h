@@ -3,7 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ItemClass.h"
 #include "Item.generated.h"
+
+
 /**
  * 
  */
@@ -13,7 +16,7 @@ struct GAME_API FItem : public FTableRowBase
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float Warmth;
+	float Warmth=0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FText Name;
@@ -22,13 +25,13 @@ struct GAME_API FItem : public FTableRowBase
 	FText Description;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float Durbility;
+	float Durbility=0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float Value;
+	float Value=0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float Damage;
+	float Damage=0;
 
 	// this is a bitfield.
 	// 00000000000000000000000000000000 = 0 = not a clothing item (can't be worn)
@@ -79,30 +82,42 @@ struct GAME_API FItem : public FTableRowBase
 	// 1+16+32768+65536+131072+128+8192+256+16384 = 254353 = upper body (breasts+stomach+back+shoulders+hand+forearm)
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 ClothingSlots;
+	int32 ClothingSlots=0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 EnchantmentSlots;
+	int32 EnchantmentSlots=0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 Level;
+	int32 Level=0;
 
-	// 0 = not a weapon
-	// 1 = double handed
-	// 2 = single handed
-	// 3 = bow
-	// 4 = spear/staff
-	// 5 = single handed quiet weapon (for sneaking)
-	// 6 = shield
+	/**Devious devices cannot be uneqipped without a key/lockpick/struggle. The higher the level the more difficult it is to escape.
+	Level 0 means the item is not devious (can be freely unequipped). Level 1,2,3... requires keys of the corresponding level. 
+	Level -1, -2, -3 cannot be picked up or struggled out of and must be opened with corresponding key 1,2,3...*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 Class;
+	int DeviousLevel = 0;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	EItemClass Class= EItemClass::PROP;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float Weight;
+	float Weight=0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSoftObjectPtr<UStaticMesh> Mesh;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSoftObjectPtr<USkeletalMesh> WearableMesh;
+
+	inline bool isWearable() const {
+		return ClothingSlots!=0;
+	}
+	inline bool isDevious() const {
+		return DeviousLevel != 0;
+	}
+	inline bool conflictsWith(const FItem& other) const {
+		return (other.ClothingSlots & ClothingSlots) != 0;
+	}
+	inline bool hardConflictsWith(const FItem& other) const {
+		return isDevious() && conflictsWith(other);
+	}
 };

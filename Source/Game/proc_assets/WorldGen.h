@@ -7,7 +7,7 @@
 #include "Logging/StructuredLog.h"
 #include "ProceduralMeshComponent.h"
 #include "../blender/proc_assets.h"
-#include "FoliageParams.h"
+#include "EntityParams.h"
 #include "WorldGenUtils.h"
 #include "../blender/noise.h"
 #include "MovingGrid.h"
@@ -40,7 +40,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	double uvScale = 1;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int chunkSpawnRadius = 1; // chunks within this radius will be generated in high-res if not present (or present but in low-res)
+	float chunkSpawnRadius = 1; // chunks within this radius will be generated in high-res if not present (or present but in low-res)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int lowResRenderRadius = 3; // chunks within this radius will be generated (in low-res) if not present
 
@@ -55,7 +55,7 @@ public:
 	UMaterialInterface* TerrainMaterial = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<FFoliageParams> FoliageParams;
+	TArray<FEntityParams> EntityParams;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FMovingGrid TerrainGrid;
@@ -64,46 +64,36 @@ public:
 	void PostInitializeComponents() override;
 private:
 	APawn* PlayerPawn=nullptr;
-	int2 absChunkOffset;
+	
 	proc_assets::Mesh meshGenResult;
 	int resultSectionIdx = -1;
 	GenStatus genStatus=GenStatus::IDLE;
-	TArray<int> foliageSectionsToUnload;
-	TArray<int> foliageSectionsToLoad;
-	int resultFoliageIdx=-1;
-	bool isBusy = false;
-	bool couldHaveMoreChunksToLoad=false;
+	TArray<int> entitySectionsToUnload;
+	TArray<int> entitySectionsToLoad;
+	int resultEntityIdx=-1;
+	int resultEntityTypeIdx = -1;
+	bool couldHaveMoreChunksToLoad = false;
 	bool playerCrossedChunkBoundary = false;
+	bool isBusy = false;
 	
 	
-
-	inline const int2 getAbsOffsetToBottomLeftmostChunk() {
-		return int2(this->absChunkOffset.X - TerrainGrid.getRadius(), this->absChunkOffset.Y - TerrainGrid.getRadius());
-	}
-	inline const int2 absToRelPos(int2 chunkAbsPos) {
-		return chunkAbsPos - getAbsOffsetToBottomLeftmostChunk();
-	}
-	inline const int2 relToAbsPos(int2 chunkRelPos) {
-		return chunkRelPos + getAbsOffsetToBottomLeftmostChunk();
-	}
+	
 
 	inline void reset() {
 		UWorld* world = this->GetWorld();
 		APlayerController* player = world->GetFirstPlayerController();
 		PlayerPawn = player->GetPawn();
-		absChunkOffset = getPlayerAbsChunk();
+		const double3 pos = getPlayerPos();
 		this->TerrainMesh->ClearAllMeshSections();
-		TerrainGrid.resetGridSize();
-		for (FFoliageParams& params : FoliageParams) {
-			params.resetCache(TerrainGrid.getArea());
+		TerrainGrid.reset(pos);
+		for (FEntityParams& params : EntityParams) {
+			params.reset(pos);
 		}
 
 	}
-	inline const int2 getPlayerAbsChunk() {
-		if (PlayerPawn == nullptr)return int2(0, 0);
-		const FVector playerPosition = PlayerPawn->GetActorLocation();
-		const int2 chunkPos = TerrainGrid.getChunkAbsPosFromWorldPos(playerPosition);
-		return chunkPos;
+	inline const double3 getPlayerPos() {
+		if (PlayerPawn == nullptr)return double3(0, 0, 0);
+		return PlayerPawn->GetActorLocation();
 	}
 	inline void addMeshSection(proc_assets::Mesh& mesh, int sectionIdx) {
 		check(sectionIdx >= 0);
@@ -118,28 +108,22 @@ private:
 		check(sectionIdx >= 0);
 		this->TerrainMesh->ClearMeshSection(sectionIdx);
 	}
-	inline void generateChunk(int2 chunkAbsPos, const int chunkDist, proc_assets::Mesh& mesh, const int sectionIdx) {
-		const FVector offset = FVector(chunkAbsPos.X * TerrainGrid.chunkSize, chunkAbsPos.Y * TerrainGrid.chunkSize, this->seaLevel);
-		const float2 offsetf = float2(offset.X, offset.Y);
-		const float2 size = float2(TerrainGrid.chunkSize, TerrainGrid.chunkSize);
-		//proc_assets::morenoise(offset, resX, resY, size, mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
-		//proc_assets::perlin_fbm(offset, r.resX, r.resY, size, s.mesh, scale, scalingPowerBase, 1. / scalingPowerBase, numOfScales, maxHeight, uvScale, true);
-		proc_assets::planeScaledUVs(offset, resolution, resolution, size, mesh, [&](FVector& vertex) {return get_height_with_derivative(float2(double2(vertex))); }, uvScale, true);
-		mesh.hasTriangles = true;
-		for (int foliageIdx = 0; foliageIdx < FoliageParams.Num(); foliageIdx++) {
-			FFoliageParams& params = FoliageParams[foliageIdx];
-			FoliageChunk& chunk = params.clearSection(sectionIdx);
-			
-			
-			const int count = int(params.density * TerrainGrid.chunkSize * TerrainGrid.chunkSize);
-			const int seed = noise::hash(chunkAbsPos.X, chunkAbsPos.Y, params.seed);
+	inline void generateEntity(int2 chunkAbsPos, const int chunkDist, const int entityIdx, const int sectionIdx) {
+		FEntityParams& params = EntityParams[entityIdx];
+		const float chunkSize = params.SpawnGrid.chunkSize;
+		const float2 offsetf = float2(chunkAbsPos.X * chunkSize, chunkAbsPos.Y * chunkSize);
+		for (int typeIdx = 0; typeIdx < params.Types.Num(); typeIdx++) {
+			FEntityType& t = params.Types[typeIdx];
+			EntityChunk& chunk = t.clearSection(sectionIdx);
+			const int count = int(t.density * chunkSize * chunkSize);
+			const int seed = noise::hash(chunkAbsPos.X, chunkAbsPos.Y, t.seed);
 			blender::RandomNumberGenerator rng(seed);
 
 			for (int i = 0; i < count; i++) {
-				const float2 position = offsetf + size * rng.get_float2();
+				const float2 position = offsetf + chunkSize * rng.get_float2();
 				float3 position3d = float3(position.X, position.Y, seaLevel);
 				FRotator3d rot;
-				if (params.alignToNormal) {
+				if (t.alignToNormal) {
 					const float3 gradient_and_height = get_height_with_derivative(position);
 					const double3 normal = math::normalize(math::tangent(double2(float2(gradient_and_height))));
 					rot = normal.Rotation();
@@ -148,12 +132,21 @@ private:
 				else {
 					position3d.Z += get_height(position);
 				}
-				if (params.maxRotation > 0) {
-					rot.Roll = rng.get_float() * params.maxRotation;
+				if (t.maxRotation > 0) {
+					rot.Roll = rng.get_float() * t.maxRotation;
 				}
 				chunk.instanceTransforms.Add(FTransform(rot, double3(position3d)));
 			}
 		}
+	}
+	inline void generateChunk(int2 chunkAbsPos, const int chunkDist, proc_assets::Mesh& mesh, const int sectionIdx) {
+		const FVector offset = FVector(chunkAbsPos.X * TerrainGrid.chunkSize, chunkAbsPos.Y * TerrainGrid.chunkSize, this->seaLevel);
+		
+		const float2 size = float2(TerrainGrid.chunkSize, TerrainGrid.chunkSize);
+		//proc_assets::morenoise(offset, resX, resY, size, mesh, scale, pointiness, scalingPowerBase, numOfScales, maxHeight);
+		//proc_assets::perlin_fbm(offset, r.resX, r.resY, size, s.mesh, scale, scalingPowerBase, 1. / scalingPowerBase, numOfScales, maxHeight, uvScale, true);
+		proc_assets::planeScaledUVs(offset, resolution, resolution, size, mesh, [&](FVector& vertex) {return get_height_with_derivative(float2(double2(vertex))); }, uvScale, true);
+		mesh.hasTriangles = true;
 	}
 
 	inline float3 get_height_with_derivative(float2 position) const {
@@ -165,82 +158,128 @@ private:
 	template<bool l2>
 	inline void addChunksAroundPlayer() {
 		TerrainGrid.addChunksWithinRadius<l2>(chunkSpawnRadius);
+		for (int i = 0; i < EntityParams.Num();i++) {
+			EntityParams[i].addChunksAroundPlayer<l2>();
+		}
+	}
+	inline void update() {
+		const double3 playerPos = getPlayerPos();
+		playerCrossedChunkBoundary = false;
+		if (TerrainGrid.update(playerPos, chunkSpawnRadius)) {
+			
+		}
+		playerCrossedChunkBoundary |= TerrainGrid.playerCrossedChunkBoundary;
+		for (int i = 0; i < EntityParams.Num(); i++) {
+			if (EntityParams[i].update(playerPos)) {
+				UE_LOGFMT(LogCore, Warning, "Entity[{0}]=\n{1}",i, EntityParams[i].SpawnGrid.toDebugStr());
+			}
+			playerCrossedChunkBoundary |= EntityParams[i].SpawnGrid.playerCrossedChunkBoundary;
+		}
 	}
 	template<bool async>
 	inline bool generateChunksAroundPlayer() {
-		const int2 centerPos = absChunkOffset;
-		for (int i = 0; i < TerrainGrid.chunkDistances.Num(); i++) {
-			const ChunkDist& chunk = TerrainGrid.chunkDistances[i];
-			const int sectionIdx = TerrainGrid.getSectionIdx(chunk.chunkIdx);
-			if (sectionIdx >= 0) {
-				SectionStatus& sectionStatus = TerrainGrid.sections[sectionIdx];
-				if (sectionStatus.newlyAdded) {
-					const int2 absPos = centerPos + chunk.chunkPos;
-					UE_LOGFMT(LogCore, Warning, "Request {0} at {1},{2}", sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
-
-					if (async) {
-						meshGenResult.clearEverythingButTriangles();
-						generateChunk(absPos, chunk.distLinf, meshGenResult, sectionIdx);
-						resultSectionIdx = sectionIdx;
-						genStatus = GenStatus::MESH_GEN_RESULT_IS_READY;
-						return true;
-					}
-					else {
-						proc_assets::Mesh mesh;
-						if (sectionStatus.wentOutOfBounds) {
-							check(sectionStatus.hasContent);
-							removeMeshSection(sectionIdx);
-							sectionStatus.wentOutOfBounds = false;
-							sectionStatus.hasContent = false;
-						}
-						generateChunk(absPos, chunk.distLinf, mesh, sectionIdx);
-						addMeshSection(mesh, sectionIdx);
-						sectionStatus.newlyAdded = false;
-						sectionStatus.hasContent = true;
-					}					
-				}
-			}
-		}
-		check(foliageSectionsToLoad.IsEmpty() && foliageSectionsToUnload.IsEmpty());
-		for (int j = 0; j < FoliageParams.Num(); j++) {
-			FFoliageParams& params = FoliageParams[j];
+		if (!async || TerrainGrid.playerCrossedChunkBoundary || TerrainGrid.couldHaveMoreChunksToLoad) {
+			if (async)TerrainGrid.playerCrossedChunkBoundary = false;
 			for (int i = 0; i < TerrainGrid.chunkDistances.Num(); i++) {
 				const ChunkDist& chunk = TerrainGrid.chunkDistances[i];
-				const int sectionIdx = TerrainGrid.chunkToSection[chunk.chunkIdx];
-				if (sectionIdx > -1) {
-					if (params.spawnRadius >= chunk.distL2) {
-						if (!params.cache.sections[sectionIdx].isLoaded) {
-							if (async) {
-								UE_LOGFMT(LogCore, Warning, "Load {0} at {1},{2}", sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
-								check(!foliageSectionsToLoad.Contains(sectionIdx));
-								foliageSectionsToLoad.Add(sectionIdx);
+				const int sectionIdx = TerrainGrid.getSectionIdx(chunk.chunkIdx);
+				const int2 absPos = TerrainGrid.absChunkOffset + chunk.chunkPos;  //TODO: here is a race condition. absChunkOffset could change since the last time we read sectionIdx.
+				if (sectionIdx >= 0) {
+					SectionStatus& sectionStatus = TerrainGrid.sections[sectionIdx];
+					if (sectionStatus.newlyAdded) {						
+						UE_LOGFMT(LogCore, Warning, "Request {0} at {1},{2}", sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
+						if (async) {
+							meshGenResult.clearEverythingButTriangles();
+							generateChunk(absPos, chunk.distLinf, meshGenResult, sectionIdx);
+							resultSectionIdx = sectionIdx;
+							genStatus = GenStatus::MESH_GEN_RESULT_IS_READY;
+							TerrainGrid.couldHaveMoreChunksToLoad = true;
+							return true;
+						}
+						else {
+							proc_assets::Mesh mesh;
+							if (sectionStatus.wentOutOfBounds) {
+								check(sectionStatus.hasContent);
+								removeMeshSection(sectionIdx);
+								sectionStatus.wentOutOfBounds = false;
+								sectionStatus.hasContent = false;
 							}
-							else {
-								params.loadSection(sectionIdx);
-							}
+							generateChunk(absPos, chunk.distLinf, mesh, sectionIdx);
+							addMeshSection(mesh, sectionIdx);
+							sectionStatus.newlyAdded = false;
+							sectionStatus.hasContent = true;
 						}
 					}
-					else if (params.spawnRadius + 1 < chunk.distL2) {
-						if (params.cache.sections[sectionIdx].isLoaded) {
-							if (async) {
-								UE_LOGFMT(LogCore, Warning, "Unload {0} at {1},{2}", sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
-								check(!foliageSectionsToUnload.Contains(sectionIdx));
-								foliageSectionsToUnload.Add(sectionIdx);
+				}
+			}
+			if (async)TerrainGrid.couldHaveMoreChunksToLoad = false;
+		}
+		check(entitySectionsToLoad.IsEmpty() && entitySectionsToUnload.IsEmpty());
+		for (int entityIdx = 0; entityIdx < EntityParams.Num(); entityIdx++) {
+			FEntityParams& params = EntityParams[entityIdx];
+			FMovingGrid & grid = params.SpawnGrid;
+			if (!async || grid.playerCrossedChunkBoundary || grid.couldHaveMoreChunksToLoad) {
+				if (async)grid.playerCrossedChunkBoundary = false;
+				for (int typeIdx = 0; typeIdx < params.Types.Num(); typeIdx++) {
+					FEntityType& t = params.Types[typeIdx];
+					for (int i = 0; i < grid.chunkDistances.Num(); i++) {
+						const ChunkDist& chunk = grid.chunkDistances[i];
+						const int sectionIdx = grid.chunkToSection[chunk.chunkIdx];
+						const int2 absPos = grid.absChunkOffset + chunk.chunkPos; //TODO: here is a race condition. absChunkOffset could change since the last time we read sectionIdx.
+						if (sectionIdx > -1) {
+							const float dist = chunk.distL2;
+							SectionStatus& sectionStatus = grid.sections[sectionIdx];
+							if (sectionStatus.newlyAdded) {
+								sectionStatus.hasContent = true;
+								sectionStatus.newlyAdded = false;
+								sectionStatus.wentOutOfBounds = false;
+								UE_LOGFMT(LogCore, Warning, "Generate entity {0} in section {1} at {2},{3}", entityIdx, sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
+								generateEntity(absPos, dist, entityIdx, sectionIdx); // this does not require any sync with game thread 
+								// so we don't return here like we did after generating chunk mesh
 							}
-							else {
-								params.unloadSection(sectionIdx);
+
+							if (sectionStatus.wentOutOfBounds || t.unloadRadius <= dist) {
+								if (t.cache.sections[sectionIdx].isLoaded) { 
+									if (async) {
+										UE_LOGFMT(LogCore, Warning, "Unload entity {0} in section {1} at {2},{3}", entityIdx, sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
+										check(!entitySectionsToUnload.Contains(sectionIdx));
+										entitySectionsToUnload.Add(sectionIdx);
+									}
+									else {
+										t.unloadSection(sectionIdx);
+									}
+								}
+								else {
+									check(!t.cache.sections[sectionIdx].isDirty);
+								}
+
+							}else if (t.loadRadius >= dist) {
+								if (!t.cache.sections[sectionIdx].isLoaded || t.cache.sections[sectionIdx].isDirty) {
+									if (async) {
+										UE_LOGFMT(LogCore, Warning, "Load entity {0} in section {1} at {2},{3}", entityIdx, sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
+										check(!entitySectionsToLoad.Contains(sectionIdx));
+										entitySectionsToLoad.Add(sectionIdx);
+									}
+									else {
+										t.loadSection(sectionIdx);
+									}
+								}
 							}
+
+						}
+					}
+					if (async) {
+						if (!entitySectionsToLoad.IsEmpty() || !entitySectionsToUnload.IsEmpty()) {
+							resultEntityIdx = entityIdx;
+							resultEntityTypeIdx = typeIdx;
+							genStatus = GenStatus::FOLIAGE_UPDATE_IS_NEEDED;
+							grid.couldHaveMoreChunksToLoad = true;
+							return true;
 						}
 						
 					}
 				}
-			}
-			if (async) {
-				if (!foliageSectionsToLoad.IsEmpty() || !foliageSectionsToUnload.IsEmpty()) {
-					resultFoliageIdx = j;
-					genStatus = GenStatus::FOLIAGE_UPDATE_IS_NEEDED;
-					return true;
-				}
+				grid.couldHaveMoreChunksToLoad = false;
 			}
 		}
 		return false;
@@ -248,24 +287,24 @@ private:
 	inline bool applyResults() {
 		switch (genStatus) {
 		case GenStatus::FOLIAGE_UPDATE_IS_NEEDED: {
-			FFoliageParams& params = FoliageParams[resultFoliageIdx];
-			if (foliageSectionsToLoad.IsEmpty()) {
-				if (foliageSectionsToUnload.IsEmpty()) {  
+			FEntityParams& params = EntityParams[resultEntityIdx];
+			if (entitySectionsToLoad.IsEmpty()) {
+				if (entitySectionsToUnload.IsEmpty()) {  
 					genStatus = GenStatus::IDLE; // we finished popping everything
 					return true;
 				}
 				else {
-					check(params.cache.sections[foliageSectionsToUnload.Last()].isLoaded);
-					params.unloadSection(foliageSectionsToUnload.Pop());
+					//check(params.cache.sections[entitySectionsToUnload.Last()].isLoaded);
+					params.Types[resultEntityTypeIdx].unloadSection(entitySectionsToUnload.Pop());
 				}
 			}
 			else {
-				if (foliageSectionsToUnload.IsEmpty()) {
-					check(!params.cache.sections[foliageSectionsToLoad.Last()].isLoaded);
-					params.loadSection(foliageSectionsToLoad.Pop());
+				if (entitySectionsToUnload.IsEmpty()) {
+					//check(!params.cache.sections[entitySectionsToLoad.Last()].isLoaded);
+					params.Types[resultEntityTypeIdx].loadSection(entitySectionsToLoad.Pop());
 				}
 				else {
-					params.loadUnloadSection(foliageSectionsToLoad.Pop(), foliageSectionsToUnload.Pop());
+					params.Types[resultEntityTypeIdx].loadUnloadSection(entitySectionsToLoad.Pop(), entitySectionsToUnload.Pop());
 				}
 			}
 			return false;
@@ -295,7 +334,7 @@ protected:
 	virtual void BeginPlay() override;
 
 public:
-	// Called every frame
+	// Called every Entity
 	virtual void Tick(float DeltaTime) override;
 
 

@@ -12,7 +12,9 @@ void UInventory::NativeConstruct()
 
 void UInventory::setInventory(UActorInventory * inventory)
 {
+
     check(inventory != nullptr);
+    inventory->currentWidget = this;
     this->Inventory = inventory;
     ItemListView->SetListItems(inventory->Items);
 }

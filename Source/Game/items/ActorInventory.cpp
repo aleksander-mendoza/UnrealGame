@@ -35,24 +35,57 @@ void UActorInventory::TickComponent(float DeltaTime, ELevelTick TickType, FActor
 	
 }
 
-void UActorInventory::ResetToDefaultItems()
+bool UActorInventory::equipItem(UItemObject* item, bool leftHand, bool unequipClothesWithOverlappingSlots)
 {
-	for (int i = 0; i < DefaultItems.Instances.Num(); i++) {
-		UItemObject* item = NewObject<UItemObject>();
-		item->Instance = DefaultItems.Instances[i];
-		Items.Add(item);
-
+	const FItem* meta = item->Instance.getRow();
+	if (meta->isWearable()) {
+		if (containerEvents && !containerEvents->CanWear(*meta)) return false;
+		if (!canPutOn(*meta)) {
+			if (unequipClothesWithOverlappingSlots && canMakeSpaceFor(*meta)) {
+				const bool r = makeSpaceFor<true>(*meta);
+				check(r);
+			}
+			else {
+				return false;
+			}
+		}
+		const bool r = addClothingItem<true>(item);
+		check(r);
+		return true;
 	}
+	else {
+		takeInHand(item, leftHand);
+		return true;
+	}
+	
 }
 
-void UActorInventory::ResetToDefaultClothes()
+bool UActorInventory::unequipItem(UItemObject* item, bool force)
 {
-	for (int i = 0; i < DefaultClothes.Instances.Num(); i++) {
-		UItemObject* item = NewObject<UItemObject>();
-		item->Instance = DefaultClothes.Instances[i];
-		Items.Add(item);
-		const bool b = addClothingItem<true>(item);
-		check(b);
+	check(item->container == this);
+	if (item->equippedAt >= 0) {
+		if (force)return removeClothingItem<false>(item);
+		else return removeClothingItem<true>(item);
 	}
+	else if (item->equippedAt == -1) {
+		check(item == RightHand);
+		emptyRightHand();
+		return true;
+	}
+	else if (item->equippedAt == -2) {
+		check(item == LeftHand);
+		emptyLeftHand();
+		return true;
+	}
+	else if (item->equippedAt == -4) {
+		check(item == RightHand);
+		check(item == LeftHand);
+		emptyBothHands();
+		return true;
+	}
+	return false;
 }
+
+
+
 

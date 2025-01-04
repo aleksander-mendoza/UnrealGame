@@ -36,4 +36,10 @@ struct GAME_API FItemInstance : public FTableRowBase
 		return Item.GetRow<FItem>("");
 	}
 
+	inline USkeletalMesh* getSkeletalMesh() {
+		return getRow()->getSkeletalMesh();
+	}
+	inline UStaticMesh* getMesh() {
+		return getRow()->getMesh();
+	}
 };

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "WorldGenUtils.h"
+#include "../items/ItemActor.h"
 #include "Logging/StructuredLog.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "EntityType.generated.h"
@@ -29,10 +30,23 @@ struct GAME_API FEntityType
 	float density;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TEnumAsByte<EComponentMobility::Type> Mobility= EComponentMobility::Static;
+	
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool treatDensityAsMaxCount=false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool simulatePhysics;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	UStaticMesh * Mesh;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float loadRadius=-1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool updateNav = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float unloadRadius = -1;
@@ -42,7 +56,7 @@ struct GAME_API FEntityType
 	UPROPERTY()
 	UInstancedStaticMeshComponent* InstancedMesh=nullptr;
 
-	
+
 	EntityChunks cache;
 
 	inline void initMesh(UObject* owner, USceneComponent* parent) {
@@ -50,9 +64,12 @@ struct GAME_API FEntityType
 		InstancedMesh = NewObject<UInstancedStaticMeshComponent>(owner, UInstancedStaticMeshComponent::StaticClass());
 		InstancedMesh->bDisableCollision = !hasCollisions;
 		InstancedMesh->SetRemoveSwap();
+		InstancedMesh->SetSimulatePhysics(simulatePhysics);
 		InstancedMesh->SetStaticMesh(Mesh);
+		InstancedMesh->SetMobility(Mobility);
 		InstancedMesh->RegisterComponent();
 		InstancedMesh->AttachToComponent(parent, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		
 	}
 	inline void addInstance(int sectionIdx, FTransform t) {
 		cache.sections[sectionIdx].instanceTransforms.Add(t);
@@ -79,13 +96,13 @@ struct GAME_API FEntityType
 		if (chunk.instanceIndices.Num() > chunk.instanceTransforms.Num()) {
 			TArrayView<FPrimitiveInstanceId> view = chunk.instanceIndices;
 			view.RightChopInline(chunk.instanceTransforms.Num());
-			InstancedMesh->RemoveInstancesById(view, false);
+			InstancedMesh->RemoveInstancesById(view, updateNav);
 			chunk.instanceIndices.SetNum(chunk.instanceTransforms.Num());
 		}
 		else if (chunk.instanceIndices.Num() < chunk.instanceTransforms.Num()) {
 			TArrayView<FTransform> view = chunk.instanceTransforms;
 			view.RightChopInline(chunk.instanceIndices.Num());
-			chunk.instanceIndices += InstancedMesh->AddInstancesById(view, false);
+			chunk.instanceIndices += InstancedMesh->AddInstancesById(view, updateNav);
 		}
 		chunk.isDirty = false;
 	}
@@ -113,7 +130,7 @@ struct GAME_API FEntityType
 		else if (!chunk.isLoaded) {
 			UE_LOGFMT(LogCore, Warning, "Loaded {0} (seed={1})", sectionIdx, seed);
 			check(chunk.instanceIndices.IsEmpty());
-			chunk.instanceIndices = InstancedMesh->AddInstancesById(chunk.instanceTransforms, false);
+			chunk.instanceIndices = InstancedMesh->AddInstancesById(chunk.instanceTransforms, updateNav);
 			chunk.isLoaded = true;
 			return true;
 		}
@@ -127,7 +144,7 @@ struct GAME_API FEntityType
 		EntityChunk& chunk = cache.sections[sectionIdx];
 		if (chunk.isLoaded) {
 			UE_LOGFMT(LogCore, Warning, "Unloaded {0} (seed={1})", sectionIdx, seed);
-			InstancedMesh->RemoveInstancesById(chunk.instanceIndices, false);
+			InstancedMesh->RemoveInstancesById(chunk.instanceIndices, updateNav);
 			chunk.instanceIndices.Empty();
 			chunk.isLoaded = false;
 			chunk.isDirty = false;

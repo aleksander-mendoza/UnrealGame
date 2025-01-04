@@ -4,36 +4,47 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "Logging/LogMacros.h"
 #include "ui/TargetLockWidgetActor.h"
 #include "ui/Inventory.h"
+#include "proc_assets/WorldGen.h"
 #include "items/ActorInventory.h" 
+#include "items/Container.h" 
 #include "GameCharacter.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
 struct FInputActionValue;
+struct Ray {
+	FVector start, end;
+};
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 
 
 UCLASS(config=Game)
-class AGameCharacter : public ACharacter
+class AGameCharacter : public ACharacter , public ContainerEvents
 {
 	GENERATED_BODY()
 
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-	USpringArmComponent* CameraBoom;
+	TObjectPtr<USpringArmComponent> CameraBoom;
 
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-	UCameraComponent* FollowCamera;
+	TObjectPtr<UCameraComponent> FollowCamera;
 
 	/** First Person camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-	UCameraComponent* FirstPersonCamera;
+	TObjectPtr<UCameraComponent> FirstPersonCamera;
+
+	/** First Person camera */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPhysicsHandleComponent> PhysicsHandle;
+	double physicshandleDistance=-1;
 
 	/** The female skeletal mesh associated with this Character (optional sub-object). */
 	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
@@ -89,12 +100,26 @@ class AGameCharacter : public ACharacter
 	UAnimMontage* AttackComboAnim;
 	bool IsAttacking=false;
 	bool DoNextCombo = false;
-
+	/** Hand socket (right)*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	FName HandSocketR;
+	/** Hand socket (right)*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	FName HandSocketL;
 
 	UPROPERTY()
 	TArray<TObjectPtr<USkeletalMeshComponent>> Clothes;
 
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> LeftHandMesh;
+
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> RightHandMesh;
+
+	AWorldGen* worldGenRef;
+
 public:
+	
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
@@ -112,7 +137,9 @@ public:
 	/** Called for lock-on input */
 	void LockOntoEnemy(const FInputActionValue& Value);
 	/** Called for interaction input */
-	void Interact(const FInputActionValue& Value);
+	void InteractStart(const FInputActionValue& Value);
+	/** Called for interaction input */
+	void InteractEnd(const FInputActionValue& Value);
 	/** Called for camera zoom input */
 	void CameraZoomIn(const FInputActionValue& Value);
 	void CameraZoomOut(const FInputActionValue& Value);
@@ -142,6 +169,42 @@ public:
 
 	void SetSwimming(bool isSwimming);
 
+	void getRay(double length, Ray& ray);
+	FVector getRayEnd(double length);
+
+	
+
+	virtual void OnEquipBothHands(TObjectPtr < UItemObject > item) override {
+		LeftHandMesh->SetStaticMesh(item->getMesh());
+	}
+	virtual void OnEquipLeftHand(TObjectPtr < UItemObject > item) override {
+		LeftHandMesh->SetStaticMesh(item->getMesh());
+	}
+	virtual void OnEquipRightHand(TObjectPtr < UItemObject > item) override {
+		RightHandMesh->SetStaticMesh(item->getMesh());
+	}
+	virtual void OnUnequipBothHands(TObjectPtr < UItemObject > item) override {
+		LeftHandMesh->SetStaticMesh(nullptr);
+	}
+	virtual void OnUnequipLeftHand(TObjectPtr < UItemObject > item) override {
+		LeftHandMesh->SetStaticMesh(nullptr);
+	}
+	virtual void OnUnequipRightHand(TObjectPtr < UItemObject > item) override {
+		RightHandMesh->SetStaticMesh(nullptr);
+	}
+	virtual void OnEquipClothes(TObjectPtr < UItemObject > item) override;
+	virtual void OnUnequipClothes(TObjectPtr < UItemObject > item) override {
+		const int idx = item->equippedAt;
+		Clothes[idx]->UnregisterComponent();
+		Clothes.RemoveAtSwap(idx);
+	}
+	virtual void OnPutItem(TObjectPtr<UItemObject> item) override {}
+	virtual void OnDropItem(TObjectPtr<UItemObject> item) override;
+	virtual bool CanWear(const FItem& item) override {
+		if (IsFemale)return item.Class == EItemClass::FEMALE_CLOTHES;
+		else return item.Class == EItemClass::MALE_CLOTHES;
+	}
+
 	inline void SetGender(const  bool isFemale) {
 		if (isFemale != IsFemale) {
 			IsFemale = isFemale;
@@ -150,90 +213,13 @@ public:
 			mesh->SetAnimInstanceClass(isFemale ? FemaleAnimClass : MaleAnimClass);
 		}
 	}
-	/**returns true if the clothing item is wearable and matches the gender/race of this character*/
-	inline bool canWear(const FItem & item) const {
-		if (IsFemale)return item.Class == EItemClass::FEMALE_CLOTHES;
-		else return item.Class == EItemClass::MALE_CLOTHES;
-	}
 	
-	
-	/**Returns false if the item couldn't be equipped. Potential reasons would be
-	1. it wasn't a clothing item 
-	2. it was clothing item but not for this character (mismatched geneder/race)
-	3. unequipClothesWithOverlappingSlots was set to false and the character was already wearing clothes with overlapping slots
-	4. unequipClothesWithOverlappingSlots was set to true but one of the already equipped conflicting items was devious */
-	bool putOnClothingItem(UItemObject* item, bool unequipClothesWithOverlappingSlots=true);
-	/**Returns false if the item couldn't be unequipped. This can happend in case of clothes that are marked as devious. Use force=true to force the lock open*/
-	bool takeOffClothingItem(UItemObject* item, bool force = false);
-	/**Returns false if the item couldn't be equipped (and the old item also was not uneqipped). Potential reasons would be
-	1. it wasn't a clothing item
-	2. it was clothing item but not for this character (mismatched geneder/race)
-	3. unequipClothesWithOverlappingSlots was set to false and the character was already wearing clothes with overlapping slots.
-	4. the old item was devious
-	5. unequipClothesWithOverlappingSlots was set to true but one of the already equipped conflicting items was devious
-	*/
-	//bool swapClothingItem(UItemObject* oldItem, UItemObject* newItem, bool unequipClothesWithOverlappingSlots = true);
 private:
-	inline void addClothingComponent(UItemObject* item) {
-		const FItem* row = item->Instance.getRow();
-		if (!row->WearableMesh.IsValid()) {
-			row->WearableMesh.LoadSynchronous();
-		}
-		USkeletalMesh* clothingMesh = row->WearableMesh.Get();
-		USkeletalMeshComponent* clothingComp = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass());
-		USkeletalMeshComponent* playerMesh = GetMesh();
-		clothingComp->RegisterComponent();
-		clothingComp->AttachToComponent(playerMesh, FAttachmentTransformRules::SnapToTargetIncludingScale);
-		clothingComp->SetSkeletalMesh(clothingMesh);
-		clothingComp->SetAnimInstanceClass(playerMesh->AnimClass);
-		clothingComp->SetLeaderPoseComponent(playerMesh, true);
-		const int idx = Clothes.Add(clothingComp);
-		checkf(item->equippedAt == idx, TEXT("%d != %d"), item->equippedAt, idx);
-		check(Inventory->Clothes[item->equippedAt] == item);
-	}
 
-	inline void resetClothes(){
-		for (int i = 0; i < Inventory->Clothes.Num(); i++) {
-			addClothingComponent(Inventory->Clothes[i]);
-		}
-	}
+	
 
-	template<bool onlyIfNotConflicting>
-	inline bool addClothingItem(UItemObject* item) {
-		if (Inventory->addClothingItem<onlyIfNotConflicting>(item)) {
-			addClothingComponent(item);
-			return true;
-		}
-		else {
-			return false;
-		}
-	}
-	template<bool onlyIfNotDevious>
-	inline bool removeClothingItem(UItemObject* item) {
-		const int idx = item->equippedAt;
-		if (Inventory->removeClothingItem<onlyIfNotDevious>(item)) {
-			Clothes[idx]->UnregisterComponent();
-			Clothes.RemoveAtSwap(idx);
-			check(idx < Inventory->Clothes.Num() || idx == Inventory->Clothes[idx]->equippedAt);
-			return true;
-		}
-		else {
-			return false;
-		}
-	}
-	template<bool onlyIfNotDevious>
-	inline bool makeSpaceFor(const FItem& item) {
-		for (int clothesIdx = 0; clothesIdx < Inventory->Clothes.Num(); clothesIdx++) {
-			UItemObject* equippedItemObj = Inventory->Clothes[clothesIdx];
-			const FItem* equippedItem = equippedItemObj->Instance.getRow();
-			if (equippedItem->conflictsWith(item)) {
-				if (!removeClothingItem<onlyIfNotDevious>(equippedItemObj)) {
-					return false;
-				}
-			}
-		}
-		return true;
-	}
+
+	
 protected:
 	// To add mapping context
 	virtual void BeginPlay();

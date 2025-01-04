@@ -18,10 +18,15 @@ class GAME_API UInventory : public UUserWidget
 	
 	virtual void NativeConstruct() override;
 	//virtual void NativeOnInitialized() override;
-private:
-	UActorInventory * Inventory;
 public:
+	UActorInventory* Inventory;
 	void setInventory(UActorInventory * Inventory);
+	void removeItem(UItemObject* item) {
+		ItemListView->RemoveItem(item);
+	}
+	void refresh() {
+		ItemListView->RequestRefresh();
+	}
 protected:
 	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
 	UListView* ItemListView;

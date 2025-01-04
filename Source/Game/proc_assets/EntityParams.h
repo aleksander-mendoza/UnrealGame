@@ -50,7 +50,9 @@ struct GAME_API FEntityParams
 			else {
 				t.loadRadius = math::min(t.loadRadius, spawnRadius);
 			}
-			t.density = math::min(t.density, 0.01);
+			if (!t.treatDensityAsMaxCount) {
+				t.density = math::min(t.density, 0.01);
+			}
 			if (t.seed == -1)t.seed = idx*500 + i;
 			t.initMesh(owner, parent);
 			check(t.unloadRadius <= SpawnGrid.radius);

@@ -103,7 +103,8 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 			EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::EndRun);
 			EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::CameraZoom);
 			EnhancedInputComponent->BindAction(LockAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::LockOntoEnemy);
-			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::Interact);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::InteractStart);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::InteractEnd);
 			EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::Attack);
 
 			EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &AGamePlayerController::TriggerInventory);
@@ -131,6 +132,7 @@ void AGamePlayerController::Look(const FInputActionValue& Value)
 void AGamePlayerController::TriggerInventory(const FInputActionValue& Value)
 {
 	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
+		if (hud->isRaceMenuOpen())return;
 		if(hud->canOpenInventory()){
 			const bool openInv = hud->isInventoryOpen();
 			if (openInv) {
@@ -147,7 +149,7 @@ void AGamePlayerController::TriggerInventory(const FInputActionValue& Value)
 				
 			}
 			SetShowMouseCursor(!openInv);
-			SetPause(!openInv);
+			//SetPause(!openInv);
 		}
 	}
 
@@ -156,6 +158,7 @@ void AGamePlayerController::TriggerInventory(const FInputActionValue& Value)
 void AGamePlayerController::TriggerRaceMenu(const FInputActionValue& Value)
 {
 	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
+		if (hud->isInventoryOpen())return;
 		if (hud->canOpenRaceMenu()) {
 			const bool openInv = hud->isRaceMenuOpen();
 			if (openInv) {

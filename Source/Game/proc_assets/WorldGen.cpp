@@ -16,6 +16,7 @@ AWorldGen::AWorldGen() :  meshGenResult()
 	PrimaryActorTick.bCanEverTick = true;
 	TerrainMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("TerrainMesh"));
 	TerrainMesh->SetupAttachment(GetRootComponent());
+	TerrainMesh->SetMobility(EComponentMobility::Static);
 	TerrainMesh->bUseAsyncCooking = true;
 }
 

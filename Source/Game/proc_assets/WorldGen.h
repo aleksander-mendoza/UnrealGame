@@ -76,7 +76,44 @@ private:
 	bool playerCrossedChunkBoundary = false;
 	bool isBusy = false;
 	
-	
+
+	UPROPERTY()
+	TArray<TObjectPtr<AItemActor>> usedStaticActorPool;
+	TArray<TObjectPtr<AItemActor>> unusedStaticActorPool;
+
+public:
+	void despawnItem(TObjectPtr<AItemActor> item) {
+		usedStaticActorPool.RemoveSingleSwap(item);
+		unusedStaticActorPool.Add(item);
+		item->SetEnabled(false);
+	}
+	TObjectPtr<AItemActor> spawnItem(TObjectPtr<UItemObject> item, double3 loc,FRotator rot) {
+		UStaticMesh* mesh = item->getMesh();
+		TObjectPtr<AItemActor> a;
+		for (int i = 0; i < unusedStaticActorPool.Num(); i++) {
+			a = unusedStaticActorPool[i];
+			check(!a->isEnabled());
+			if (a->GetMesh() == mesh) {
+				unusedStaticActorPool.RemoveAtSwap(i, EAllowShrinking::No);
+				a->SetActorLocation(loc);
+				a->SetActorRotation(rot);
+				goto end;
+			}
+		}
+		
+		if (!unusedStaticActorPool.IsEmpty()) {
+			a = unusedStaticActorPool.Pop();
+			a->SetActorLocation(loc);
+			a->SetActorRotation(rot);
+		}
+		else {
+			a = GetWorld()->SpawnActor<AItemActor>(AItemActor::StaticClass(), loc, rot);
+		}
+	end:
+		a->setItem(item, mesh);
+		usedStaticActorPool.Add(a);
+		return a;
+	}
 	
 
 	inline void reset() {
@@ -115,9 +152,9 @@ private:
 		for (int typeIdx = 0; typeIdx < params.Types.Num(); typeIdx++) {
 			FEntityType& t = params.Types[typeIdx];
 			EntityChunk& chunk = t.clearSection(sectionIdx);
-			const int count = int(t.density * chunkSize * chunkSize);
 			const int seed = noise::hash(chunkAbsPos.X, chunkAbsPos.Y, t.seed);
 			blender::RandomNumberGenerator rng(seed);
+			const int count = t.treatDensityAsMaxCount ? (rng.get_int32() % int(t.density+1)) : int(t.density * chunkSize * chunkSize);
 
 			for (int i = 0; i < count; i++) {
 				const float2 position = offsetf + chunkSize * rng.get_float2();

@@ -44,6 +44,7 @@ public:
 		return RaceMenuInterface;
 	}
 	inline void hideInventory() {
+		InventoryInterface->Inventory->currentWidget = nullptr;
 		InventoryInterface->RemoveFromParent();
 		InventoryInterface = nullptr;
 	}

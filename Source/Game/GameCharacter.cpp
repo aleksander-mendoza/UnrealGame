@@ -14,6 +14,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Logging/StructuredLog.h"
+#include "Kismet/GameplayStatics.h"
 #include "anim/NotifyCombo.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
@@ -44,6 +45,8 @@ AGameCharacter::AGameCharacter()
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
+	USkeletalMeshComponent* playerMesh = GetMesh();
+
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -59,42 +62,32 @@ AGameCharacter::AGameCharacter()
 
 	// Create a follow camera
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-	FirstPersonCamera->SetupAttachment(GetMesh(), "head"); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
+	FirstPersonCamera->SetupAttachment(playerMesh, "head"); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FirstPersonCamera->SetRelativeTransform(FTransform(FRotator(0, 90, -90), FVector(0, 10, 0)));
 	FirstPersonCamera->bUsePawnControlRotation = true; // Camera rotates relative to head
 	FirstPersonCamera->SetActive(false);
 
+	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
+
+	
+	LeftHandMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftHandMesh"));
+	RightHandMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightHandMesh"));
+	LeftHandMesh->SetSimulatePhysics(false);
+	RightHandMesh->SetSimulatePhysics(false);
+	LeftHandMesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
+	RightHandMesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
+	RightHandMesh->RegisterComponent();
+	LeftHandMesh->RegisterComponent();
 
 	Inventory = CreateDefaultSubobject<UActorInventory>(TEXT("PlayerInventory"));
+	Inventory->containerEvents = this;
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 	SetGender(IsFemale);
+
+
 	
 
-}
-
-bool AGameCharacter::putOnClothingItem(UItemObject* item, bool unequipClothesWithOverlappingSlots)
-{
-	const FItem* meta = item->Instance.getRow();
-	if (!canWear(*meta)) return false;
-	if (!Inventory->canPutOn(*meta)) {
-		if (unequipClothesWithOverlappingSlots && Inventory->canMakeSpaceFor(*meta)) {
-			const bool r = makeSpaceFor<true>(*meta);
-			check(r);
-		}
-		else {
-			return false;
-		}
-	}
-	const bool r = addClothingItem<true>(item);
-	check(r);
-	return true;
-}
-
-bool AGameCharacter::takeOffClothingItem(UItemObject* item, bool force)
-{
-	if(force)return removeClothingItem<false>(item);
-	else return removeClothingItem<true>(item);
 }
 
 
@@ -111,9 +104,13 @@ void AGameCharacter::BeginPlay()
 			}
 		}
 	}
+	USkeletalMeshComponent* playerMesh = GetMesh();
+	const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
+	LeftHandMesh->AttachToComponent(playerMesh, atr, HandSocketL);
+	RightHandMesh->AttachToComponent(playerMesh, atr, HandSocketR);
+
 	ToggleDirectionalMovement(true);
-	Inventory->ResetToDefault();
-	resetClothes();
+	Inventory->ResetToDefault(GetWorld());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -194,17 +191,14 @@ void AGameCharacter::LockOntoEnemy(const FInputActionValue& Value) {
 	
 	if (TargetLockActor==nullptr) {
 
-		FTransform transform = GetCurrentCamera()->GetComponentTransform();
-		double3 start = transform.GetLocation();
-		start.Z += 20.;
-		double3 forward = transform.GetRotation().GetForwardVector();
-		double3 end = start + forward * TargetLockDistance;
+		Ray ray;
+		getRay(TargetLockDistance, ray);
 		TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
 		objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
 		TArray<AActor*> actorsToIgnore;
 		actorsToIgnore.Add(this);
 		FHitResult OutHit; 
-		if (UKismetSystemLibrary::SphereTraceSingleForObjects(GetWorld(), start, end, 150., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true)) {
+		if (UKismetSystemLibrary::SphereTraceSingleForObjects(GetWorld(), ray.start, ray.end, 150., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true)) {
 			LockOntoTarget(OutHit.GetActor());
 		}
 
@@ -224,20 +218,28 @@ void AGameCharacter::OnComboPartEnd(bool isLast) {
 		IsAttacking = false;
 	}
 }
-void AGameCharacter::Interact(const FInputActionValue& Value) {
-	FTransform transform = GetCurrentCamera()->GetComponentTransform();
-	double3 start = transform.GetLocation();
-	start.Z += 20.;
-	double3 forward = transform.GetRotation().GetForwardVector();
-	double3 end = start + forward * InteractDistance;
+void AGameCharacter::InteractStart(const FInputActionValue& Value) {
+	Ray ray;
+	getRay(InteractDistance, ray);
 	TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
 	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_WorldDynamic));
+	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_WorldStatic));
+	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
+	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_PhysicsBody));
 	TArray<AActor*> actorsToIgnore;
 	actorsToIgnore.Add(this);
 	FHitResult OutHit;
-	if (UKismetSystemLibrary::LineTraceSingleForObjects(GetWorld(), start, end, objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true)) {
-		OutHit.GetActor();
+	if (UKismetSystemLibrary::LineTraceSingleForObjects(GetWorld(), ray.start, ray.end, objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true)) {
+		auto h = OutHit.GetHitObjectHandle();
+		auto c = OutHit.GetComponent();
+		physicshandleDistance = OutHit.Distance;
+		PhysicsHandle->GrabComponentAtLocationWithRotation(c,"",h.GetLocation(),h.GetRotation());
+		
 	}
+}
+void AGameCharacter::InteractEnd(const FInputActionValue& Value) {
+	PhysicsHandle->ReleaseComponent();
+	physicshandleDistance = -1;
 }
 void AGameCharacter::Attack(const FInputActionValue& Value) {
 	if (IsAttacking) {
@@ -304,6 +306,48 @@ void AGameCharacter::SetSwimming(bool isSwimming) {
 	
 }
 
+void AGameCharacter::getRay(double length, Ray& ray) {
+	FTransform transform = GetCurrentCamera()->GetComponentTransform();
+	ray.start = transform.GetLocation();
+	ray.start.Z += 20.;
+	double3 forward = transform.GetRotation().GetForwardVector();
+	ray.end = ray.start + forward * length;
+}
+
+
+double3 AGameCharacter::getRayEnd(double length) {
+	Ray ray;
+	getRay(length, ray);
+	return ray.end;
+}
+
+void AGameCharacter::OnEquipClothes(TObjectPtr<UItemObject> item)
+{
+	USkeletalMesh* clothingMesh = item->getSkeletalMesh();
+	USkeletalMeshComponent* clothingComp = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass());
+	USkeletalMeshComponent* playerMesh = GetMesh();
+	clothingComp->RegisterComponent();
+	clothingComp->AttachToComponent(playerMesh, FAttachmentTransformRules::SnapToTargetIncludingScale);
+	clothingComp->SetSkeletalMesh(clothingMesh);
+	clothingComp->SetAnimInstanceClass(playerMesh->AnimClass);
+	clothingComp->SetLeaderPoseComponent(playerMesh, true);
+	const int idx = Clothes.Add(clothingComp);
+	checkf(item->equippedAt == idx, TEXT("%d != %d"), item->equippedAt, idx);
+	check(Inventory->Clothes[item->equippedAt] == item);
+}
+
+void AGameCharacter::OnDropItem(TObjectPtr<UItemObject> item) {
+	if (worldGenRef == nullptr) {
+		TSubclassOf<AWorldGen> ClassToFind = AWorldGen::StaticClass();
+		TArray<AActor*> FoundActors;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ClassToFind, FoundActors);
+		check(FoundActors.Num()==1);
+		worldGenRef = Cast<AWorldGen>(FoundActors[0]);
+		check(worldGenRef != nullptr);
+	}
+	worldGenRef->spawnItem(item, GetActorLocation(), FRotator());
+}
+
 
 void AGameCharacter::Tick(float DeltaTime) {
 	if (TargetLockActor!=nullptr) {
@@ -313,5 +357,11 @@ void AGameCharacter::Tick(float DeltaTime) {
 		rot.Pitch -= 20.;
 		GetController()->SetControlRotation(rot);
 	}
+	if (physicshandleDistance>0) {
+		double3 pos = getRayEnd(physicshandleDistance);
+		PhysicsHandle->SetTargetLocation(pos);
+	}
 	
 }
+
+

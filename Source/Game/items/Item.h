@@ -120,4 +120,16 @@ struct GAME_API FItem : public FTableRowBase
 	inline bool hardConflictsWith(const FItem& other) const {
 		return isDevious() && conflictsWith(other);
 	}
+	inline USkeletalMesh* getSkeletalMesh() {
+		if (!WearableMesh.IsValid()) {
+			WearableMesh.LoadSynchronous();
+		}
+		return WearableMesh.Get();
+	}
+	inline UStaticMesh* getMesh() {
+		if (!Mesh.IsValid()) {
+			Mesh.LoadSynchronous();
+		}
+		return Mesh.Get();
+	}
 };

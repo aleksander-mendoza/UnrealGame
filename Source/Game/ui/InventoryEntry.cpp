@@ -31,16 +31,16 @@ void UInventoryEntry::setStatus() {
 		StatusLabel->SetText(FText::FromString("LR"));
 	}
 	else if (Item->equippedAt == -3) {
-		StatusLabel->SetText(FText::FromString("  "));
+		StatusLabel->SetText(FText::FromString(""));
 	}
 	else if (Item->equippedAt == -2) {
-		StatusLabel->SetText(FText::FromString("L "));
+		StatusLabel->SetText(FText::FromString("L"));
 	}
 	else if (Item->equippedAt == -1) {
-		StatusLabel->SetText(FText::FromString("R "));
+		StatusLabel->SetText(FText::FromString("R"));
 	}
 	else if (Item->equippedAt >= 0) {
-		StatusLabel->SetText(FText::FromString("* "));
+		StatusLabel->SetText(FText::FromString("*"));
 	}
 }
 void UInventoryEntry::NativeOnItemSelectionChanged(bool bIsSelected)

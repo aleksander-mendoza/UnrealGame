@@ -309,7 +309,7 @@ void AGameCharacter::SetSwimming(bool isSwimming) {
 void AGameCharacter::getRay(double length, Ray& ray) {
 	FTransform transform = GetCurrentCamera()->GetComponentTransform();
 	ray.start = transform.GetLocation();
-	ray.start.Z += 20.;
+	//ray.start.Z += 20.;
 	double3 forward = transform.GetRotation().GetForwardVector();
 	ray.end = ray.start + forward * length;
 }

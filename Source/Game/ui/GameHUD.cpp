@@ -3,3 +3,7 @@
 
 #include "GameHUD.h"
 
+void AGameHUD::BeginPlay()
+{
+	StatusWidget->AddToViewport(9998);
+}

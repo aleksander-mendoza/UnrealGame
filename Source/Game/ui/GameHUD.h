@@ -6,6 +6,7 @@
 #include "GameFramework/HUD.h"
 #include "Inventory.h"
 #include "RaceMenu.h"
+#include "Status.h"
 #include "../GameCharacter.h"
 #include "GameHUD.generated.h"
 
@@ -17,7 +18,15 @@ class GAME_API AGameHUD : public AHUD
 {
 	GENERATED_BODY()
 
+protected:
+	virtual void BeginPlay();
+
 public:
+
+	
+
+	UPROPERTY(EditAnywhere, Category = "User Interface")
+	TObjectPtr<UStatus> StatusWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "User Interface")
 	TSubclassOf<URaceMenu> RaceMenuWidgetClass;

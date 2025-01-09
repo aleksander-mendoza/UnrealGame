@@ -39,6 +39,17 @@ struct EntityChunks {
 	TArray<EntityChunk> sections;
 
 };
+struct TileMeta {
+	FPrimitiveInstanceId id;
+	int tileIdx;
+};
+struct TileChunk {
+	TMap<int3, TileMeta> posToInstance;
+};
+
+struct TileChunks {
+	TArray<TileChunk> sections;
+};
 
 struct SectionStatus {
 	bool wentOutOfBounds = false;

@@ -14,6 +14,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Logging/StructuredLog.h"
+#include "proc_assets/WorldGen.h"
 #include "Kismet/GameplayStatics.h"
 #include "anim/NotifyCombo.h"
 
@@ -50,7 +51,7 @@ AGameCharacter::AGameCharacter()
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f; // The camera follows at this distance behind the character	
+	CameraBoom->TargetArmLength = 0.; // The camera follows at this distance behind the character	
 	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
 
 	// Create a follow camera
@@ -58,14 +59,14 @@ AGameCharacter::AGameCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 	FollowCamera->SetRelativeTransform(FTransform(FVector(0., 0., 40.)));
-	FollowCamera->SetActive(true);
+	FollowCamera->SetActive(false);
 
 	// Create a follow camera
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
 	FirstPersonCamera->SetupAttachment(playerMesh, "head"); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FirstPersonCamera->SetRelativeTransform(FTransform(FRotator(0, 90, -90), FVector(0, 10, 0)));
 	FirstPersonCamera->bUsePawnControlRotation = true; // Camera rotates relative to head
-	FirstPersonCamera->SetActive(false);
+	FirstPersonCamera->SetActive(true);
 
 	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
 
@@ -76,8 +77,6 @@ AGameCharacter::AGameCharacter()
 	RightHandMesh->SetSimulatePhysics(false);
 	LeftHandMesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
 	RightHandMesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
-	RightHandMesh->RegisterComponent();
-	LeftHandMesh->RegisterComponent();
 
 	Inventory = CreateDefaultSubobject<UActorInventory>(TEXT("PlayerInventory"));
 	Inventory->containerEvents = this;
@@ -106,6 +105,8 @@ void AGameCharacter::BeginPlay()
 	}
 	USkeletalMeshComponent* playerMesh = GetMesh();
 	const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
+	RightHandMesh->RegisterComponent();
+	LeftHandMesh->RegisterComponent();
 	LeftHandMesh->AttachToComponent(playerMesh, atr, HandSocketL);
 	RightHandMesh->AttachToComponent(playerMesh, atr, HandSocketR);
 
@@ -311,6 +312,7 @@ void AGameCharacter::getRay(double length, Ray& ray) {
 	ray.start = transform.GetLocation();
 	//ray.start.Z += 20.;
 	double3 forward = transform.GetRotation().GetForwardVector();
+	ray.start += forward * CameraBoom->TargetArmLength;
 	ray.end = ray.start + forward * length;
 }
 
@@ -337,14 +339,6 @@ void AGameCharacter::OnEquipClothes(TObjectPtr<UItemObject> item)
 }
 
 void AGameCharacter::OnDropItem(TObjectPtr<UItemObject> item) {
-	if (worldGenRef == nullptr) {
-		TSubclassOf<AWorldGen> ClassToFind = AWorldGen::StaticClass();
-		TArray<AActor*> FoundActors;
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ClassToFind, FoundActors);
-		check(FoundActors.Num()==1);
-		worldGenRef = Cast<AWorldGen>(FoundActors[0]);
-		check(worldGenRef != nullptr);
-	}
 	worldGenRef->spawnItem(item, GetActorLocation(), FRotator());
 }
 

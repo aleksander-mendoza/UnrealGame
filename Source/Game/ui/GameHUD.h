@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
 #include "Inventory.h"
+#include "BuildingInventory.h"
 #include "RaceMenu.h"
 #include "Status.h"
 #include "../GameCharacter.h"
@@ -40,6 +41,19 @@ public:
 	UPROPERTY()
 	TObjectPtr<UInventory> InventoryInterface;
 
+
+	UPROPERTY(EditDefaultsOnly, Category = "User Interface")
+	TSubclassOf<UBuildingInventory> BuildingInventoryWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UBuildingInventory> BuildingInventoryInterface;
+
+	inline TObjectPtr<UBuildingInventory> showBuildingInventory(AGameCharacter* GameCharacter) {
+		BuildingInventoryInterface = CreateWidget<UBuildingInventory>(GetWorld(), BuildingInventoryWidgetClass);
+		//BuildingInventoryInterface->setInventory(GameCharacter->Inventory);
+		BuildingInventoryInterface->AddToViewport(9999); // Z-order, this just makes it render on the very top.
+		return BuildingInventoryInterface;
+	}
 	inline TObjectPtr<UInventory> showInventory(AGameCharacter* GameCharacter) {
 		InventoryInterface = CreateWidget<UInventory>(GetWorld(), InventoryWidgetClass);
 		InventoryInterface->setInventory(GameCharacter->Inventory);
@@ -57,6 +71,10 @@ public:
 		InventoryInterface->RemoveFromParent();
 		InventoryInterface = nullptr;
 	}
+	inline void hideBuildingInventory() {
+		BuildingInventoryInterface->RemoveFromParent();
+		BuildingInventoryInterface = nullptr;
+	}
 	inline void hideRaceMenu() {
 		RaceMenuInterface->RemoveFromParent();
 		RaceMenuInterface = nullptr;
@@ -66,6 +84,12 @@ public:
 	}
 	inline bool canOpenInventory() const {
 		return IsValid(InventoryWidgetClass);
+	}
+	inline bool isBuildingInventoryOpen() const {
+		return BuildingInventoryInterface != nullptr;
+	}
+	inline bool canOpenBuildingInventory() const {
+		return IsValid(BuildingInventoryWidgetClass);
 	}
 	inline bool isRaceMenuOpen() const {
 		return RaceMenuInterface != nullptr;

@@ -67,6 +67,11 @@ class GAME_API AGamePlayerController : public APlayerController
 	UInputAction* OpenRaceMenuAction;
 
 
+	/** Open/Close Building Inventory Input Action */
+	UPROPERTY()
+	UInputAction* OpenBuildingInventoryAction;
+
+
 
 	virtual void SetupInputComponent() override;
 	virtual void SetPawn(APawn * pawn) override;
@@ -75,6 +80,7 @@ class GAME_API AGamePlayerController : public APlayerController
 
 	void TriggerInventory(const FInputActionValue& Value);
 	void TriggerRaceMenu(const FInputActionValue& Value);
+	void TriggerBuildingInventory(const FInputActionValue& Value);
 private:
 	AGameCharacter* GameCharacter;
 	UInputAction* MapKey(FKey key, EInputActionValueType type = EInputActionValueType::Boolean, bool triggerWhenPaused=false);

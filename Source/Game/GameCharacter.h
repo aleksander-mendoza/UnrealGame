@@ -8,14 +8,15 @@
 #include "Logging/LogMacros.h"
 #include "ui/TargetLockWidgetActor.h"
 #include "ui/Inventory.h"
-#include "proc_assets/WorldGen.h"
 #include "items/ActorInventory.h" 
 #include "items/Container.h" 
+#include "anim/CharacterAnimInstance.h"
 #include "GameCharacter.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
 struct FInputActionValue;
+class AWorldGen;
 struct Ray {
 	FVector start, end;
 };
@@ -56,11 +57,11 @@ class AGameCharacter : public ACharacter , public ContainerEvents
 
 	/* The AnimBlueprint class to use. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
-	class TSubclassOf<UAnimInstance> FemaleAnimClass;
+	class TSubclassOf<UCharacterAnimInstance> FemaleAnimClass;
 
 	/* The AnimBlueprint class to use. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
-	class TSubclassOf<UAnimInstance> MaleAnimClass;
+	class TSubclassOf<UCharacterAnimInstance> MaleAnimClass;
 
 	/** Is the character male or female */
 	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
@@ -116,10 +117,10 @@ class AGameCharacter : public ACharacter , public ContainerEvents
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> RightHandMesh;
 
-	AWorldGen* worldGenRef;
+	
 
 public:
-	
+	AWorldGen* worldGenRef;
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/

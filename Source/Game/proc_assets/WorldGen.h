@@ -9,8 +9,11 @@
 #include "../blender/proc_assets.h"
 #include "EntityParams.h"
 #include "WorldGenUtils.h"
+#include "../items/ItemActor.h"
 #include "../blender/noise.h"
+#include "../GameCharacter.h"
 #include "MovingGrid.h"
+#include "../structures/BuildingSystem.h"
 #include "WorldGen.generated.h"
 
 
@@ -61,9 +64,18 @@ public:
 	FMovingGrid TerrainGrid;
 
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FBuildingSystem BuildingSystem;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	class TSubclassOf<AGameCharacter> PlayerPawnClass;
+
+	UPROPERTY()
+	AGameCharacter* PlayerPawn;
+
 	void PostInitializeComponents() override;
 private:
-	APawn* PlayerPawn=nullptr;
+	
 	
 	proc_assets::Mesh meshGenResult;
 	int resultSectionIdx = -1;
@@ -79,7 +91,14 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<AItemActor>> usedStaticActorPool;
+	UPROPERTY()
 	TArray<TObjectPtr<AItemActor>> unusedStaticActorPool;
+
+
+	UPROPERTY()
+	TArray<TObjectPtr<AGameCharacter>> usedNPCPool;
+	UPROPERTY()
+	TArray<TObjectPtr<AGameCharacter>> unusedNPCPool;
 
 public:
 	void despawnItem(TObjectPtr<AItemActor> item) {
@@ -117,9 +136,6 @@ public:
 	
 
 	inline void reset() {
-		UWorld* world = this->GetWorld();
-		APlayerController* player = world->GetFirstPlayerController();
-		PlayerPawn = player->GetPawn();
 		const double3 pos = getPlayerPos();
 		this->TerrainMesh->ClearAllMeshSections();
 		TerrainGrid.reset(pos);
@@ -162,15 +178,18 @@ public:
 				FRotator3d rot;
 				if (t.alignToNormal) {
 					const float3 gradient_and_height = get_height_with_derivative(position);
-					const double3 normal = math::normalize(math::tangent(double2(float2(gradient_and_height))));
-					rot = normal.Rotation();
+					const double3 steepestDescent = double3(gradient_and_height.X, gradient_and_height.Y, gradient_and_height.X* gradient_and_height.X + gradient_and_height.Y* gradient_and_height.Y);
+					rot = steepestDescent.Rotation();
+					//rot.Pitch = atanf(gradient_and_height.X)*180/PI;
+					//rot.Yaw = atan2f(gradient_and_height.X, gradient_and_height.Y) * 180 / PI;
 					position3d.Z += gradient_and_height.Z;
 				}
 				else {
+					rot = FRotator3d();
 					position3d.Z += get_height(position);
 				}
 				if (t.maxRotation > 0) {
-					rot.Roll = rng.get_float() * t.maxRotation;
+					rot.Yaw += rng.get_float() * t.maxRotation;
 				}
 				chunk.instanceTransforms.Add(FTransform(rot, double3(position3d)));
 			}
@@ -195,6 +214,7 @@ public:
 	template<bool l2>
 	inline void addChunksAroundPlayer() {
 		TerrainGrid.addChunksWithinRadius<l2>(chunkSpawnRadius);
+		BuildingSystem.addChunksAroundPlayer<l2>();
 		for (int i = 0; i < EntityParams.Num();i++) {
 			EntityParams[i].addChunksAroundPlayer<l2>();
 		}
@@ -204,6 +224,9 @@ public:
 		playerCrossedChunkBoundary = false;
 		if (TerrainGrid.update(playerPos, chunkSpawnRadius)) {
 			
+		}
+		if (BuildingSystem.update(playerPos)) {
+
 		}
 		playerCrossedChunkBoundary |= TerrainGrid.playerCrossedChunkBoundary;
 		for (int i = 0; i < EntityParams.Num(); i++) {
@@ -259,6 +282,7 @@ public:
 				if (async)grid.playerCrossedChunkBoundary = false;
 				for (int typeIdx = 0; typeIdx < params.Types.Num(); typeIdx++) {
 					FEntityType& t = params.Types[typeIdx];
+					EntityChunks & cache = t.chunked.cache;
 					for (int i = 0; i < grid.chunkDistances.Num(); i++) {
 						const ChunkDist& chunk = grid.chunkDistances[i];
 						const int sectionIdx = grid.chunkToSection[chunk.chunkIdx];
@@ -276,7 +300,7 @@ public:
 							}
 
 							if (sectionStatus.wentOutOfBounds || t.unloadRadius <= dist) {
-								if (t.cache.sections[sectionIdx].isLoaded) { 
+								if (cache.sections[sectionIdx].isLoaded) { 
 									if (async) {
 										UE_LOGFMT(LogCore, Warning, "Unload entity {0} in section {1} at {2},{3}", entityIdx, sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
 										check(!entitySectionsToUnload.Contains(sectionIdx));
@@ -287,11 +311,11 @@ public:
 									}
 								}
 								else {
-									check(!t.cache.sections[sectionIdx].isDirty);
+									check(!cache.sections[sectionIdx].isDirty);
 								}
 
 							}else if (t.loadRadius >= dist) {
-								if (!t.cache.sections[sectionIdx].isLoaded || t.cache.sections[sectionIdx].isDirty) {
+								if (!cache.sections[sectionIdx].isLoaded || cache.sections[sectionIdx].isDirty) {
 									if (async) {
 										UE_LOGFMT(LogCore, Warning, "Load entity {0} in section {1} at {2},{3}", entityIdx, sectionIdx, chunk.chunkPos.X, chunk.chunkPos.Y);
 										check(!entitySectionsToLoad.Contains(sectionIdx));

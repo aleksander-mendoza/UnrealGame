@@ -68,6 +68,7 @@ void AGamePlayerController::SetupInputComponent()
 	ZoomAction = MapKey(EKeys::MouseWheelAxis, EInputActionValueType::Axis1D);
 	OpenInventoryAction = MapKey(EKeys::C, EInputActionValueType::Boolean, true);
 	OpenRaceMenuAction = MapKey(EKeys::R, EInputActionValueType::Boolean);
+	OpenBuildingInventoryAction = MapKey(EKeys::B, EInputActionValueType::Boolean);
 
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
@@ -109,7 +110,7 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 
 			EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &AGamePlayerController::TriggerInventory);
 			EnhancedInputComponent->BindAction(OpenRaceMenuAction, ETriggerEvent::Started, this, &AGamePlayerController::TriggerRaceMenu);
-
+			EnhancedInputComponent->BindAction(OpenBuildingInventoryAction, ETriggerEvent::Started, this, &AGamePlayerController::TriggerBuildingInventory);
 		}
 	}
 }
@@ -129,10 +130,33 @@ void AGamePlayerController::Look(const FInputActionValue& Value)
 	}
 }
 
+void AGamePlayerController::TriggerBuildingInventory(const FInputActionValue& Value) {
+	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
+		if (hud->isRaceMenuOpen() || hud->isInventoryOpen())return;
+		if (hud->canOpenBuildingInventory()) {
+			const bool openInv = hud->isBuildingInventoryOpen();
+			if (openInv) {
+				hud->hideBuildingInventory();
+				FInputModeGameOnly Mode;
+				SetInputMode(Mode);
+			}
+			else {
+				FInputModeGameAndUI Mode;
+				Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+				Mode.SetHideCursorDuringCapture(false);
+				Mode.SetWidgetToFocus(hud->showBuildingInventory(GameCharacter)->TakeWidget());
+				SetInputMode(Mode);
+
+			}
+			SetShowMouseCursor(!openInv);
+			//SetPause(!openInv);
+		}
+	}
+}
 void AGamePlayerController::TriggerInventory(const FInputActionValue& Value)
 {
 	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
-		if (hud->isRaceMenuOpen())return;
+		if (hud->isRaceMenuOpen()||hud->isBuildingInventoryOpen())return;
 		if(hud->canOpenInventory()){
 			const bool openInv = hud->isInventoryOpen();
 			if (openInv) {
@@ -158,7 +182,7 @@ void AGamePlayerController::TriggerInventory(const FInputActionValue& Value)
 void AGamePlayerController::TriggerRaceMenu(const FInputActionValue& Value)
 {
 	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
-		if (hud->isInventoryOpen())return;
+		if (hud->isInventoryOpen() || hud->isBuildingInventoryOpen())return;
 		if (hud->canOpenRaceMenu()) {
 			const bool openInv = hud->isRaceMenuOpen();
 			if (openInv) {

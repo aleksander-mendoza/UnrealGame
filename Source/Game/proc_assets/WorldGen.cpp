@@ -18,6 +18,8 @@ AWorldGen::AWorldGen() :  meshGenResult()
 	TerrainMesh->SetupAttachment(GetRootComponent());
 	TerrainMesh->SetMobility(EComponentMobility::Static);
 	TerrainMesh->bUseAsyncCooking = true;
+
+	
 }
 
 void AWorldGen::PostInitializeComponents()
@@ -35,6 +37,13 @@ void AWorldGen::PostInitializeComponents()
 void AWorldGen::BeginPlay()
 {
 	Super::BeginPlay();
+	UWorld* world = this->GetWorld();
+	APlayerController* player = world->GetFirstPlayerController();
+	double3 startLoc(0, 0, get_height(float2(0, 0) + 100));
+	PlayerPawn = world->SpawnActor<AGameCharacter>(PlayerPawnClass, startLoc, FRotator());
+	player->Possess(PlayerPawn);
+	PlayerPawn->worldGenRef = this;
+
 	reset();
 	addChunksAroundPlayer<false>();
 	generateChunksAroundPlayer<false>();

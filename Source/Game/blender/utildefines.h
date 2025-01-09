@@ -337,6 +337,24 @@ namespace math {
         return float4(floor(a.X), floor(a.Y), floor(a.Z), floor(a.W));
     }
 
+
+    inline double floor(const double a)
+    {
+        return ::floor(a);
+    }
+    inline double2 floor(const double2& a)
+    {
+        return double2(floor(a.X), floor(a.Y));
+    }
+    inline double3 floor(const double3& a)
+    {
+        return double3(floor(a.X), floor(a.Y), floor(a.Z));
+    }
+    inline double4 floor(const double4& a)
+    {
+        return double4(floor(a.X), floor(a.Y), floor(a.Z), floor(a.W));
+    }
+
     inline int floori(const float a)
     {
         return floorf(a);

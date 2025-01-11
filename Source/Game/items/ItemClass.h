@@ -23,4 +23,9 @@ enum class EItemClass : uint8
 	POTION UMETA(DisplayName = "potion"),
 	FOOD UMETA(DisplayName = "food"),
 	KEY UMETA(DisplayName = "food"),
+	NONE UMETA(DisplayName = "placeholder when no item exists"),
+	
 };
+inline bool isDoubleHanded(EItemClass c){
+	return c == EItemClass::DOUBLE_HANDED_WEAPON || c == EItemClass::BOW;
+}

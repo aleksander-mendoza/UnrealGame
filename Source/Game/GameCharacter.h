@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
+#include "Camera/CameraComponent.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Logging/LogMacros.h"
@@ -17,7 +18,7 @@
 #include "GameCharacter.generated.h"
 
 class USpringArmComponent;
-class UCameraComponent;
+
 struct FInputActionValue;
 class AWorldGen;
 struct Ray {
@@ -99,11 +100,36 @@ class AGameCharacter : public ACharacter , public ContainerEvents
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	float MinZoomOut = 80.0;
 	
-	/** Attack Combo Animation*/
+	unsigned int comboAnimIdx = 0;
+	/** Single-handed (left-handed) attack combo Animation*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UAnimMontage* AttackComboAnim;
-	bool IsAttacking=false;
-	bool DoNextCombo = false;
+	TArray<TObjectPtr<UAnimMontage>> LeftHandedAttackComboAnims;
+
+	/** Single-handed (right-handed) attack combo Animation*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UAnimMontage>> RightHandedAttackComboAnims;
+
+	/** Double-handed Attack Combo Animation*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UAnimMontage>> DoubleHandedAttackComboAnims;
+
+	/** Unarmed Attack Combo Animation*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UAnimMontage>> BareRightHandAttackComboAnims;
+	
+	/** Unarmed Attack Combo Animation*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UAnimMontage>> BareLeftHandAttackComboAnims;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UAnimMontage>> LeftHandedStealthAttackComboAnims;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UAnimMontage>> RightHandedStealthAttackComboAnims;
+
+	bool IsAttackingLeftHanded = false;
+	bool IsAttackingRightHanded = false;
+	float AttackCooldown = 0;
+	bool CanMove = true;
 	/** Hand socket (right)*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	FName HandSocketR;
@@ -120,9 +146,13 @@ class AGameCharacter : public ACharacter , public ContainerEvents
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> RightHandMesh;
 
-	
-
+	TObjectPtr<UAnimMontage> CurrentAttackComboAnim = nullptr;
+	bool CurrentAttackComboAnimIsLeftHanded = false;
 public:
+
+	
+	const float ATTACK_COOLDOWN = 0.2;
+	const float ATTACK_DISABLED = INFINITY;
 	bool bIsSlowWalking = false;
 	bool bIsRunning = false;
 	bool bIsSwimming = false;
@@ -151,7 +181,97 @@ public:
 		this->SetActorEnableCollision(enabled);
 	}
 	/** Called for attack input */
-	void Attack(const FInputActionValue& Value);
+	void LeftHandedAttackStart(const FInputActionValue& Value) {
+		leftHandedAttackStart();
+	}
+	/** Called for attack input */
+	void RightHandedAttackStart(const FInputActionValue& Value) {
+		rightHandedAttackStart();
+	}
+	void leftHandedAttackStart() {
+		IsAttackingLeftHanded = true;
+		attackStart(true, LeftHandedStealthAttackComboAnims, LeftHandedAttackComboAnims, BareLeftHandAttackComboAnims);
+	}
+	void rightHandedAttackStart() {
+		IsAttackingRightHanded = true;
+		attackStart(false, RightHandedStealthAttackComboAnims, RightHandedAttackComboAnims, BareRightHandAttackComboAnims);
+	}
+	void attackStart(bool leftHand, TArray<TObjectPtr<UAnimMontage>> & stealthAttackComboAnims, TArray<TObjectPtr<UAnimMontage>>&  attackComboAnims, TArray<TObjectPtr<UAnimMontage>>& bare) {
+		
+		if (AttackCooldown<=0) {
+			check(CurrentAttackComboAnim == nullptr);
+			CurrentAttackComboAnim = nullptr;
+			switch (Inventory->getWeaponClass(leftHand)) {
+			case EItemClass::BOW: 
+				if (leftHand) {
+					UCharacterAnimInstance* i = getAnimInstance();
+					i->AimsBow = true;
+					i->ShotBow = false;
+					AttackCooldown = ATTACK_DISABLED;
+					break;
+				}// TODO: right handed attack with bow allows for zoom-in
+			case EItemClass::DOUBLE_HANDED_WEAPON:
+				if (leftHand && DoubleHandedAttackComboAnims.Num() > 0) {
+					CurrentAttackComboAnim = DoubleHandedAttackComboAnims[comboAnimIdx++ % DoubleHandedAttackComboAnims.Num()];
+				}// TODO: right handed attack with double handed weapon works like blocking
+				break;
+			case EItemClass::SINGLE_HANDED_QUIET_WEAPON:
+				if (stealthAttackComboAnims.Num() > 0) {
+					CurrentAttackComboAnim = stealthAttackComboAnims[comboAnimIdx++ % stealthAttackComboAnims.Num()];
+				}
+				break;
+			case EItemClass::SINGLE_HANDED_WEAPON:
+				if (attackComboAnims.Num() > 0) {
+					CurrentAttackComboAnim = attackComboAnims[comboAnimIdx++ % attackComboAnims.Num()];
+				}
+				break;
+			default:
+				if (bare.Num() > 0) {
+					CurrentAttackComboAnim = bare[comboAnimIdx++ % bare.Num()];
+				}
+			}
+			if (CurrentAttackComboAnim != nullptr) {
+				AttackCooldown = ATTACK_DISABLED;
+				CurrentAttackComboAnimIsLeftHanded = leftHand;
+				getAnimInstance()->Montage_Play(CurrentAttackComboAnim);
+			}
+		}
+	}
+	
+	/** Called for attack end input */
+	void LeftHandedAttackEnd(const FInputActionValue& Value) {
+		UCharacterAnimInstance * i = getAnimInstance(); 
+		if (i->AimsBow) {
+			i->AimsBow = false;
+			i->ShotBow = true;
+			AttackCooldown = ATTACK_COOLDOWN;
+		}
+		IsAttackingLeftHanded = false;
+	}
+	void RightHandedAttackEnd(const FInputActionValue& Value) {
+		IsAttackingRightHanded = false;
+	}
+	/** Called for attack cancel input */
+	void AttackCancel(const FInputActionValue& Value) {
+		attackCancel();
+	}
+	void attackCancel() {
+		UCharacterAnimInstance* i = getAnimInstance();
+		if (CurrentAttackComboAnim == nullptr) {
+			if (i->AimsBow) {
+				i->AimsBow = false;
+				AttackCooldown = ATTACK_COOLDOWN;
+			}
+		}else{
+			check(i->AimsBow == false);
+			i->Montage_Stop(ATTACK_COOLDOWN, CurrentAttackComboAnim);
+			CurrentAttackComboAnim = nullptr;
+			AttackCooldown = ATTACK_COOLDOWN;
+		}
+		
+		IsAttackingLeftHanded = false;
+		IsAttackingRightHanded = false;
+	}
 	/** Called for lock-on input */
 	void LockOntoEnemy(const FInputActionValue& Value);
 	/** Called for interaction input */
@@ -206,7 +326,7 @@ public:
 			GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
 			bIsRunning = true;
 			this->UnCrouch();
-			bIsSlowWalking = false;
+			getAnimInstance()->IsSlowWalking = bIsSlowWalking = false;
 		}
 	}
 	void EndRun(const FInputActionValue& Value) {
@@ -254,9 +374,19 @@ public:
 	The distance is clamped to MaxZoomOut. */
 	void SetCameraDistance(float distance);
 
-	UCameraComponent* GetCurrentCamera();
+	UCameraComponent* GetCurrentCamera() {
+		return FollowCamera->IsActive() ? FollowCamera : FirstPersonCamera;
+	}
 
-	void OnComboPartEnd(bool isLast);
+	void OnComboPartEnd(bool isLast) {
+		if (isLast) {
+			AttackCooldown = ATTACK_COOLDOWN;
+			CurrentAttackComboAnim = nullptr;
+		}
+		else if (!(CurrentAttackComboAnimIsLeftHanded?IsAttackingLeftHanded:IsAttackingRightHanded)) {
+			attackCancel();
+		}
+	}
 
 	void SetSwimming(bool isSwimming) {
 		if (isSwimming) {

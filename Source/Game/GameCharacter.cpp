@@ -90,19 +90,32 @@ AGameCharacter::AGameCharacter()
 }
 
 
+void preprocessComboAnim(AGameCharacter *c, UAnimMontage * a) {
+	int n = a->Notifies.Num();
+	for (int i = 0; i < n; i++) {
+		if (UNotifyCombo* notify = Cast<UNotifyCombo>(a->Notifies[i].Notify)) {
+			check(notify->Owner == nullptr || notify->Owner == c);
+			notify->Owner = c;
+			notify->IsLast = i + 1 == n;
+		}
+	}
+}
+void preprocessComboAnims(AGameCharacter* c, TArray<TObjectPtr<UAnimMontage>>& a) {
+	for (int i = 0; i < a.Num(); i++) {
+		preprocessComboAnim(c, a[i]);
+	}
+}
 void AGameCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
-	if (AttackComboAnim != nullptr) {
-		int n = AttackComboAnim->Notifies.Num();
-		for (int i = 0; i < n; i++) { 
-			if (UNotifyCombo* notify = Cast<UNotifyCombo>(AttackComboAnim->Notifies[i].Notify)) {
-				notify->Owner = this;
-				notify->IsLast = i+1==n;
-			}
-		}
-	}
+	preprocessComboAnims(this, RightHandedStealthAttackComboAnims);
+	preprocessComboAnims(this, LeftHandedStealthAttackComboAnims);
+	preprocessComboAnims(this, RightHandedAttackComboAnims);
+	preprocessComboAnims(this, LeftHandedAttackComboAnims);
+	preprocessComboAnims(this, DoubleHandedAttackComboAnims);
+	preprocessComboAnims(this, BareLeftHandAttackComboAnims);
+	preprocessComboAnims(this, BareRightHandAttackComboAnims);
 	USkeletalMeshComponent* playerMesh = GetMesh();
 	const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
 	RightHandMesh->RegisterComponent();
@@ -186,9 +199,6 @@ void AGameCharacter::ToggleDirectionalMovement(bool trueDirectionalMovement) {
 	mov->bUseControllerDesiredRotation = !trueDirectionalMovement;
 	getAnimInstance()->IsStrafe = trueDirectionalMovement;
 }
-UCameraComponent* AGameCharacter::GetCurrentCamera() {
-	return FollowCamera->IsActive() ? FollowCamera : FirstPersonCamera;
-}
 void AGameCharacter::LockOntoEnemy(const FInputActionValue& Value) {
 	
 	
@@ -208,16 +218,6 @@ void AGameCharacter::LockOntoEnemy(const FInputActionValue& Value) {
 	}
 	else {
 		LockOntoTarget((AActor*)nullptr);
-	}
-}
-void AGameCharacter::OnComboPartEnd(bool isLast) {
-	if (isLast) {
-		IsAttacking = false;
-	}else if (DoNextCombo) {
-		DoNextCombo = false;
-	}else {
-		getAnimInstance()->Montage_Stop(0.2, AttackComboAnim);
-		IsAttacking = false;
 	}
 }
 void AGameCharacter::InteractStart(const FInputActionValue& Value) {
@@ -243,52 +243,43 @@ void AGameCharacter::InteractEnd(const FInputActionValue& Value) {
 	PhysicsHandle->ReleaseComponent();
 	physicshandleDistance = -1;
 }
-void AGameCharacter::Attack(const FInputActionValue& Value) {
-	if (IsAttacking) {
-		DoNextCombo = true;
-	}
-	else {
-		UAnimInstance * anim = this->GetMesh()->GetAnimInstance();
-		anim->Montage_Play(AttackComboAnim);
-		IsAttacking = true;
-		DoNextCombo = false;
-	}
-}
 
 void AGameCharacter::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
-	FVector MovementVector = Value.Get<FVector>();
+	if (CanMove) {
+		// input is a Vector2D
+		FVector MovementVector = Value.Get<FVector>();
 
-	if (Controller != nullptr)
-	{
-		// find out which way is forward
-		const FRotator Rotation = Controller->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
-		// get forward vector
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		if (Controller != nullptr)
+		{
+			// find out which way is forward
+			const FRotator Rotation = Controller->GetControlRotation();
+			const FRotator YawRotation(0, Rotation.Yaw, 0);
+			// get forward vector
+			const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 
-		// get right vector 
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+			// get right vector 
+			const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-		if (this->GetCharacterMovement()->IsInWater()) {
-			if (!bIsSwimming) {
-				SetSwimming(true);
+			if (this->GetCharacterMovement()->IsInWater()) {
+				if (!bIsSwimming) {
+					SetSwimming(true);
+				}
+				// add movement 
+				const FVector UpDirection(0, 0, 1);
+				AddMovementInput(UpDirection, MovementVector.Z);
 			}
-			// add movement 
-			const FVector UpDirection(0,0,1);
-			AddMovementInput(UpDirection, MovementVector.Z);
-		}
-		else {
-			if (bIsSwimming) {
-				SetSwimming(false);
-			}
-			
+			else {
+				if (bIsSwimming) {
+					SetSwimming(false);
+				}
 
-			
+
+
+			}
+			AddMovementInput(ForwardDirection, MovementVector.Y);
+			AddMovementInput(RightDirection, MovementVector.X);
 		}
-		AddMovementInput(ForwardDirection, MovementVector.Y);
-		AddMovementInput(RightDirection, MovementVector.X);
 	}
 }
 
@@ -348,6 +339,17 @@ void AGameCharacter::Tick(float DeltaTime) {
 			endRun();
 		}
 		Health->setStamina(s);
+	}
+	if (AttackCooldown > 0) {
+		AttackCooldown -= DeltaTime;
+		if (AttackCooldown <= 0) {
+			if (IsAttackingLeftHanded) {
+				leftHandedAttackStart();
+			}
+			else if (IsAttackingRightHanded) {
+				rightHandedAttackStart();
+			}
+		}
 	}
 	
 }

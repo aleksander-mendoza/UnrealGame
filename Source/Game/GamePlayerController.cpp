@@ -64,13 +64,15 @@ void AGamePlayerController::SetupInputComponent()
 	SlowWalkAction = MapKey(EKeys::V);
 	RunAction = MapKey(EKeys::LeftShift);
 	JumpAction = MapKey(EKeys::SpaceBar);
-	AttackAction = MapKey(EKeys::LeftMouseButton);
+	LeftHandedAttackAction = MapKey(EKeys::LeftMouseButton);
+	RightHandedAttackAction = MapKey(EKeys::RightMouseButton);
+	AttackCancelAction = MapKey(EKeys::R);
 	InteractAction = MapKey(EKeys::E);
 	LockAction = MapKey(EKeys::MiddleMouseButton);
 	ZoomAction = MapKey(EKeys::MouseWheelAxis, EInputActionValueType::Axis1D);
 	CrouchAction = MapKey(EKeys::LeftControl);
 	OpenInventoryAction = MapKey(EKeys::C, EInputActionValueType::Boolean, true);
-	OpenRaceMenuAction = MapKey(EKeys::R, EInputActionValueType::Boolean);
+	OpenRaceMenuAction = MapKey(EKeys::F1, EInputActionValueType::Boolean);
 	OpenBuildingInventoryAction = MapKey(EKeys::B, EInputActionValueType::Boolean);
 
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -112,7 +114,12 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 			EnhancedInputComponent->BindAction(LockAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::LockOntoEnemy);
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::InteractStart);
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::InteractEnd);
-			EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::Attack);
+			EnhancedInputComponent->BindAction(LeftHandedAttackAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::LeftHandedAttackStart);
+			EnhancedInputComponent->BindAction(LeftHandedAttackAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::LeftHandedAttackEnd);
+			EnhancedInputComponent->BindAction(RightHandedAttackAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::RightHandedAttackStart);
+			EnhancedInputComponent->BindAction(RightHandedAttackAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::RightHandedAttackEnd);
+			EnhancedInputComponent->BindAction(AttackCancelAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::AttackCancel);
+			
 			EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::crouch);
 			EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::uncrouch);
 			EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &AGamePlayerController::TriggerInventory);

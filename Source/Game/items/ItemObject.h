@@ -35,5 +35,8 @@ public:
 	inline FItem* getRow() {
 		return Instance.getRow();
 	}
+	inline EItemClass getItemClass() {
+		return Instance.getRow()->Class;
+	}
 	
 };

@@ -55,7 +55,15 @@ class GAME_API AGamePlayerController : public APlayerController
 
 	/** Attack Input Action */
 	UPROPERTY()
-	UInputAction* AttackAction;
+	UInputAction* LeftHandedAttackAction;
+
+	/** Attack Input Action */
+	UPROPERTY()
+	UInputAction* RightHandedAttackAction;
+
+	/** Attack Cacnel Input Action */
+	UPROPERTY()
+	UInputAction* AttackCancelAction;
 
 	/** Attack Input Action */
 	UPROPERTY()

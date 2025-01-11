@@ -132,4 +132,7 @@ struct GAME_API FItem : public FTableRowBase
 		}
 		return Mesh.Get();
 	}
+	inline bool isDoubleHanded() const {
+		return ::isDoubleHanded(Class);
+	}
 };

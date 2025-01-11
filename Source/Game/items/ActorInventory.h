@@ -54,7 +54,15 @@ public:
 	ContainerEvents* containerEvents;
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-
+	inline EItemClass getWeaponClass(bool leftHand) {
+		return leftHand ? getLeftHandWeaponClass() : getRightHandWeaponClass();
+	}
+	inline EItemClass getLeftHandWeaponClass() {
+		return LeftHand ==nullptr? EItemClass::NONE : LeftHand->getItemClass();
+	}
+	inline EItemClass getRightHandWeaponClass() {
+		return RightHand == nullptr ? EItemClass::NONE : RightHand->getItemClass();
+	}
 	inline void ResetToDefaultItems(UWorld* world)
 	{
 		for (int i = 0; i < DefaultItems.Instances.Num(); i++) {
@@ -220,7 +228,7 @@ public:
 	inline void takeInHand(TObjectPtr<UItemObject> item, bool left) {
 		check(item->container == this);
 		FItem * i = item->getRow();
-		if (i->Class == EItemClass::DOUBLE_HANDED_WEAPON) {
+		if (i->isDoubleHanded()) {
 			emptyRightHand();
 			emptyLeftHand();
 			LeftHand = item;

@@ -20,8 +20,8 @@ class GAME_API AGameHUD : public AHUD
 	GENERATED_BODY()
 
 protected:
+	AGameHUD();
 	virtual void BeginPlay();
-
 public:
 
 	

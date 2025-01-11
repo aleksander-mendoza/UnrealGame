@@ -4,12 +4,15 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Components/CapsuleComponent.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Logging/LogMacros.h"
 #include "ui/TargetLockWidgetActor.h"
 #include "ui/Inventory.h"
 #include "items/ActorInventory.h" 
 #include "items/Container.h" 
+#include "character/Health.h" 
 #include "anim/CharacterAnimInstance.h"
 #include "GameCharacter.generated.h"
 
@@ -120,6 +123,9 @@ class AGameCharacter : public ACharacter , public ContainerEvents
 	
 
 public:
+	bool bIsSlowWalking = false;
+	bool bIsRunning = false;
+	bool bIsSwimming = false;
 	AWorldGen* worldGenRef;
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
@@ -127,12 +133,23 @@ public:
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
 	/** Player Inventory */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr <UActorInventory> Inventory;
+
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr <UHealth> Health;
 
 	AGameCharacter();
 	
 
+	inline bool isEnabled() const {
+		return this->IsHidden();
+	}
+	inline void SetEnabled(bool enabled) {
+		this->SetActorHiddenInGame(!enabled);
+		this->SetActorEnableCollision(enabled);
+	}
 	/** Called for attack input */
 	void Attack(const FInputActionValue& Value);
 	/** Called for lock-on input */
@@ -149,11 +166,84 @@ public:
 	void Move(const FInputActionValue& Value);
 
 
-	void ToggleSlowWalk(const FInputActionValue& Value);
-	void StartRun(const FInputActionValue& Value);
-	void EndRun(const FInputActionValue& Value);
+	void ToggleCrouch(const FInputActionValue& Value) {
+		if (this->bIsCrouched) {
+			this->uncrouch(Value);
+		}
+		else {
+			this->crouch(Value);
+		}
+	}
+	void StartSlowWalk(const FInputActionValue& Value)
+	{
+		if (!bIsSwimming && !bIsCrouched) {
+			bIsRunning = false;
+			GetCharacterMovement()->MaxWalkSpeed = SlowWalkSpeed;
+			getAnimInstance()->IsSlowWalking = bIsSlowWalking = true;
+		}
+	}
+	void endSlowWalk()
+	{
+		GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+		getAnimInstance()->IsSlowWalking = bIsSlowWalking = false;
+	}
+	void EndSlowWalk(const FInputActionValue& Value)
+	{
+		endSlowWalk();
+	}
+	void ToggleSlowWalk(const FInputActionValue& Value)
+	{
+		if (bIsSlowWalking) {
+			EndSlowWalk(Value);
+		}
+		else {
+			StartSlowWalk(Value);
+		}
+	}
+	void StartRun(const FInputActionValue& Value)
+	{
+		if (!bIsSwimming && Health->Stamina > 10) {
+			GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
+			bIsRunning = true;
+			this->UnCrouch();
+			bIsSlowWalking = false;
+		}
+	}
+	void EndRun(const FInputActionValue& Value) {
+		endRun();
+	}
+	void endRun()
+	{
+		bIsRunning = false;
+		GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+	}
 
-
+	void uncrouch(const FInputActionValue& Value)
+	{
+		this->UnCrouch();
+	}
+	void crouch(const FInputActionValue& Value)
+	{
+		if (!bIsSwimming) {
+			if (bIsRunning) {
+				EndRun(Value);
+			}
+			else if (bIsSlowWalking) {
+				EndSlowWalk(Value);
+			}
+			this->Crouch();
+		}
+		
+	}
+	void SetJiggleStiffness(float jiggleStiffness) {
+		getAnimInstance()->JiggleStiffness = jiggleStiffness;
+	}
+	void SetJiggleDamping(float jiggleDamping) {
+		getAnimInstance()->JiggleDamping = jiggleDamping;
+	}
+	void SetJiggleStrength(float jiggleStrength) {
+		getAnimInstance()->JiggleStrength= jiggleStrength;
+	}
 	/**If actor is null pinter then it clears the lock*/
 	void LockOntoTarget(AActor * target);
 	/**Toggle between first person camera and third person camera.*/
@@ -168,7 +258,13 @@ public:
 
 	void OnComboPartEnd(bool isLast);
 
-	void SetSwimming(bool isSwimming);
+	void SetSwimming(bool isSwimming) {
+		if (isSwimming) {
+			if (bIsSlowWalking)endSlowWalk();
+			if (bIsRunning)endRun();
+		}
+		getAnimInstance()->IsSwimming = this->bIsSwimming = isSwimming;
+	}
 
 	void getRay(double length, Ray& ray);
 	FVector getRayEnd(double length);
@@ -176,7 +272,7 @@ public:
 	
 
 	virtual void OnEquipBothHands(TObjectPtr < UItemObject > item) override {
-		LeftHandMesh->SetStaticMesh(item->getMesh());
+		RightHandMesh->SetStaticMesh(item->getMesh());
 	}
 	virtual void OnEquipLeftHand(TObjectPtr < UItemObject > item) override {
 		LeftHandMesh->SetStaticMesh(item->getMesh());
@@ -205,13 +301,20 @@ public:
 		if (IsFemale)return item.Class == EItemClass::FEMALE_CLOTHES;
 		else return item.Class == EItemClass::MALE_CLOTHES;
 	}
-
+	UCharacterAnimInstance* animInstane=nullptr;
+	UCharacterAnimInstance* getAnimInstance() {
+		if (animInstane == nullptr)animInstane = Cast<UCharacterAnimInstance>(GetMesh()->GetAnimInstance());
+		check(animInstane);
+		return animInstane;
+	}
 	inline void SetGender(const  bool isFemale) {
 		if (isFemale != IsFemale) {
 			IsFemale = isFemale;
 			USkeletalMeshComponent * mesh = GetMesh();
 			mesh->SetSkeletalMesh(isFemale ? FemaleMesh : MaleMesh);
 			mesh->SetAnimInstanceClass(isFemale ? FemaleAnimClass : MaleAnimClass);
+			animInstane = nullptr;
+				
 		}
 	}
 	

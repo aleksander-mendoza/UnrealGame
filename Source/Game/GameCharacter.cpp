@@ -3,8 +3,6 @@
 #include "GameCharacter.h"
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
-#include "Components/CapsuleComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
 #include "EnhancedInputComponent.h"
@@ -78,6 +76,8 @@ AGameCharacter::AGameCharacter()
 	LeftHandMesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
 	RightHandMesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
 
+	Health = CreateDefaultSubobject<UHealth>(TEXT("Health"));
+
 	Inventory = CreateDefaultSubobject<UActorInventory>(TEXT("PlayerInventory"));
 	Inventory->containerEvents = this;
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
@@ -109,9 +109,10 @@ void AGameCharacter::BeginPlay()
 	LeftHandMesh->RegisterComponent();
 	LeftHandMesh->AttachToComponent(playerMesh, atr, HandSocketL);
 	RightHandMesh->AttachToComponent(playerMesh, atr, HandSocketR);
-
+	
 	ToggleDirectionalMovement(true);
 	Inventory->ResetToDefault(GetWorld());
+	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -183,6 +184,7 @@ void AGameCharacter::ToggleDirectionalMovement(bool trueDirectionalMovement) {
 	UCharacterMovementComponent * mov = this->GetCharacterMovement();
 	mov->bOrientRotationToMovement = trueDirectionalMovement;
 	mov->bUseControllerDesiredRotation = !trueDirectionalMovement;
+	getAnimInstance()->IsStrafe = trueDirectionalMovement;
 }
 UCameraComponent* AGameCharacter::GetCurrentCamera() {
 	return FollowCamera->IsActive() ? FollowCamera : FirstPersonCamera;
@@ -214,8 +216,7 @@ void AGameCharacter::OnComboPartEnd(bool isLast) {
 	}else if (DoNextCombo) {
 		DoNextCombo = false;
 	}else {
-		UAnimInstance* anim = this->GetMesh()->GetAnimInstance();
-		anim->Montage_Stop(0.2, AttackComboAnim);
+		getAnimInstance()->Montage_Stop(0.2, AttackComboAnim);
 		IsAttacking = false;
 	}
 }
@@ -257,54 +258,38 @@ void AGameCharacter::Attack(const FInputActionValue& Value) {
 void AGameCharacter::Move(const FInputActionValue& Value)
 {
 	// input is a Vector2D
-	FVector2D MovementVector = Value.Get<FVector2D>();
+	FVector MovementVector = Value.Get<FVector>();
 
 	if (Controller != nullptr)
 	{
 		// find out which way is forward
 		const FRotator Rotation = Controller->GetControlRotation();
 		const FRotator YawRotation(0, Rotation.Yaw, 0);
-		if (this->GetCharacterMovement()->IsInWater()) {
-			// get forward vector
-			const FVector ForwardDirection = Rotation.Quaternion().GetForwardVector();
+		// get forward vector
+		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 
+		// get right vector 
+		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+		if (this->GetCharacterMovement()->IsInWater()) {
+			if (!bIsSwimming) {
+				SetSwimming(true);
+			}
 			// add movement 
-			AddMovementInput(ForwardDirection, MovementVector.Length());
+			const FVector UpDirection(0,0,1);
+			AddMovementInput(UpDirection, MovementVector.Z);
 		}
 		else {
-			// get forward vector
-			const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+			if (bIsSwimming) {
+				SetSwimming(false);
+			}
+			
 
-			// get right vector 
-			const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-			// add movement 
-			AddMovementInput(ForwardDirection, MovementVector.Y);
-			AddMovementInput(RightDirection, MovementVector.X);
 			
 		}
+		AddMovementInput(ForwardDirection, MovementVector.Y);
+		AddMovementInput(RightDirection, MovementVector.X);
 	}
-}
-void AGameCharacter::ToggleSlowWalk(const FInputActionValue& Value)
-{
-	UCharacterMovementComponent * m = GetCharacterMovement();
-	if (m->MaxWalkSpeed <= SlowWalkSpeed) {
-		m->MaxWalkSpeed = WalkSpeed;
-	}
-	else {
-		m->MaxWalkSpeed = SlowWalkSpeed;
-	}
-}
-void AGameCharacter::StartRun(const FInputActionValue& Value)
-{
-	GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
-}
-void AGameCharacter::EndRun(const FInputActionValue& Value)
-{
-	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
-}
-void AGameCharacter::SetSwimming(bool isSwimming) {
-	
 }
 
 void AGameCharacter::getRay(double length, Ray& ray) {
@@ -354,6 +339,15 @@ void AGameCharacter::Tick(float DeltaTime) {
 	if (physicshandleDistance>0) {
 		double3 pos = getRayEnd(physicshandleDistance);
 		PhysicsHandle->SetTargetLocation(pos);
+	}
+	if (bIsRunning) {
+		float s = Health->Stamina - 10*DeltaTime;
+		Health->PreventStaminaRegen = 1;
+		if (s < 0) {
+			s = 0;
+			endRun();
+		}
+		Health->setStamina(s);
 	}
 	
 }

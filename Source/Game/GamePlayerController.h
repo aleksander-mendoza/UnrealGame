@@ -48,6 +48,10 @@ class GAME_API AGamePlayerController : public APlayerController
 	/** Zoom In Input Action */
 	UPROPERTY()
 	UInputAction* ZoomAction;
+	
+	/** Crouch Input Action */
+	UPROPERTY()
+	UInputAction* CrouchAction;
 
 	/** Attack Input Action */
 	UPROPERTY()

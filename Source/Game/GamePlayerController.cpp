@@ -43,12 +43,14 @@ void AGamePlayerController::SetupInputComponent()
 	DefaultMappingContext = NewObject<UInputMappingContext>(this);
 
 	MoveAction = NewObject<UInputAction>(this);
-	MoveAction->ValueType = EInputActionValueType::Axis2D;
+	MoveAction->ValueType = EInputActionValueType::Axis3D;
 
 	MapKey(MoveAction, EKeys::W, false, true, EInputAxisSwizzle::YXZ);
 	MapKey(MoveAction, EKeys::S, true, true, EInputAxisSwizzle::YXZ);
 	MapKey(MoveAction, EKeys::A, true);
 	MapKey(MoveAction, EKeys::D);
+	MapKey(MoveAction, EKeys::SpaceBar, false, true, EInputAxisSwizzle::ZYX);
+	MapKey(MoveAction, EKeys::LeftControl, true, true, EInputAxisSwizzle::ZYX);
 
 	MapKey(MoveAction, EKeys::Up, false, true, EInputAxisSwizzle::YXZ);
 	MapKey(MoveAction, EKeys::Down, true, true, EInputAxisSwizzle::YXZ);
@@ -59,13 +61,14 @@ void AGamePlayerController::SetupInputComponent()
 	LookAction->ValueType = EInputActionValueType::Axis2D;
 	MapKey(LookAction, EKeys::Mouse2D, false, true, false);
 
-	SlowWalkAction = MapKey(EKeys::LeftControl);
+	SlowWalkAction = MapKey(EKeys::V);
 	RunAction = MapKey(EKeys::LeftShift);
 	JumpAction = MapKey(EKeys::SpaceBar);
 	AttackAction = MapKey(EKeys::LeftMouseButton);
 	InteractAction = MapKey(EKeys::E);
 	LockAction = MapKey(EKeys::MiddleMouseButton);
 	ZoomAction = MapKey(EKeys::MouseWheelAxis, EInputActionValueType::Axis1D);
+	CrouchAction = MapKey(EKeys::LeftControl);
 	OpenInventoryAction = MapKey(EKeys::C, EInputActionValueType::Boolean, true);
 	OpenRaceMenuAction = MapKey(EKeys::R, EInputActionValueType::Boolean);
 	OpenBuildingInventoryAction = MapKey(EKeys::B, EInputActionValueType::Boolean);
@@ -84,7 +87,10 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 	Super::SetPawn(pawn);
 	GameCharacter = Cast<AGameCharacter>(pawn);
 	if (GameCharacter) {
-
+		if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
+			GameCharacter->Health->setWidget(hud->StatusWidget);
+			
+		}
 		if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent)) {
 
 			EnhancedInputComponent->ClearActionBindings();
@@ -99,7 +105,7 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 			EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AGamePlayerController::Look);
 
 			// Zoom in/out
-			EnhancedInputComponent->BindAction(SlowWalkAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::ToggleSlowWalk);
+			EnhancedInputComponent->BindAction(SlowWalkAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::ToggleSlowWalk);
 			EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::StartRun);
 			EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::EndRun);
 			EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::CameraZoom);
@@ -107,10 +113,13 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::InteractStart);
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::InteractEnd);
 			EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::Attack);
-
+			EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::crouch);
+			EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::uncrouch);
 			EnhancedInputComponent->BindAction(OpenInventoryAction, ETriggerEvent::Started, this, &AGamePlayerController::TriggerInventory);
 			EnhancedInputComponent->BindAction(OpenRaceMenuAction, ETriggerEvent::Started, this, &AGamePlayerController::TriggerRaceMenu);
 			EnhancedInputComponent->BindAction(OpenBuildingInventoryAction, ETriggerEvent::Started, this, &AGamePlayerController::TriggerBuildingInventory);
+
+			
 		}
 	}
 }

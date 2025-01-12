@@ -63,6 +63,16 @@ public:
 	inline EItemClass getRightHandWeaponClass() {
 		return RightHand == nullptr ? EItemClass::NONE : RightHand->getItemClass();
 	}
+	inline float getWeaponDamage(bool leftHand, float bareHandDamage) {
+		return leftHand ? getLeftHandWeaponDamage(bareHandDamage) : getRightHandWeaponDamage(bareHandDamage);
+	}
+	inline float getLeftHandWeaponDamage(float bareHandDamage) {
+		return LeftHand == nullptr ? bareHandDamage : LeftHand->getItemDamage();
+	}
+	inline float getRightHandWeaponDamage(float bareHandDamage) {
+		return RightHand == nullptr ? bareHandDamage : RightHand->getItemDamage();
+	}
+	
 	inline void ResetToDefaultItems(UWorld* world)
 	{
 		for (int i = 0; i < DefaultItems.Instances.Num(); i++) {

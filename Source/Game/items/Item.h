@@ -16,6 +16,9 @@ struct GAME_API FItem : public FTableRowBase
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float Armor = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float Warmth=0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -109,6 +112,7 @@ struct GAME_API FItem : public FTableRowBase
 	TSoftObjectPtr<USkeletalMesh> WearableMesh;
 
 	inline bool isWearable() const {
+		check((ClothingSlots != 0) == ::isWearable(Class));
 		return ClothingSlots!=0;
 	}
 	inline bool isDevious() const {

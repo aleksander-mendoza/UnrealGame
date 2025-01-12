@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
+#include "Engine/StaticMeshSocket.h"
+#include "Engine/SkeletalMeshSocket.h"
 #include "Camera/CameraComponent.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -101,35 +103,46 @@ class AGameCharacter : public ACharacter , public ContainerEvents
 	float MinZoomOut = 80.0;
 	
 	unsigned int comboAnimIdx = 0;
+
+	/** Death Animation*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UAnimMontage>> DeathAnims;
+
+	/** Hit Animation*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UAnimMontage>> HitAnims;
+
 	/** Single-handed (left-handed) attack combo Animation*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UAnimMontage>> LeftHandedAttackComboAnims;
 
 	/** Single-handed (right-handed) attack combo Animation*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UAnimMontage>> RightHandedAttackComboAnims;
 
 	/** Double-handed Attack Combo Animation*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UAnimMontage>> DoubleHandedAttackComboAnims;
 
 	/** Unarmed Attack Combo Animation*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UAnimMontage>> BareRightHandAttackComboAnims;
 	
 	/** Unarmed Attack Combo Animation*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UAnimMontage>> BareLeftHandAttackComboAnims;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UAnimMontage>> LeftHandedStealthAttackComboAnims;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UAnimMontage>> RightHandedStealthAttackComboAnims;
 
-	bool IsAttackingLeftHanded = false;
-	bool IsAttackingRightHanded = false;
+	bool wantsToAttackLeftHanded = false;
+	bool wantsToAttackRightHanded = false;
 	float AttackCooldown = 0;
-	bool CanMove = true;
+	inline bool isPlayingAttackAnim() {
+		return CurrentAttackComboAnim != nullptr;
+	}
 	/** Hand socket (right)*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	FName HandSocketR;
@@ -143,11 +156,15 @@ class AGameCharacter : public ACharacter , public ContainerEvents
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> LeftHandMesh;
 
+	const UStaticMeshSocket* LeftHandBladeStart, * LeftHandBladeEnd, * RightHandBladeStart, * RightHandBladeEnd;
+	const USkeletalMeshSocket* LeftBareHandSocket, * RightBareHandSocket;
+
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> RightHandMesh;
 
 	TObjectPtr<UAnimMontage> CurrentAttackComboAnim = nullptr;
 	bool CurrentAttackComboAnimIsLeftHanded = false;
+
 public:
 
 	
@@ -172,7 +189,6 @@ public:
 
 	AGameCharacter();
 	
-
 	inline bool isEnabled() const {
 		return this->IsHidden();
 	}
@@ -189,11 +205,11 @@ public:
 		rightHandedAttackStart();
 	}
 	void leftHandedAttackStart() {
-		IsAttackingLeftHanded = true;
+		wantsToAttackLeftHanded = true;
 		attackStart(true, LeftHandedStealthAttackComboAnims, LeftHandedAttackComboAnims, BareLeftHandAttackComboAnims);
 	}
 	void rightHandedAttackStart() {
-		IsAttackingRightHanded = true;
+		wantsToAttackRightHanded = true;
 		attackStart(false, RightHandedStealthAttackComboAnims, RightHandedAttackComboAnims, BareRightHandAttackComboAnims);
 	}
 	void attackStart(bool leftHand, TArray<TObjectPtr<UAnimMontage>> & stealthAttackComboAnims, TArray<TObjectPtr<UAnimMontage>>&  attackComboAnims, TArray<TObjectPtr<UAnimMontage>>& bare) {
@@ -208,6 +224,9 @@ public:
 					i->AimsBow = true;
 					i->ShotBow = false;
 					AttackCooldown = ATTACK_DISABLED;
+					if (bIsRunning) {
+						endRun();
+					}
 					break;
 				}// TODO: right handed attack with bow allows for zoom-in
 			case EItemClass::DOUBLE_HANDED_WEAPON:
@@ -246,10 +265,10 @@ public:
 			i->ShotBow = true;
 			AttackCooldown = ATTACK_COOLDOWN;
 		}
-		IsAttackingLeftHanded = false;
+		wantsToAttackLeftHanded = false;
 	}
 	void RightHandedAttackEnd(const FInputActionValue& Value) {
-		IsAttackingRightHanded = false;
+		wantsToAttackRightHanded = false;
 	}
 	/** Called for attack cancel input */
 	void AttackCancel(const FInputActionValue& Value) {
@@ -260,17 +279,14 @@ public:
 		if (CurrentAttackComboAnim == nullptr) {
 			if (i->AimsBow) {
 				i->AimsBow = false;
-				AttackCooldown = ATTACK_COOLDOWN;
+				attackEnded();
 			}
 		}else{
 			check(i->AimsBow == false);
 			i->Montage_Stop(ATTACK_COOLDOWN, CurrentAttackComboAnim);
 			CurrentAttackComboAnim = nullptr;
-			AttackCooldown = ATTACK_COOLDOWN;
+			attackEnded();
 		}
-		
-		IsAttackingLeftHanded = false;
-		IsAttackingRightHanded = false;
 	}
 	/** Called for lock-on input */
 	void LockOntoEnemy(const FInputActionValue& Value);
@@ -323,10 +339,13 @@ public:
 	void StartRun(const FInputActionValue& Value)
 	{
 		if (!bIsSwimming && Health->Stamina > 10) {
-			GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
-			bIsRunning = true;
-			this->UnCrouch();
-			getAnimInstance()->IsSlowWalking = bIsSlowWalking = false;
+			UCharacterAnimInstance * i = getAnimInstance();
+			if (!i->AimsBow) {
+				GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
+				bIsRunning = true;
+				this->UnCrouch();
+				i->IsSlowWalking = bIsSlowWalking = false;
+			}
 		}
 	}
 	void EndRun(const FInputActionValue& Value) {
@@ -355,6 +374,12 @@ public:
 		}
 		
 	}
+
+	void Jump() override
+	{
+		if (!isPlayingAttackAnim() && !bIsSlowWalking)Super::Jump();
+	}
+
 	void SetJiggleStiffness(float jiggleStiffness) {
 		getAnimInstance()->JiggleStiffness = jiggleStiffness;
 	}
@@ -377,13 +402,21 @@ public:
 	UCameraComponent* GetCurrentCamera() {
 		return FollowCamera->IsActive() ? FollowCamera : FirstPersonCamera;
 	}
-
+	void attackEnded() {
+		check(CurrentAttackComboAnim == nullptr);
+		check(getAnimInstance()->AimsBow == false);
+		AttackCooldown = ATTACK_COOLDOWN;
+		enableLeftHandHitDetection = false;
+		enableRightHandHitDetection = false;
+		enableLeftFootHitDetection = false;
+		enableRightFootHitDetection = false;
+	}
 	void OnComboPartEnd(bool isLast) {
 		if (isLast) {
-			AttackCooldown = ATTACK_COOLDOWN;
 			CurrentAttackComboAnim = nullptr;
+			attackEnded();
 		}
-		else if (!(CurrentAttackComboAnimIsLeftHanded?IsAttackingLeftHanded:IsAttackingRightHanded)) {
+		else if (!(CurrentAttackComboAnimIsLeftHanded?wantsToAttackLeftHanded:wantsToAttackRightHanded)) {
 			attackCancel();
 		}
 	}
@@ -400,36 +433,106 @@ public:
 	FVector getRayEnd(double length);
 
 	
-
+	bool enableLeftHandHitDetection;
+	bool enableRightHandHitDetection;
+	bool enableLeftFootHitDetection;
+	bool enableRightFootHitDetection;
+	const float HIT_DETECTION_PERIOD = 0.1;
+	float hitDetectionTimer;
+	const float INVINCIBILITY_AFTER_HIT = 0.2;
+	float invincibilityDuration = 0;
+	void HitDetectRightHand() {
+		if(enableRightHandHitDetection)HitDetect(Inventory->RightHand, RightBareHandSocket, RightHandBladeStart, RightHandBladeEnd, RightHandMesh);
+	}
+	void HitDetectLeftHand() {
+		if (enableLeftHandHitDetection && Inventory->RightHand!= Inventory->LeftHand) {
+			HitDetect(Inventory->LeftHand, LeftBareHandSocket, LeftHandBladeStart, LeftHandBladeEnd, LeftHandMesh);
+		}
+	}
+	void HitDetectRightFoot() {
+		
+	}
+	void HitDetectLeftFoot() {
+		
+	}
+	void HitDetectAll() {
+		HitDetectRightHand();
+		HitDetectLeftHand();
+		HitDetectRightFoot();
+		HitDetectLeftFoot();
+	}
+	float HitDetect(UItemObject * item, const USkeletalMeshSocket* bareHand,  const UStaticMeshSocket* start, const UStaticMeshSocket* end, UStaticMeshComponent* mesh, TArray<FHitResult>& OutHit);
+	void HitDetect(UItemObject* item, const USkeletalMeshSocket* bareHand, const UStaticMeshSocket* start, const UStaticMeshSocket* end, UStaticMeshComponent* mesh) {
+		TArray<FHitResult> OutHit;
+		float damage = HitDetect(item, bareHand, start, end, mesh, OutHit);
+		for (int i = 0; i < OutHit.Num(); i++) {
+			AGameCharacter* c = Cast< AGameCharacter>(OutHit[i].GetActor());
+			c->OnHit(this, damage);
+		}
+	}
+	void Kill(AGameCharacter* killer) {//TODO: kill moves that involve the killer
+		if (DeathAnims.Num() > 0) {
+			getAnimInstance()->Montage_Play(DeathAnims[comboAnimIdx++ % DeathAnims.Num()]);
+		}
+		GetMesh()->SetSimulatePhysics(true);
+	}
+	void OnHit(AGameCharacter * actor, float damage) {
+		if (invincibilityDuration <= 0) {
+			if (Health->takeHealth(damage)) {
+				if (HitAnims.Num() > 0) {
+					getAnimInstance()->Montage_Play(HitAnims[comboAnimIdx++ % HitAnims.Num()]);
+				}
+				invincibilityDuration = INVINCIBILITY_AFTER_HIT;
+			}
+			else {
+				Kill(actor);
+			}
+		}
+	}
 	virtual void OnEquipBothHands(TObjectPtr < UItemObject > item) override {
-		RightHandMesh->SetStaticMesh(item->getMesh());
+		OnEquipRightHand(item);
 	}
 	virtual void OnEquipLeftHand(TObjectPtr < UItemObject > item) override {
-		LeftHandMesh->SetStaticMesh(item->getMesh());
+		UStaticMesh * m = item->getMesh();
+		LeftHandMesh->SetStaticMesh(m);
+		LeftHandBladeStart = m->FindSocket("BladeStart");
+		LeftHandBladeEnd = m->FindSocket("BladeEnd");
+		check((LeftHandBladeStart == nullptr) == (LeftHandBladeEnd == nullptr));
 	}
 	virtual void OnEquipRightHand(TObjectPtr < UItemObject > item) override {
-		RightHandMesh->SetStaticMesh(item->getMesh());
+		UStaticMesh* m = item->getMesh();
+		RightHandMesh->SetStaticMesh(m);
+		RightHandBladeStart = m->FindSocket("BladeStart");
+		RightHandBladeEnd = m->FindSocket("BladeEnd");
+		check((RightHandBladeStart == nullptr) == (RightHandBladeEnd == nullptr));
 	}
 	virtual void OnUnequipBothHands(TObjectPtr < UItemObject > item) override {
-		LeftHandMesh->SetStaticMesh(nullptr);
+		OnUnequipRightHand(item);
 	}
 	virtual void OnUnequipLeftHand(TObjectPtr < UItemObject > item) override {
 		LeftHandMesh->SetStaticMesh(nullptr);
+		LeftHandBladeStart = nullptr;
+		LeftHandBladeEnd = nullptr;	
 	}
 	virtual void OnUnequipRightHand(TObjectPtr < UItemObject > item) override {
 		RightHandMesh->SetStaticMesh(nullptr);
+		RightHandBladeStart = nullptr;
+		RightHandBladeEnd = nullptr;
 	}
 	virtual void OnEquipClothes(TObjectPtr < UItemObject > item) override;
 	virtual void OnUnequipClothes(TObjectPtr < UItemObject > item) override {
 		const int idx = item->equippedAt;
 		Clothes[idx]->UnregisterComponent();
 		Clothes.RemoveAtSwap(idx);
+		Health->Defence -= item->getItemArmor();
 	}
-	virtual void OnPutItem(TObjectPtr<UItemObject> item) override {}
+	virtual void OnPutItem(TObjectPtr<UItemObject> item) override {
+		Health->CarriedWeight += item->getItemWeight();
+	}
 	virtual void OnDropItem(TObjectPtr<UItemObject> item) override;
 	virtual bool CanWear(const FItem& item) override {
-		if (IsFemale)return item.Class == EItemClass::FEMALE_CLOTHES;
-		else return item.Class == EItemClass::MALE_CLOTHES;
+		if (IsFemale)return isFemaleWearable(item.Class);
+		else return isMaleWearable(item.Class);
 	}
 	UCharacterAnimInstance* animInstane=nullptr;
 	UCharacterAnimInstance* getAnimInstance() {

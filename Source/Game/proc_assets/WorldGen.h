@@ -138,7 +138,7 @@ public:
 		despawnActor(usedStaticActorPool, unusedStaticActorPool, item);
 	}
 	TObjectPtr<AItemActor> spawnItem(TObjectPtr<UItemObject> item, double3 loc,FRotator rot) {
-		TObjectPtr<AItemActor> a = spawnActor(usedStaticActorPool, unusedStaticActorPool, loc, rot, UItemObject::StaticClass());
+		TObjectPtr<AItemActor> a = spawnActor(usedStaticActorPool, unusedStaticActorPool, loc, rot, AItemActor::StaticClass());
 		UStaticMesh* mesh = item->getMesh();
 		a->setItem(item, mesh);
 		return a;

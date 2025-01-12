@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "../ui/Status.h"
+#include "../items/ItemObject.h"
 #include "Health.generated.h"
 
 
@@ -63,8 +64,62 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float Arousal;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float Defence = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float CarriedWeight = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float MaxCarriedWeight = 100;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float LightArmorMultiplier = 1;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float HeavyArmorMultiplier = 1;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float BareHandDamage = 10;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float SingleHandedWeaponDamageMultiplier = 10;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float DoubleHandedWeaponDamageMultiplier = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float StealthDamageMultiplier = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float BowDamageMultiplier = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float SpearDamageMultiplier = 1;
+
 	TObjectPtr<UStatus> Widget=nullptr;
 
+	float getDamage(UItemObject* item) {
+		if (item == nullptr) {
+			return BareHandDamage;
+		}
+		FItem * row = item->getRow();
+		switch(row->Class) {
+		case EItemClass::DOUBLE_HANDED_WEAPON:
+			return row->Damage * DoubleHandedWeaponDamageMultiplier;
+		case EItemClass::SINGLE_HANDED_QUIET_WEAPON:
+			return row->Damage * StealthDamageMultiplier;
+		case EItemClass::SINGLE_HANDED_WEAPON:
+			return row->Damage * SingleHandedWeaponDamageMultiplier;
+		case EItemClass::BOW:
+			return row->Damage * BowDamageMultiplier;
+		case EItemClass::SPEAR:
+			return row->Damage * SpearDamageMultiplier;
+		default:
+			return row->Damage + BareHandDamage;
+		}
+	}
 	void setWidget(TObjectPtr<UStatus> widget) {
 		Widget = widget;
 		Widget->healthComponenet = this;

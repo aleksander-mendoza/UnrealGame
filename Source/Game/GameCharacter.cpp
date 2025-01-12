@@ -94,8 +94,6 @@ void preprocessComboAnim(AGameCharacter *c, UAnimMontage * a) {
 	int n = a->Notifies.Num();
 	for (int i = 0; i < n; i++) {
 		if (UNotifyCombo* notify = Cast<UNotifyCombo>(a->Notifies[i].Notify)) {
-			check(notify->Owner == nullptr || notify->Owner == c);
-			notify->Owner = c;
 			notify->IsLast = i + 1 == n;
 		}
 	}
@@ -122,6 +120,8 @@ void AGameCharacter::BeginPlay()
 	LeftHandMesh->RegisterComponent();
 	LeftHandMesh->AttachToComponent(playerMesh, atr, HandSocketL);
 	RightHandMesh->AttachToComponent(playerMesh, atr, HandSocketR);
+	LeftBareHandSocket = playerMesh->GetSocketByName(HandSocketL);
+	RightBareHandSocket = playerMesh->GetSocketByName(HandSocketR);
 	
 	ToggleDirectionalMovement(true);
 	Inventory->ResetToDefault(GetWorld());
@@ -246,7 +246,7 @@ void AGameCharacter::InteractEnd(const FInputActionValue& Value) {
 
 void AGameCharacter::Move(const FInputActionValue& Value)
 {
-	if (CanMove) {
+	if (!isPlayingAttackAnim()) {
 		// input is a Vector2D
 		FVector MovementVector = Value.Get<FVector>();
 
@@ -299,9 +299,39 @@ double3 AGameCharacter::getRayEnd(double length) {
 	return ray.end;
 }
 
+float AGameCharacter::HitDetect(UItemObject* item, const USkeletalMeshSocket* bareHand, const UStaticMeshSocket* start, const UStaticMeshSocket* end, UStaticMeshComponent* mesh, TArray<FHitResult> & OutHit)
+{
+	TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
+	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
+	TArray<AActor*> actorsToIgnore;
+	actorsToIgnore.Add(this);
+	double3 s, e;
+	if (item == nullptr || start == nullptr) {
+		check(bareHand != nullptr);
+		e = s = bareHand->GetSocketLocation(GetMesh());
+		
+	}else{
+		check(end != nullptr);
+		check(start != nullptr);
+		FTransform startTrans;
+		start->GetSocketTransform(startTrans, mesh);
+		FTransform endTrans;
+		end->GetSocketTransform(endTrans, mesh);
+		s = startTrans.GetLocation();
+		e = endTrans.GetLocation();
+		
+	}
+	if (UKismetSystemLibrary::SphereTraceMultiForObjects(GetWorld(), s, e, 50., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::ForDuration, OutHit, true)) {
+		return Health->getDamage(item);
+	}
+	return 0;
+}
+
 void AGameCharacter::OnEquipClothes(TObjectPtr<UItemObject> item)
 {
 	USkeletalMesh* clothingMesh = item->getSkeletalMesh();
+	check(clothingMesh != nullptr);
+	check(item->isWearable());
 	USkeletalMeshComponent* clothingComp = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass());
 	USkeletalMeshComponent* playerMesh = GetMesh();
 	clothingComp->RegisterComponent();
@@ -310,12 +340,14 @@ void AGameCharacter::OnEquipClothes(TObjectPtr<UItemObject> item)
 	clothingComp->SetAnimInstanceClass(playerMesh->AnimClass);
 	clothingComp->SetLeaderPoseComponent(playerMesh, true);
 	const int idx = Clothes.Add(clothingComp);
+	Health->Defence += item->getItemArmor();
 	checkf(item->equippedAt == idx, TEXT("%d != %d"), item->equippedAt, idx);
 	check(Inventory->Clothes[item->equippedAt] == item);
 }
 
 void AGameCharacter::OnDropItem(TObjectPtr<UItemObject> item) {
 	worldGenRef->spawnItem(item, GetActorLocation(), FRotator());
+	Health->CarriedWeight -= item->getItemWeight();
 }
 
 
@@ -340,16 +372,30 @@ void AGameCharacter::Tick(float DeltaTime) {
 		}
 		Health->setStamina(s);
 	}
-	if (AttackCooldown > 0) {
-		AttackCooldown -= DeltaTime;
-		if (AttackCooldown <= 0) {
-			if (IsAttackingLeftHanded) {
-				leftHandedAttackStart();
-			}
-			else if (IsAttackingRightHanded) {
-				rightHandedAttackStart();
+	if (isPlayingAttackAnim()) {
+		if (hitDetectionTimer > 0) {
+			hitDetectionTimer -= DeltaTime;
+		}
+		else {
+			HitDetectAll();
+			hitDetectionTimer = HIT_DETECTION_PERIOD;
+		}
+	}else{
+		if (AttackCooldown > 0) {
+			AttackCooldown -= DeltaTime;
+			if (AttackCooldown <= 0) {
+				if (wantsToAttackLeftHanded) {
+					leftHandedAttackStart();
+				}
+				else if (wantsToAttackRightHanded) {
+					rightHandedAttackStart();
+				}
 			}
 		}
+	}
+	
+	if (invincibilityDuration > 0) {
+		invincibilityDuration -= DeltaTime;
 	}
 	
 }

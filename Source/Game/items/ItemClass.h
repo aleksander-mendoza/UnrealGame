@@ -19,6 +19,10 @@ enum class EItemClass : uint8
 	SHIELD UMETA(DisplayName = "shield"),
 	FEMALE_CLOTHES UMETA(DisplayName = "female clothes"),
 	MALE_CLOTHES UMETA(DisplayName = "male clothes"),
+	FEMALE_LIGHT_ARMOR UMETA(DisplayName = "female light armor"),
+	MALE_LIGHT_ARMOR UMETA(DisplayName = "male light armor"),
+	FEMALE_HEAVY_ARMOR UMETA(DisplayName = "female heavy armor"),
+	MALE_HEAVY_ARMOR UMETA(DisplayName = "male heavy armor"),
 	BOOK UMETA(DisplayName = "book"),
 	POTION UMETA(DisplayName = "potion"),
 	FOOD UMETA(DisplayName = "food"),
@@ -28,4 +32,22 @@ enum class EItemClass : uint8
 };
 inline bool isDoubleHanded(EItemClass c){
 	return c == EItemClass::DOUBLE_HANDED_WEAPON || c == EItemClass::BOW;
+}
+inline bool isWearable(EItemClass c) {
+	return c == EItemClass::FEMALE_CLOTHES
+		|| c == EItemClass::MALE_CLOTHES
+		|| c == EItemClass::FEMALE_LIGHT_ARMOR
+		|| c == EItemClass::MALE_LIGHT_ARMOR
+		|| c == EItemClass::FEMALE_HEAVY_ARMOR
+		|| c == EItemClass::MALE_HEAVY_ARMOR;
+}
+inline bool isFemaleWearable(EItemClass c) {
+	return c == EItemClass::FEMALE_CLOTHES
+		|| c == EItemClass::FEMALE_LIGHT_ARMOR
+		|| c == EItemClass::FEMALE_HEAVY_ARMOR;
+}
+inline bool isMaleWearable(EItemClass c) {
+	return c == EItemClass::MALE_CLOTHES
+		|| c == EItemClass::MALE_LIGHT_ARMOR
+		|| c == EItemClass::MALE_HEAVY_ARMOR;
 }

@@ -10,17 +10,18 @@
 void UCharacterAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaTime)
 {
 	if (IsValid(MovementComponent)) {
+		Velocity = MovementComponent->Velocity;
 		if (IsSwimming) {
-			GroundSpeed = MovementComponent->Velocity.Length();
+			GroundSpeed = Velocity.Length();
 		}
 		else {
-			GroundSpeed = double2(MovementComponent->Velocity).Length();
+			GroundSpeed = double2(Velocity).Length();
 		}
 		const double3 acc = MovementComponent->GetCurrentAcceleration();
 		ShouldMove = acc != double3(0, 0, 0) && GroundSpeed > 3.;
 		IsFalling = MovementComponent->IsFalling();
 		const FRotator rot = Character->GetActorRotation();
-		Direction = UKismetAnimationLibrary::CalculateDirection(MovementComponent->Velocity, rot);
+		Direction = UKismetAnimationLibrary::CalculateDirection(Velocity, rot);
 		IsCrouching = MovementComponent->IsCrouching();
 	}
 }

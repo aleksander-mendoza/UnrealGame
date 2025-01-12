@@ -38,5 +38,16 @@ public:
 	inline EItemClass getItemClass() {
 		return Instance.getRow()->Class;
 	}
-	
+	inline float getItemDamage() {
+		return Instance.getRow()->Damage;
+	}
+	inline float getItemArmor() {
+		return Instance.getRow()->Armor;
+	}
+	inline float getItemWeight() {
+		return Instance.getRow()->Weight;
+	}
+	inline float isWearable() {
+		return Instance.getRow()->isWearable();
+	}
 };

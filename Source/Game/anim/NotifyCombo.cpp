@@ -2,11 +2,10 @@
 
 
 #include "NotifyCombo.h"
-
+#include "../GameCharacter.h"
 
 void UNotifyCombo::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) {
-	if (Owner != nullptr) {
-		Owner->OnComboPartEnd(IsLast);
-	}
-
+//	OnComboNotify.Broadcast(IsLast);
+	AGameCharacter * p = Cast<AGameCharacter>(MeshComp->GetOwner());
+	if (p)p->OnComboPartEnd(IsLast);
 }

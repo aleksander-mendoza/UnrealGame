@@ -97,7 +97,7 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 
 			EnhancedInputComponent->ClearActionBindings();
 			// Jumping
-			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, GameCharacter, &ACharacter::Jump);
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::Jump);
 			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::StopJumping);
 
 			// Moving

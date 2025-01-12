@@ -7,6 +7,7 @@
 #include "../GameCharacter.h"
 #include "NotifyCombo.generated.h"
 
+//DECLARE_MULTICAST_DELEGATE_OneParam(FOnComboNotifySignature, bool);
 /**
  * 
  */
@@ -17,8 +18,6 @@ class GAME_API UNotifyCombo : public UAnimNotify
 
 	virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
 public:
-	AGameCharacter* Owner = nullptr;
+	//FOnComboNotifySignature OnComboNotify;
 	bool IsLast = false;
 };
-
-UNotifyCombo* CastToNotifyCombo(TObjectPtr<class UAnimNotify>);

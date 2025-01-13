@@ -4,6 +4,7 @@
 #include "GamePlayerController.h"
 #include "InputMappingContext.h"
 #include "ui/GameHUD.h"
+#include "input/TapOrHold.h"
 #include "Logging/StructuredLog.h"
 
 UInputAction * AGamePlayerController::MapKey(FKey key, EInputActionValueType type, bool triggerWhenPaused) {
@@ -11,6 +12,14 @@ UInputAction * AGamePlayerController::MapKey(FKey key, EInputActionValueType typ
 	act->bTriggerWhenPaused = triggerWhenPaused;
 	act->ValueType = type;
 	DefaultMappingContext->MapKey(act, key);
+	return act;
+}
+UInputAction* AGamePlayerController::MapTapKey(FKey key) {
+	UInputAction* act = NewObject<UInputAction>(this);
+	FEnhancedActionKeyMapping& mapping = DefaultMappingContext->MapKey(act, key);
+	UObject* outer = DefaultMappingContext->GetOuter();
+	UTapOrHold* tap = NewObject<UTapOrHold>(outer);
+	mapping.Triggers.Add(tap);
 	return act;
 }
 void AGamePlayerController::MapKey(UInputAction* act, FKey key, bool negateX, bool negateY, bool negateZ) {
@@ -44,7 +53,7 @@ void AGamePlayerController::SetupInputComponent()
 
 	MoveAction = NewObject<UInputAction>(this);
 	MoveAction->ValueType = EInputActionValueType::Axis3D;
-
+	
 	MapKey(MoveAction, EKeys::W, false, true, EInputAxisSwizzle::YXZ);
 	MapKey(MoveAction, EKeys::S, true, true, EInputAxisSwizzle::YXZ);
 	MapKey(MoveAction, EKeys::A, true);
@@ -67,12 +76,12 @@ void AGamePlayerController::SetupInputComponent()
 	LeftHandedAttackAction = MapKey(EKeys::LeftMouseButton);
 	RightHandedAttackAction = MapKey(EKeys::RightMouseButton);
 	AttackCancelAction = MapKey(EKeys::R);
-	InteractAction = MapKey(EKeys::E);
+	InteractAction = MapTapKey(EKeys::E);
 	LockAction = MapKey(EKeys::MiddleMouseButton);
 	ZoomAction = MapKey(EKeys::MouseWheelAxis, EInputActionValueType::Axis1D);
 	CrouchAction = MapKey(EKeys::LeftControl);
 	OpenInventoryAction = MapKey(EKeys::C, EInputActionValueType::Boolean, true);
-	OpenRaceMenuAction = MapKey(EKeys::F1, EInputActionValueType::Boolean);
+	OpenRaceMenuAction = MapKey(EKeys::P, EInputActionValueType::Boolean);
 	OpenBuildingInventoryAction = MapKey(EKeys::B, EInputActionValueType::Boolean);
 
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -112,6 +121,7 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 			EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::EndRun);
 			EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::CameraZoom);
 			EnhancedInputComponent->BindAction(LockAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::LockOntoEnemy);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::InteractTriggered);
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::InteractStart);
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::InteractEnd);
 			EnhancedInputComponent->BindAction(LeftHandedAttackAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::LeftHandedAttackStart);

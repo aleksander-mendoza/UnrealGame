@@ -232,6 +232,7 @@ void AGameCharacter::InteractStart(const FInputActionValue& Value) {
 	actorsToIgnore.Add(this);
 	FHitResult OutHit;
 	if (UKismetSystemLibrary::LineTraceSingleForObjects(GetWorld(), ray.start, ray.end, objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true)) {
+		interactedActor = OutHit.GetActor();
 		auto h = OutHit.GetHitObjectHandle();
 		auto c = OutHit.GetComponent();
 		physicshandleDistance = OutHit.Distance;
@@ -240,6 +241,7 @@ void AGameCharacter::InteractStart(const FInputActionValue& Value) {
 	}
 }
 void AGameCharacter::InteractEnd(const FInputActionValue& Value) {
+	interactedActor = nullptr;
 	PhysicsHandle->ReleaseComponent();
 	physicshandleDistance = -1;
 }
@@ -321,7 +323,7 @@ float AGameCharacter::HitDetect(UItemObject* item, const USkeletalMeshSocket* ba
 		e = endTrans.GetLocation();
 		
 	}
-	if (UKismetSystemLibrary::SphereTraceMultiForObjects(GetWorld(), s, e, 50., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::ForDuration, OutHit, true)) {
+	if (UKismetSystemLibrary::SphereTraceMultiForObjects(GetWorld(), s, e, 50., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true)) {
 		return Health->getDamage(item);
 	}
 	return 0;

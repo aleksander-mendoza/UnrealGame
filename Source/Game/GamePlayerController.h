@@ -96,6 +96,7 @@ class GAME_API AGamePlayerController : public APlayerController
 private:
 	AGameCharacter* GameCharacter;
 	UInputAction* MapKey(FKey key, EInputActionValueType type = EInputActionValueType::Boolean, bool triggerWhenPaused=false);
+	UInputAction* MapTapKey(FKey key);
 	void MapKey(UInputAction* act, FKey key, bool negateX, bool negateY, bool negateZ);
 	void MapKey(UInputAction* act, FKey key, bool negate = false, bool swizzle = false, EInputAxisSwizzle order = EInputAxisSwizzle::YXZ);
 };

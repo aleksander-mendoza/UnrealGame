@@ -2,6 +2,8 @@
 
 
 #include "ItemActor.h"
+#include "../GameCharacter.h"
+#include "../proc_assets/WorldGen.h"
 
 // Sets default values
 AItemActor::AItemActor()
@@ -14,6 +16,14 @@ AItemActor::AItemActor()
 	this->SetActorHiddenInGame(true);
 	PrimaryActorTick.bCanEverTick = false;
 
+}
+
+bool AItemActor::OnInteract(AGameCharacter* actor)
+{
+	actor->Inventory->addItem(Item);
+	actor->worldGenRef->despawnItem(this);
+	Item = nullptr;
+	return true;
 }
 
 // Called when the game starts or when spawned

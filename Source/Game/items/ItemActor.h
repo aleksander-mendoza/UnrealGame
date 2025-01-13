@@ -5,10 +5,12 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "ItemObject.h"
+#include "../character/Interactable.h"
 #include "ItemActor.generated.h"
 
+
 UCLASS()
-class GAME_API AItemActor : public AActor
+class GAME_API AItemActor : public AActor, public IInteractable
 {
 	GENERATED_BODY()
 	
@@ -23,6 +25,8 @@ class GAME_API AItemActor : public AActor
 public:	
 	// Sets default values for this actor's properties
 	AItemActor();
+
+	virtual bool OnInteract(class AGameCharacter* actor);
 	
 	inline bool isEnabled() const{
 		return this->IsHidden();

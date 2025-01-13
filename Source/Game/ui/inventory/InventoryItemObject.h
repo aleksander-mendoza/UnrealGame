@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "../items/ItemInstance.h"
+#include "../../items/ItemInstance.h"
 #include "InventoryItemObject.generated.h"
 
 UCLASS()

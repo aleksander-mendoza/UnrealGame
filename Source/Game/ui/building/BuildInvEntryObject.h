@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "../structures/BuildingSystem.h"
+#include "../../structures/BuildingSystem.h"
 #include "BuildInvEntryObject.generated.h"
 
 UCLASS()

@@ -4,9 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
-#include "Inventory.h"
-#include "BuildingInventory.h"
-#include "RaceMenu.h"
+#include "inventory/Inventory.h"
+#include "building/BuildingInventory.h"
+#include "racemenu/RaceMenu.h"
 #include "Status.h"
 #include "../GameCharacter.h"
 #include "GameHUD.generated.h"

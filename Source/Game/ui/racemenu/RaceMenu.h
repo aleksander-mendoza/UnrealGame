@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/ListView.h"
-#include "../GameCharacter.h"
+#include "../../GameCharacter.h"
 #include "RaceMenu.generated.h"
 
 /**

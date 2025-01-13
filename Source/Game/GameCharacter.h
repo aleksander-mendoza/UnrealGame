@@ -12,10 +12,11 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Logging/LogMacros.h"
 #include "ui/TargetLockWidgetActor.h"
-#include "ui/Inventory.h"
 #include "items/ActorInventory.h" 
 #include "items/Container.h" 
+#include "character/Hittable.h" 
 #include "character/Health.h" 
+#include "character/Interactable.h"
 #include "anim/CharacterAnimInstance.h"
 #include "GameCharacter.generated.h"
 
@@ -32,7 +33,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 
 UCLASS(config=Game)
-class AGameCharacter : public ACharacter , public ContainerEvents
+class AGameCharacter : public ACharacter , public ContainerEvents, public IHittable, public IInteractable
 {
 	GENERATED_BODY()
 
@@ -288,8 +289,19 @@ public:
 			attackEnded();
 		}
 	}
+	virtual bool OnInteract(class AGameCharacter* actor)  {
+		//TODO: start dialogue
+		return true;
+	}
 	/** Called for lock-on input */
 	void LockOntoEnemy(const FInputActionValue& Value);
+	AActor* interactedActor;
+	/** Called for interaction input */
+	void InteractTriggered(const FInputActionValue& Value) {
+		if (IInteractable* i = Cast<IInteractable>(interactedActor)) {
+			i->OnInteract(this);
+		}
+	}
 	/** Called for interaction input */
 	void InteractStart(const FInputActionValue& Value);
 	/** Called for interaction input */
@@ -476,7 +488,7 @@ public:
 		}
 		GetMesh()->SetSimulatePhysics(true);
 	}
-	void OnHit(AGameCharacter * actor, float damage) {
+	virtual void OnHit(AGameCharacter * actor, float damage) override{
 		if (invincibilityDuration <= 0) {
 			if (Health->takeHealth(damage)) {
 				if (HitAnims.Num() > 0) {

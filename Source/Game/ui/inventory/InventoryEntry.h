@@ -6,7 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/IUserObjectListEntry.h"
 #include "Components/TextBlock.h"
-#include "../items/ItemObject.h"
+#include "../../items/ItemObject.h"
 #include "InventoryEntry.generated.h"
 
 /**

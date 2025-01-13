@@ -4,11 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
-#include "Hittable.generated.h"
+#include "Interactable.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UHittable : public UInterface
+class UInteractable : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -16,11 +16,12 @@ class UHittable : public UInterface
 /**
  * 
  */
-class GAME_API IHittable
+class GAME_API IInteractable
 {
 	GENERATED_BODY()
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void OnHit(class AGameCharacter* actor, float damage) = 0;
+	/**returns true if the this object can be held/carried and moved*/
+	virtual bool OnInteract(class AGameCharacter* actor) = 0;
 };

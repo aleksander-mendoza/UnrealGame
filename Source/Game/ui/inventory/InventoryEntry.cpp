@@ -1,9 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "InventoryEntry.h"
-#include "../items/ActorInventory.h"
+#include "../../items/ActorInventory.h"
 #include "Inventory.h"
-#include "../items/ItemObject.h"
+#include "../../items/ItemObject.h"
 
 
 void UInventoryEntry::NativeOnListItemObjectSet(UObject* ListItemObject)

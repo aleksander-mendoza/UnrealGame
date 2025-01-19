@@ -39,15 +39,16 @@ void AWorldGen::BeginPlay()
 	Super::BeginPlay();
 	UWorld* world = this->GetWorld();
 	APlayerController* player = world->GetFirstPlayerController();
-	double3 startLoc(0, 0, get_height(float2(0, 0) + 100));
-	PlayerPawn = world->SpawnActor<AGameCharacter>(PlayerPawnClass, startLoc, FRotator());
-	player->Possess(PlayerPawn);
-	PlayerPawn->worldGenRef = this;
+	
+	PlayerPawn = Cast<AGameCharacter>(player->GetPawn());
 
-	reset();
-	addChunksAroundPlayer<false>();
-	generateChunksAroundPlayer<false>();
-	check(!isBusy);
+
+	if (TerrainGenEnabled) {
+		reset();
+		addChunksAroundPlayer<false>();
+		generateChunksAroundPlayer<false>();
+		check(!isBusy);
+	}
 }
 
 
@@ -56,19 +57,20 @@ void AWorldGen::BeginPlay()
 void AWorldGen::Tick(float DeltaTime)
 {
 	//Super::Tick(DeltaTime);
-	update();
-	if (!isBusy) {
-		if (applyResults() && (couldHaveMoreChunksToLoad || playerCrossedChunkBoundary)) {
-			isBusy = true;
-			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this]()
-				{
-					couldHaveMoreChunksToLoad = generateChunksAroundPlayer<true>();
-					isBusy = false;
-				}
-			);
-			
+	if (TerrainGenEnabled) {
+		update();
+		if (!isBusy) {
+			if (applyResults() && (couldHaveMoreChunksToLoad || playerCrossedChunkBoundary)) {
+				isBusy = true;
+				AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this]()
+					{
+						couldHaveMoreChunksToLoad = generateChunksAroundPlayer<true>();
+						isBusy = false;
+					}
+				);
+
+			}
 		}
 	}
-	
 
 }

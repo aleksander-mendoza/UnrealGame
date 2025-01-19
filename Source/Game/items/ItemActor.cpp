@@ -3,7 +3,7 @@
 
 #include "ItemActor.h"
 #include "../GameCharacter.h"
-#include "../proc_assets/WorldGen.h"
+#include "../open_world/OpenWorld.h"
 
 // Sets default values
 AItemActor::AItemActor()
@@ -21,7 +21,7 @@ AItemActor::AItemActor()
 bool AItemActor::OnInteract(AGameCharacter* actor)
 {
 	actor->Inventory->addItem(Item);
-	actor->worldGenRef->despawnItem(this);
+	actor->worldRef->despawnItem(this);
 	Item = nullptr;
 	return true;
 }

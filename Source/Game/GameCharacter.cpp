@@ -12,7 +12,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Logging/StructuredLog.h"
-#include "proc_assets/WorldGen.h"
+#include "open_world/OpenWorld.h"
 #include "Kismet/GameplayStatics.h"
 #include "anim/NotifyCombo.h"
 
@@ -21,7 +21,7 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 //////////////////////////////////////////////////////////////////////////
 // AGameCharacter
 
-AGameCharacter::AGameCharacter()
+AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer.SetDefaultSubobjectClass<UGameCharacterMovementComponent>(CharacterMovementComponentName))
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -37,12 +37,7 @@ AGameCharacter::AGameCharacter()
 
 	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
 	// instead of recompiling to adjust them
-	GetCharacterMovement()->JumpZVelocity = 700.f;
-	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 500.f;
-	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
-	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
-	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
+
 
 	USkeletalMeshComponent* playerMesh = GetMesh();
 
@@ -69,13 +64,8 @@ AGameCharacter::AGameCharacter()
 	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
 
 	
-	LeftHandMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftHandMesh"));
-	RightHandMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightHandMesh"));
-	LeftHandMesh->SetSimulatePhysics(false);
-	RightHandMesh->SetSimulatePhysics(false);
-	LeftHandMesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
-	RightHandMesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
-
+	Combat = CreateDefaultSubobject<UCombat>(TEXT("Combat"));
+	Combat->GameCharacter = this;
 	Health = CreateDefaultSubobject<UHealth>(TEXT("Health"));
 
 	Inventory = CreateDefaultSubobject<UActorInventory>(TEXT("PlayerInventory"));
@@ -84,57 +74,23 @@ AGameCharacter::AGameCharacter()
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 	SetGender(IsFemale);
 
-
-	
-
+	GameMovement = Cast<UGameCharacterMovementComponent>(GetMovementComponent());
+	check(IsValid(GameMovement));
+	GameMovement->GameCharacter = this;
 }
 
 
-void preprocessComboAnim(AGameCharacter *c, UAnimMontage * a) {
-	int n = a->Notifies.Num();
-	for (int i = 0; i < n; i++) {
-		if (UNotifyCombo* notify = Cast<UNotifyCombo>(a->Notifies[i].Notify)) {
-			notify->IsLast = i + 1 == n;
-		}
-	}
-}
-void preprocessComboAnims(AGameCharacter* c, TArray<TObjectPtr<UAnimMontage>>& a) {
-	for (int i = 0; i < a.Num(); i++) {
-		preprocessComboAnim(c, a[i]);
-	}
-}
 void AGameCharacter::BeginPlay()
 {
 	// Call the base class  
-	Super::BeginPlay();
-	preprocessComboAnims(this, RightHandedStealthAttackComboAnims);
-	preprocessComboAnims(this, LeftHandedStealthAttackComboAnims);
-	preprocessComboAnims(this, RightHandedAttackComboAnims);
-	preprocessComboAnims(this, LeftHandedAttackComboAnims);
-	preprocessComboAnims(this, DoubleHandedAttackComboAnims);
-	preprocessComboAnims(this, BareLeftHandAttackComboAnims);
-	preprocessComboAnims(this, BareRightHandAttackComboAnims);
-	USkeletalMeshComponent* playerMesh = GetMesh();
-	const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-	RightHandMesh->RegisterComponent();
-	LeftHandMesh->RegisterComponent();
-	LeftHandMesh->AttachToComponent(playerMesh, atr, HandSocketL);
-	RightHandMesh->AttachToComponent(playerMesh, atr, HandSocketR);
-	LeftBareHandSocket = playerMesh->GetSocketByName(HandSocketL);
-	RightBareHandSocket = playerMesh->GetSocketByName(HandSocketR);
-	
+	Super::BeginPlay();	
 	ToggleDirectionalMovement(true);
 	Inventory->ResetToDefault(GetWorld());
-	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 }
 
 //////////////////////////////////////////////////////////////////////////
 // Input
 
-void AGameCharacter::ToggleCamera(bool firstPersonView) {
-	FollowCamera->SetActive(!firstPersonView);
-	FirstPersonCamera->SetActive(firstPersonView);
-}
 void AGameCharacter::SetCameraDistance(float distance) {
 	if (distance < MinZoomOut) {
 		ToggleCamera(true);
@@ -193,12 +149,6 @@ void AGameCharacter::LockOntoTarget(AActor* target) {
 	}
 	ToggleDirectionalMovement(target != nullptr);
 }
-void AGameCharacter::ToggleDirectionalMovement(bool trueDirectionalMovement) {
-	UCharacterMovementComponent * mov = this->GetCharacterMovement();
-	mov->bOrientRotationToMovement = trueDirectionalMovement;
-	mov->bUseControllerDesiredRotation = !trueDirectionalMovement;
-	getAnimInstance()->IsStrafe = trueDirectionalMovement;
-}
 void AGameCharacter::LockOntoEnemy(const FInputActionValue& Value) {
 	
 	
@@ -224,10 +174,7 @@ void AGameCharacter::InteractStart(const FInputActionValue& Value) {
 	Ray ray;
 	getRay(InteractDistance, ray);
 	TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
-	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_WorldDynamic));
-	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_WorldStatic));
-	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
-	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_PhysicsBody));
+	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Visibility));
 	TArray<AActor*> actorsToIgnore;
 	actorsToIgnore.Add(this);
 	FHitResult OutHit;
@@ -248,40 +195,13 @@ void AGameCharacter::InteractEnd(const FInputActionValue& Value) {
 
 void AGameCharacter::Move(const FInputActionValue& Value)
 {
-	if (!isPlayingAttackAnim()) {
-		// input is a Vector2D
-		FVector MovementVector = Value.Get<FVector>();
-
-		if (Controller != nullptr)
-		{
-			// find out which way is forward
-			const FRotator Rotation = Controller->GetControlRotation();
-			const FRotator YawRotation(0, Rotation.Yaw, 0);
-			// get forward vector
-			const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-
-			// get right vector 
-			const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-			if (this->GetCharacterMovement()->IsInWater()) {
-				if (!bIsSwimming) {
-					SetSwimming(true);
-				}
-				// add movement 
-				const FVector UpDirection(0, 0, 1);
-				AddMovementInput(UpDirection, MovementVector.Z);
-			}
-			else {
-				if (bIsSwimming) {
-					SetSwimming(false);
-				}
-
-
-
-			}
-			AddMovementInput(ForwardDirection, MovementVector.Y);
-			AddMovementInput(RightDirection, MovementVector.X);
-		}
+	// input is a Vector2D
+	FVector MovementVector = Value.Get<FVector>();
+	if (Controller != nullptr)
+	{
+		// find out which way is forward
+		const FRotator Rotation = Controller->GetControlRotation();
+		GameMovement->Move(MovementVector, Rotation);
 	}
 }
 
@@ -301,33 +221,6 @@ double3 AGameCharacter::getRayEnd(double length) {
 	return ray.end;
 }
 
-float AGameCharacter::HitDetect(UItemObject* item, const USkeletalMeshSocket* bareHand, const UStaticMeshSocket* start, const UStaticMeshSocket* end, UStaticMeshComponent* mesh, TArray<FHitResult> & OutHit)
-{
-	TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
-	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
-	TArray<AActor*> actorsToIgnore;
-	actorsToIgnore.Add(this);
-	double3 s, e;
-	if (item == nullptr || start == nullptr) {
-		check(bareHand != nullptr);
-		e = s = bareHand->GetSocketLocation(GetMesh());
-		
-	}else{
-		check(end != nullptr);
-		check(start != nullptr);
-		FTransform startTrans;
-		start->GetSocketTransform(startTrans, mesh);
-		FTransform endTrans;
-		end->GetSocketTransform(endTrans, mesh);
-		s = startTrans.GetLocation();
-		e = endTrans.GetLocation();
-		
-	}
-	if (UKismetSystemLibrary::SphereTraceMultiForObjects(GetWorld(), s, e, 50., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true)) {
-		return Health->getDamage(item);
-	}
-	return 0;
-}
 
 void AGameCharacter::OnEquipClothes(TObjectPtr<UItemObject> item)
 {
@@ -348,7 +241,7 @@ void AGameCharacter::OnEquipClothes(TObjectPtr<UItemObject> item)
 }
 
 void AGameCharacter::OnDropItem(TObjectPtr<UItemObject> item) {
-	worldGenRef->spawnItem(item, GetActorLocation(), FRotator());
+	worldRef->spawnItem(item, GetActorLocation(), FRotator());
 	Health->CarriedWeight -= item->getItemWeight();
 }
 
@@ -365,35 +258,22 @@ void AGameCharacter::Tick(float DeltaTime) {
 		double3 pos = getRayEnd(physicshandleDistance);
 		PhysicsHandle->SetTargetLocation(pos);
 	}
-	if (bIsRunning) {
-		float s = Health->Stamina - 10*DeltaTime;
-		Health->PreventStaminaRegen = 1;
-		if (s < 0) {
-			s = 0;
-			endRun();
+	if (GameMovement->IsRunning()) {
+		if (!Health->UpdateRunning(DeltaTime)) {
+			GameMovement->StartWalking();
 		}
-		Health->setStamina(s);
+		
 	}
-	if (isPlayingAttackAnim()) {
-		if (hitDetectionTimer > 0) {
-			hitDetectionTimer -= DeltaTime;
+	if (GameMovement->isPlayingAttackAnim()) {
+		if (Combat->hitDetectionTimer > 0) {
+			Combat->hitDetectionTimer -= DeltaTime;
 		}
 		else {
-			HitDetectAll();
-			hitDetectionTimer = HIT_DETECTION_PERIOD;
+			HitDetect();
+			Combat->hitDetectionTimer = HIT_DETECTION_PERIOD;
 		}
 	}else{
-		if (AttackCooldown > 0) {
-			AttackCooldown -= DeltaTime;
-			if (AttackCooldown <= 0) {
-				if (wantsToAttackLeftHanded) {
-					leftHandedAttackStart();
-				}
-				else if (wantsToAttackRightHanded) {
-					rightHandedAttackStart();
-				}
-			}
-		}
+		TickAttackCooldown(DeltaTime);
 	}
 	
 	if (invincibilityDuration > 0) {

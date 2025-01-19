@@ -9,6 +9,6 @@ AGameHUD::AGameHUD(){
 
 void AGameHUD::BeginPlay()
 {
-	StatusWidget->AddToViewport(9998);
+	if(StatusWidget)StatusWidget->AddToViewport(9998);
 }
 

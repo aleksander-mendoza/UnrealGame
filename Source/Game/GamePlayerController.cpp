@@ -124,6 +124,7 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Triggered, GameCharacter, &AGameCharacter::InteractTriggered);
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::InteractStart);
 			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::InteractEnd);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, GameCharacter, &AGameCharacter::InteractEnd);
 			EnhancedInputComponent->BindAction(LeftHandedAttackAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::LeftHandedAttackStart);
 			EnhancedInputComponent->BindAction(LeftHandedAttackAction, ETriggerEvent::Completed, GameCharacter, &AGameCharacter::LeftHandedAttackEnd);
 			EnhancedInputComponent->BindAction(RightHandedAttackAction, ETriggerEvent::Started, GameCharacter, &AGameCharacter::RightHandedAttackStart);

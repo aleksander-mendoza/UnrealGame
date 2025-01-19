@@ -14,7 +14,8 @@ ETriggerState UTapOrHold::UpdateState_Implementation(const UEnhancedPlayerInput*
 	{
 		
 		HeldDuration += DeltaTime;
-		return ETriggerState::Ongoing;
+		
+		
 	}
 	else
 	{
@@ -26,8 +27,8 @@ ETriggerState UTapOrHold::UpdateState_Implementation(const UEnhancedPlayerInput*
 		{
 			return ETriggerState::Triggered;
 		}
-		return ETriggerState::None;
 	}
+	return ETriggerState::Ongoing;
 
 	
 }

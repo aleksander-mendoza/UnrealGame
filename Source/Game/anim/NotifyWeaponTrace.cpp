@@ -9,11 +9,7 @@ void UNotifyWeaponTrace::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequ
 {
 	AGameCharacter* p = Cast<AGameCharacter>(MeshComp->GetOwner());
 	if (p) {
-		p->enableLeftHandHitDetection |= enableLeftHandHitDetection;
-		p->enableRightHandHitDetection |= enableRightHandHitDetection;
-		p->enableLeftFootHitDetection |= enableLeftFootHitDetection;
-		p->enableRightFootHitDetection |= enableRightFootHitDetection;
-		p->hitDetectionTimer = 0;
+		p->EnableWeaponTrace(enableLeftHandHitDetection, enableRightHandHitDetection, enableLeftFootHitDetection, enableRightFootHitDetection);
 	}
 }
 
@@ -21,9 +17,6 @@ void UNotifyWeaponTrace::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequen
 {
 	AGameCharacter* p = Cast<AGameCharacter>(MeshComp->GetOwner());
 	if (p) {
-		if (enableLeftHandHitDetection)p->enableLeftHandHitDetection = false;
-		if (enableRightHandHitDetection)p->enableRightHandHitDetection = false;
-		if (enableLeftFootHitDetection)p->enableLeftFootHitDetection = false;
-		if (enableRightFootHitDetection)p->enableRightFootHitDetection = false;
+		p->DisableWeaponTrace();
 	}
 }

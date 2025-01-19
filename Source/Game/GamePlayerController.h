@@ -93,7 +93,7 @@ class GAME_API AGamePlayerController : public APlayerController
 	void TriggerInventory(const FInputActionValue& Value);
 	void TriggerRaceMenu(const FInputActionValue& Value);
 	void TriggerBuildingInventory(const FInputActionValue& Value);
-private:
+public:
 	AGameCharacter* GameCharacter;
 	UInputAction* MapKey(FKey key, EInputActionValueType type = EInputActionValueType::Boolean, bool triggerWhenPaused=false);
 	UInputAction* MapTapKey(FKey key);

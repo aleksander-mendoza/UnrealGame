@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+//#include "CoreMinimal.h"
 #include "ItemClass.generated.h"
 /**
  *

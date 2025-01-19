@@ -7,6 +7,7 @@
 #include "ItemObject.h"
 #include "ItemInstanceList.h"
 #include "Container.h"
+#include "../anim/ArmedPoseType.h"
 #include "ActorInventory.generated.h"
 
 //DECLARE_DELEGATE_OneParam(FStringDelegate, FString);
@@ -54,8 +55,31 @@ public:
 	ContainerEvents* containerEvents;
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	inline TObjectPtr < UItemObject>  getHandItem(bool leftHand) {
+		return leftHand ? LeftHand : RightHand;
+	}
 	inline EItemClass getWeaponClass(bool leftHand) {
 		return leftHand ? getLeftHandWeaponClass() : getRightHandWeaponClass();
+	}
+
+	inline EArmedPoseType getArmedPoseType() {
+		const EItemClass left = getLeftHandWeaponClass();
+		const EItemClass right = getRightHandWeaponClass();
+		if (left == EItemClass::BOW) {
+			return EArmedPoseType::BOW;
+		}else if (left == EItemClass::DOUBLE_HANDED_WEAPON) {
+			return EArmedPoseType::DOUBLE_HANDED;
+		}
+		else if (left == EItemClass::SINGLE_HANDED_QUIET_WEAPON || left == EItemClass::SINGLE_HANDED_WEAPON ||
+			right == EItemClass::SINGLE_HANDED_QUIET_WEAPON || right == EItemClass::SINGLE_HANDED_WEAPON) {
+			return EArmedPoseType::SINGLE_HANDED;
+		}
+		else {
+			return EArmedPoseType::BARE_HANDED;
+		}
+	}
+	inline bool IsDoubleHanded() {
+		return LeftHand != nullptr && LeftHand == RightHand;
 	}
 	inline EItemClass getLeftHandWeaponClass() {
 		return LeftHand ==nullptr? EItemClass::NONE : LeftHand->getItemClass();
@@ -127,7 +151,7 @@ public:
 			check(Clothes[i]->equippedAt==i);
 		}
 		check(cs == occupiedClothingSlots);
-		if (LeftHand == RightHand && LeftHand != nullptr) {
+		if (IsDoubleHanded()) {
 			check(Items.Contains(LeftHand));
 			check(LeftHand->equippedAt == -4);
 		}

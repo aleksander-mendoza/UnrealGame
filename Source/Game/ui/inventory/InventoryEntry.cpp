@@ -54,11 +54,9 @@ FReply UInventoryEntry::NativeOnMouseButtonDown(const FGeometry& InGeometry, con
 	if (InMouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton)) {
 		Item->container->toggleItem(Item, true, true, false);
 		Item->container->currentWidget->refresh();
-		this->setStatus();
 	}else if (InMouseEvent.IsMouseButtonDown(EKeys::RightMouseButton)) {
 		Item->container->toggleItem(Item, false, true, false);
 		Item->container->currentWidget->refresh();
-		this->setStatus();
 	}
 	return FReply::Handled();
 }

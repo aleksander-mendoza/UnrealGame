@@ -11,7 +11,7 @@ void UCharacterAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaTime)
 {
 	if (IsValid(MovementComponent)) {
 		Velocity = MovementComponent->Velocity;
-		if (IsSwimming) {
+		if (MovementComponent->IsSwimming()) {
 			GroundSpeed = Velocity.Length();
 		}
 		else {
@@ -19,10 +19,18 @@ void UCharacterAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaTime)
 		}
 		const double3 acc = MovementComponent->GetCurrentAcceleration();
 		ShouldMove = acc != double3(0, 0, 0) && GroundSpeed > 3.;
-		IsFalling = MovementComponent->IsFalling();
 		const FRotator rot = Character->GetActorRotation();
 		Direction = UKismetAnimationLibrary::CalculateDirection(Velocity, rot);
+		ArmedPoseType = MovementComponent->getArmedStatus();
+		IsAttackCancelled = MovementComponent->IsAttackCancelled();
 		IsCrouching = MovementComponent->IsCrouching();
+		IsSwimming = MovementComponent->IsSwimming();
+		IsRunning = MovementComponent->IsRunning();
+		IsWalking = MovementComponent->IsWalking();
+		IsSlowWalking = MovementComponent->IsSlowWalking();
+		IsFalling = MovementComponent->IsFalling();
+		AimsBow = MovementComponent->AimsBow();
+		IsStrafe = MovementComponent->IsDirectionalMovement();
 	}
 }
 
@@ -30,6 +38,6 @@ void UCharacterAnimInstance::NativeInitializeAnimation()
 {
 	if (!IsValid(Character)) {
 		Character = Cast<AGameCharacter>(GetOwningActor());
-		if(Character!=nullptr) MovementComponent = Character->GetCharacterMovement();
+		if(Character!=nullptr) MovementComponent = Character->GameMovement;
 	}
 }

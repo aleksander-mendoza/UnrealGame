@@ -100,11 +100,15 @@ public:
 
 	TObjectPtr<UStatus> Widget=nullptr;
 
-	float getDamage(UItemObject* item) {
+	float getDamage(const UItemObject* item) {
 		if (item == nullptr) {
 			return BareHandDamage;
 		}
-		FItem * row = item->getRow();
+		return getDamage(item->Instance);
+	}
+	
+	float getDamage(const FItemInstance & item) {
+		const FItem* row = item.getRow();
 		switch(row->Class) {
 		case EItemClass::DOUBLE_HANDED_WEAPON:
 			return row->Damage * DoubleHandedWeaponDamageMultiplier;
@@ -174,6 +178,22 @@ public:
 		}
 		return false;
 
+	}
+	bool UpdateRunning(float DeltaTime) {
+		float s = Stamina - 10 * DeltaTime;
+		PreventStaminaRegen = 1;
+		if (s < 0) {
+			s = 0;
+			
+		}
+		setStamina(s);
+		return s <= 0;
+	}
+	inline bool CanRun() {
+		return Stamina > 10;
+	}
+	inline bool CanJump() {
+		return true;
 	}
 protected:
 	// Called when the game starts

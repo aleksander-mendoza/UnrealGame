@@ -25,7 +25,7 @@ public:
 		ItemListView->RemoveItem(item);
 	}
 	void refresh() {
-		ItemListView->RequestRefresh();
+		ItemListView->RegenerateAllEntries();
 	}
 protected:
 	UPROPERTY(VisibleAnywhere, meta = (BindWidget))

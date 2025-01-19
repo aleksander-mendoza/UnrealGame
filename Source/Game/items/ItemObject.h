@@ -32,22 +32,22 @@ public:
 	inline UStaticMesh* getMesh() {
 		return Instance.getMesh();
 	}
-	inline FItem* getRow() {
+	inline FItem* getRow() const {
 		return Instance.getRow();
 	}
-	inline EItemClass getItemClass() {
+	inline EItemClass getItemClass() const {
 		return Instance.getRow()->Class;
 	}
-	inline float getItemDamage() {
+	inline float getItemDamage() const {
 		return Instance.getRow()->Damage;
 	}
-	inline float getItemArmor() {
+	inline float getItemArmor() const {
 		return Instance.getRow()->Armor;
 	}
-	inline float getItemWeight() {
+	inline float getItemWeight()const {
 		return Instance.getRow()->Weight;
 	}
-	inline float isWearable() {
+	inline float isWearable() const {
 		return Instance.getRow()->isWearable();
 	}
 };

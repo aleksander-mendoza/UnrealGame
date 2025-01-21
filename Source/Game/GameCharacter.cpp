@@ -259,7 +259,7 @@ void AGameCharacter::Tick(float DeltaTime) {
 		PhysicsHandle->SetTargetLocation(pos);
 	}
 	if (GameMovement->IsRunning()) {
-		if (!Health->UpdateRunning(DeltaTime)) {
+		if (Health->UpdateRunning(DeltaTime)) {
 			GameMovement->StartWalking();
 		}
 		

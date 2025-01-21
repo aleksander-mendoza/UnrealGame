@@ -253,7 +253,7 @@ public:
 			}
 			else {
 				RightHand->equippedAt = -3;
-				if (containerEvents)containerEvents->OnUnequipLeftHand(RightHand);
+				if (containerEvents)containerEvents->OnUnequipRightHand(RightHand);
 				RightHand = nullptr;
 				check(isAllValid());
 			}

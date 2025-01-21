@@ -6,6 +6,8 @@
 #include "../items/ActorInventory.h"
 #include "MovementSpeed.h"
 #include "../anim/MeleeAttackClass.h"
+#include "../anim/AttackHandedness.h"
+#include "../anim/WeaponAnim.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameCharacterMovementComponent.generated.h"
 
@@ -28,54 +30,48 @@ private:
 
 public:
 
-	UPROPERTY(Category = Movement, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(Category = "Character Movement: Attack", EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	float BowAttackCooldown = 0.2;
 
-	UPROPERTY(Category = Movement, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(Category = "Character Movement: Attack", EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	float SingleHandedAttackCooldown = 0.2;
 
-	UPROPERTY(Category = Movement, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(Category = "Character Movement: Attack", EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	float DoubleHandedAttackCooldown = 0.2;
 
-	UPROPERTY(Category = Movement, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(Category = "Character Movement: Walking", EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	float SlowWalkSpeed = 100;
 
-	UPROPERTY(Category = Movement, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(Category = "Character Movement: Walking", EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	float RunSpeed = 500;
 	
 	EMovementSpeed MovementSpeed = EMovementSpeed::WALK;
 
 	EArmedPoseType ArmedPoseType = EArmedPoseType::UNARMED;
 	bool attackCancelled = false;
-	TObjectPtr<UAnimMontage> CurrentAttackComboAnim[2] = { nullptr, nullptr };
+	FWeaponAnim * CurrentAttackAnim = nullptr;
+	bool isAttackLeftHanded = false;
 	class AGameCharacter * GameCharacter;
-	bool wantsToAttack[2] = { false, false };
-	float attackCooldown[2] = { 0,0 };
-	inline bool WantsToAttack(bool leftHand) {
-		return wantsToAttack[leftHand];
+	bool wantsToAttack;
+	bool wantsToAttackLeftHanded;
+	float attackCooldown = 0;
+	inline bool WantsToAttack() {
+		return wantsToAttack;
 	}
-	inline bool wantsToAttackLeft() {
-		return WantsToAttack(true);
+	inline bool WantsToAttackLeft() {
+		return wantsToAttack && wantsToAttackLeftHanded;
 	}
-	inline bool wantsToAttackRight() {
-		return WantsToAttack(false);
+	inline bool WantsToAttackRight() {
+		return wantsToAttack && !wantsToAttackLeftHanded;
 	}
 
-	inline TObjectPtr<UAnimMontage>  GetCurrentAttackAnim(bool leftHand) {
-		
-		return CurrentAttackComboAnim[leftHand];
-	}
-	inline TObjectPtr<UAnimMontage>  leftAttackAnim() {
-		return GetCurrentAttackAnim(true);
-	}
-	inline TObjectPtr<UAnimMontage>  rightAttackAnim() {
-		return GetCurrentAttackAnim(false);
+	inline TObjectPtr<UAnimMontage>  GetCurrentAttackAnim() {
+		if (CurrentAttackAnim == nullptr)return nullptr;
+		check(CurrentAttackAnim->Anim != nullptr);
+		return CurrentAttackAnim->Anim;
 	}
 	inline bool isPlayingAttackAnim() {
-		return leftAttackAnim() != nullptr || rightAttackAnim() != nullptr;
-	}
-	inline bool isPlayingAttackAnim(bool leftHand) {
-		return GetCurrentAttackAnim(leftHand) != nullptr;
+		return CurrentAttackAnim !=nullptr;
 	}
 
 	inline EArmedPoseType getArmedStatus() {
@@ -102,7 +98,7 @@ public:
 	}
 	inline void StartWalking() {
 		MovementSpeed = EMovementSpeed::WALK;
-		MaxWalkSpeed = RunSpeed;
+		MaxWalkSpeed = WalkSpeed;
 	}
 	inline bool CanStartRunning() {
 		return !AimsBow();
@@ -115,7 +111,7 @@ public:
 	}
 	inline void StartSlowWalking() {
 		MovementSpeed = EMovementSpeed::SLOW_WALK;
-		MaxWalkSpeed = RunSpeed;
+		MaxWalkSpeed = SlowWalkSpeed;
 	}
 	inline bool IsAttackCancelled() {
 		return attackCancelled;
@@ -151,39 +147,30 @@ public:
 		AddInputVector(RightDirection * MovementVector.X);
 	}
 	inline void EnableAttacking(float cooldown = 0) {
-		EnableAttacking(false, cooldown);
-		EnableAttacking(true, cooldown);
+		attackCooldown = cooldown;
 	}
-	inline bool TickCooldown(bool leftHand, float DeltaTime) {
-		if (attackCooldown[leftHand] > 0) {
-			attackCooldown[leftHand] -= DeltaTime;
+	inline bool TickCooldown(float DeltaTime) {
+		if (attackCooldown > 0) {
+			attackCooldown -= DeltaTime;
 			return false;
 		}
 		else {
-			return wantsToAttack[leftHand];
+			return WantsToAttack();
 		}
 	}
-	inline void EnableAttacking(bool leftHand, float cooldown=0) {
-		attackCooldown[leftHand] = cooldown;
-	}
-	inline void DisableAttacking(bool leftHand) {
-		attackCooldown[leftHand] = ATTACK_DISABLED;
-	}
 	inline void DisableAttacking() {
-		DisableAttacking(true);
-		DisableAttacking(false);
+		EnableAttacking(ATTACK_DISABLED);
 	}
 	inline EMeleeAttackClass attackStart(bool leftHand, UActorInventory * inv) {
 		attackCancelled = false;
-		wantsToAttack[leftHand] = true;
+		wantsToAttack = true;
+		wantsToAttackLeftHanded = leftHand;
 		if (ArmedPoseType == EArmedPoseType::UNARMED) {
 			ArmedPoseType = inv->getArmedPoseType();
-			DisableAttacking(); // unsheathing animation starts. 
-			// The animation is expected to notify us at the end and reset cooldown to 0
-			return EMeleeAttackClass::NONE;
-		}else if (attackCooldown[leftHand] <= 0) {
-			check(CurrentAttackComboAnim[leftHand] == nullptr);
-			CurrentAttackComboAnim[leftHand] = nullptr;
+			return poseToAttack(ArmedPoseType);
+		}else if (attackCooldown <= 0) {
+			check(!isPlayingAttackAnim());
+			CurrentAttackAnim = nullptr;
 			EItemClass weaponClass = inv->getWeaponClass(leftHand);
 			switch (weaponClass) {
 			case EItemClass::BOW:
@@ -196,63 +183,83 @@ public:
 					// TODO: right handed attack with double handed weapon works like blocking
 					return EMeleeAttackClass::NONE;
 				}
-				DisableAttacking(leftHand);
 				return EMeleeAttackClass::DOUBLE_HANDED_WEAPON;
 			case EItemClass::SINGLE_HANDED_QUIET_WEAPON:
 			case EItemClass::SINGLE_HANDED_WEAPON:
-				DisableAttacking(leftHand);
 				return EMeleeAttackClass::SINGLE_HANDED_WEAPON;
 			default:
-				DisableAttacking(leftHand);
 				return EMeleeAttackClass::BARE_HANDED;
 			}
 		}
 		return EMeleeAttackClass::NONE;
 	}
 	UAnimInstance* getAnimInstance() const;
-
-	void attackEnd(bool leftHanded) {
+	void becomeUnarmed() {
+		StopCurrentAttackAnim(0);
+		ArmedPoseType = EArmedPoseType::UNARMED;
+		wantsToAttack = false;
+		attackCancelled = false;
+	}
+	void attackEnd(bool leftHand) {
+		if (wantsToAttack && wantsToAttackLeftHanded == leftHand) {
+			attackEnd();
+		}
+	}
+	void attackEnd() {
 		if (ArmedPoseType==EArmedPoseType::BOW_AIMED) {
 			ArmedPoseType = EArmedPoseType::BOW;
 			EnableAttacking(BowAttackCooldown);
 		}
-		wantsToAttack[leftHanded] = false;
+		wantsToAttack = false;
 	}
 	inline void StopCurrentAttackAnim(float cooldown=0) {
-		StopCurrentAttackAnim(true, cooldown);
-		StopCurrentAttackAnim(false, cooldown);
-	}
-	inline void StopCurrentAttackAnim(bool leftHand, float cooldown=0) {
-		if (isPlayingAttackAnim(leftHand)) {
-			EnableAttacking(leftHand, cooldown);
-			getAnimInstance()->Montage_Stop(GetAttackCooldown(), GetCurrentAttackAnim(leftHand));
-			CurrentAttackComboAnim[leftHand] = nullptr;
+		//check(isPlayingAttackAnim());
+		if (isPlayingAttackAnim()) {
+			EnableAttacking(cooldown);
+			getAnimInstance()->Montage_Stop(cooldown, GetCurrentAttackAnim());
+			CurrentAttackAnim = nullptr;
 		}
 	}
-	inline void PlayAttackAnim(bool leftHand, TObjectPtr<UAnimMontage> anim) {
-		CurrentAttackComboAnim[leftHand] = anim;
-		getAnimInstance()->Montage_Play(anim);
+	inline bool AttackAnimRequiresMirroring() {
+		if (CurrentAttackAnim != nullptr) {
+			return CurrentAttackAnim->IsLeftHanded == isAttackLeftHanded;
+		}
+		return false;
 	}
-	bool attackCancel() {
-		wantsToAttack[0] = false;
-		wantsToAttack[1] = false;
+	inline void PlayAttackAnim(bool leftHand, FWeaponAnim * anim) {
+		check(anim != nullptr);
+		check(anim->Anim != nullptr);
+		//check(!isPlayingAttackAnim());
+		UAnimInstance * i = getAnimInstance();
+		if (CurrentAttackAnim != nullptr) {
+			i->Montage_Stop(0, GetCurrentAttackAnim());
+		}
+		CurrentAttackAnim = anim;
+		isAttackLeftHanded = leftHand;
+		i->Montage_Play(GetCurrentAttackAnim());
+		DisableAttacking();
+		//}
+	}
+	EMeleeAttackClass attackCancel() {
+		wantsToAttack = false;
 		switch (ArmedPoseType) {
 		case EArmedPoseType::UNARMED:
-			return false;
+			return EMeleeAttackClass::NONE;
 		case EArmedPoseType::BOW_AIMED:
 			attackCancelled = true;
 			EnableAttacking();
 			ArmedPoseType = EArmedPoseType::BOW;
-			return false;
+			return EMeleeAttackClass::NONE;
 		default:
 			if (isPlayingAttackAnim()) {
 				attackCancelled = true;
 				StopCurrentAttackAnim(GetAttackCooldown());
-				return true;
+				return EMeleeAttackClass::NONE;
 			}
 			else {
+				EMeleeAttackClass attackClass = poseToAttack(ArmedPoseType);
 				ArmedPoseType = EArmedPoseType::UNARMED;
-				return false;
+				return attackClass;
 			}
 		}
 	}
@@ -272,13 +279,14 @@ public:
 			return SingleHandedAttackCooldown;
 		}
 	}
-	void NotifyAttackAnimationFinished(bool leftHand) {
-		CurrentAttackComboAnim[leftHand] = nullptr;
-		EnableAttacking(leftHand, GetAttackCooldown());
+	void NotifyAttackAnimationFinished() {
+		EnableAttacking(GetAttackCooldown());
+		CurrentAttackAnim = nullptr;
 	}
-	void OnComboPartEnd(bool leftHand) {
-		if (isPlayingAttackAnim(leftHand) && !WantsToAttack(leftHand)) {
-			StopCurrentAttackAnim(leftHand, GetAttackCooldown());
+	void OnComboPartEnd() {
+		check(isPlayingAttackAnim());
+		if (!WantsToAttack() || isAttackLeftHanded!=wantsToAttackLeftHanded) {
+			StopCurrentAttackAnim(GetAttackCooldown());
 		}
 	}
 };

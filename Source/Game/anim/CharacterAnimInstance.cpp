@@ -31,6 +31,7 @@ void UCharacterAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaTime)
 		IsFalling = MovementComponent->IsFalling();
 		AimsBow = MovementComponent->AimsBow();
 		IsStrafe = MovementComponent->IsDirectionalMovement();
+		IsSheathed = Character->Combat->isSheathed();
 	}
 }
 

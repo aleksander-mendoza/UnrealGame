@@ -8,6 +8,7 @@
 #include "../anim/WeaponSetAnims.h"
 #include "../items/ActorInventory.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "../anim/AttackHandedness.h"
 #include "Combat.generated.h"
 
 #define HIT_DETECTION_PERIOD 0.1
@@ -37,23 +38,23 @@ public:
 	FWeaponSetAnims WeaponAnims;
 
 	/** Hand socket (right)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
 	FName HandSocketR;
 	/** Hand socket (right)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	FName HandSocketL;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
+	FName HandSocketL ;
 	/** Sheathed weapon socket (left)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
 	FName SheathedSocketL;
 	/** Sheathed weapon socket (right)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	FName SheathedSocketR;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
+	FName SheathedSocketR ;
 	/** Sheathed weapon socket (back left)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
 	FName SheathedSocketBackL;
 
 	/** Sheathed weapon socket (back right)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
 	FName SheathedSocketBackR;
 
 	UPROPERTY()
@@ -61,7 +62,9 @@ public:
 
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> RightHandMesh;
-
+	inline FName & SheathedSocketName(bool leftHand, bool back) {
+		return leftHand ? (back? SheathedSocketBackL : SheathedSocketL) : (back ? SheathedSocketBackR : SheathedSocketR);
+	}
 	inline TObjectPtr<UStaticMeshComponent>  ItemMesh(bool leftHand) {
 		return leftHand ? LeftHandMesh : RightHandMesh;
 	}
@@ -74,6 +77,9 @@ public:
 	bool enableFootHitDetection[2];
 	inline bool HasWeaponEquipped(bool leftHand) {
 		return BladeStart[leftHand]!=nullptr;
+	}
+	inline const FName & GetHandSocketName(bool leftHand) {
+		return leftHand ? HandSocketL : HandSocketR;
 	}
 	inline const USkeletalMeshSocket* GetHandSocket(bool leftHand) {
 		return BareHandSocket[leftHand];
@@ -126,30 +132,40 @@ public:
 	
 	USkeletalMeshComponent* GetMesh() const;
 
-	
-	inline void sheathLeft() {
-		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		LeftHandMesh->AttachToComponent(GetMesh(), atr, SheathedSocketL);
+	bool IsSheathed[2] = { true, true };
+	inline bool isSheathed() const {
+		return IsSheathed[0]|| IsSheathed[1];
 	}
-	inline void sheathRight() {
-		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		RightHandMesh->AttachToComponent(GetMesh(), atr, SheathedSocketR);
+	inline bool isSheathed(bool leftHand) const{
+		return IsSheathed[leftHand];
 	}
-	inline void unsheathBackRight() {
+	inline void unsheath(bool leftHand) {
 		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		RightHandMesh->AttachToComponent(GetMesh(), atr, SheathedSocketBackR);
+		ItemMesh(leftHand)->AttachToComponent(GetMesh(), atr, GetHandSocketName(leftHand));
+		IsSheathed[leftHand] = false;
 	}
-	inline void unsheathBackLeft() {
+	inline void sheath(bool leftHand, bool back) {
 		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		LeftHandMesh->AttachToComponent(GetMesh(), atr, SheathedSocketBackL);
+		ItemMesh(leftHand)->AttachToComponent(GetMesh(), atr, SheathedSocketName(leftHand, back));
+		IsSheathed[leftHand] = true;
+	}
+	inline void sheathLeft(bool back=false) {
+		sheath(true, back);
+	}
+	inline void sheathRight(bool back = false) {
+		sheath(false, back);
+	}
+	inline void sheathBackRight() {
+		sheath(false, true);
+	}
+	inline void sheathBackLeft() {
+		sheath(true, true);
 	}
 	inline void unsheathLeft() {
-		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		LeftHandMesh->AttachToComponent(GetMesh(), atr, HandSocketL);
+		unsheath(true);
 	}
 	inline void unsheathRight() {
-		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		RightHandMesh->AttachToComponent(GetMesh(), atr, HandSocketR);
+		unsheath(false);
 	}
 	inline TObjectPtr<UAnimMontage> getHitAnim() {
 		return HitAnims.Num()==0?nullptr: HitAnims[comboAnimIdx++ % HitAnims.Num()];
@@ -157,14 +173,17 @@ public:
 	inline TObjectPtr<UAnimMontage> getDeathAnim() {
 		return DeathAnims.Num() == 0 ? nullptr : DeathAnims[comboAnimIdx++ % DeathAnims.Num()];
 	}
-	inline TObjectPtr<UAnimMontage> getAttackAnim(EMeleeAttackClass weaponClass, bool leftHand) {
-		return WeaponAnims.getAttackAnim(weaponClass, leftHand, comboAnimIdx++);
+	inline FWeaponAnim* getSheathAnim(EMeleeAttackClass weaponClass) {
+		return WeaponAnims.getSheathAnim(weaponClass);
 	}
-	inline TObjectPtr<UAnimMontage> getLeftAttackAnim(EMeleeAttackClass weaponClass) {
-		return getAttackAnim(weaponClass, true);
+	inline FWeaponAnim* getUnsheathAnim(EMeleeAttackClass weaponClass) {
+		return WeaponAnims.getUnsheathAnim(weaponClass);
 	}
-	inline TObjectPtr<UAnimMontage> getRightAttackAnim(EMeleeAttackClass weaponClass) {
-		return getAttackAnim(weaponClass, false);
+	inline FWeaponAnim* getAttackAnim(EMeleeAttackClass weaponClass) {
+		return WeaponAnims.getAttackAnim(weaponClass, comboAnimIdx++);
+	}
+	inline FWeaponAnim * getAttackOrUnsheathAnim(EMeleeAttackClass weaponClass) {
+		return isSheathed() ? getUnsheathAnim(weaponClass) : getAttackAnim(weaponClass);
 	}
 	inline void EquipItem(bool leftHand, TObjectPtr < UItemObject > item) {
 		EquipItem(leftHand, item->getMesh());
@@ -223,7 +242,7 @@ public:
 		enableFootHitDetection[1] = false;
 		hitDetectionTimer = INFINITY;
 	}
-	void NotifyAttackAnimationFinished(bool leftHanded) {
+	void NotifyAttackAnimationFinished() {
 		DisableWeaponTrace();
 	}
 	const float INVINCIBILITY_AFTER_HIT = 0.2;

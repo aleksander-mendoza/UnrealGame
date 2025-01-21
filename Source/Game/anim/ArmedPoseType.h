@@ -3,7 +3,9 @@
 #pragma once
 
 //#include "CoreMinimal.h"
+#include "../anim/MeleeAttackClass.h"
 #include "ArmedPoseType.generated.h"
+
 /**
  *
  */
@@ -17,3 +19,16 @@ enum class EArmedPoseType : uint8
 	SINGLE_HANDED UMETA(DisplayName = "Single-handed"),
 	DOUBLE_HANDED UMETA(DisplayName = "Double-handed"),
 };
+
+inline EMeleeAttackClass poseToAttack(EArmedPoseType pose) {
+	switch (pose) {
+	case EArmedPoseType::DOUBLE_HANDED:
+		return EMeleeAttackClass::DOUBLE_HANDED_WEAPON;
+	case EArmedPoseType::BARE_HANDED:
+		return EMeleeAttackClass::BARE_HANDED;
+	case EArmedPoseType::SINGLE_HANDED:
+		return EMeleeAttackClass::SINGLE_HANDED_WEAPON;
+	default:
+		return EMeleeAttackClass::NONE;
+	}
+}

@@ -8,24 +8,13 @@ void UNotifySheath::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* 
 //	OnComboNotify.Broadcast(IsLast);
 	AGameCharacter * c = Cast<AGameCharacter>(MeshComp->GetOwner());
 	if (c) {
-		UCombat* p = c->Combat;
-		if (IsSheathLeft) {
-			p->sheathLeft();
+		if (IsUnsheath) {
+			if (IsLeft)c->Combat->unsheathLeft();
+			if (IsRight)c->Combat->unsheathRight();
 		}
-		if (IsSheathRight) {
-			p->sheathRight();
-		}
-		if (IsSheathBackRight) {
-			p->unsheathBackRight();
-		}
-		if (IsSheathBackLeft) {
-			p->unsheathBackLeft();
-		}
-		if (IsUnsheathLeft) {
-			p->unsheathLeft();
-		}
-		if (IsUnsheathRight) {
-			p->unsheathRight();
+		else {
+			if (IsLeft)c->Combat->sheathLeft(IsLeftBack);
+			if (IsRight)c->Combat->sheathRight(IsRightBack);
 		}
 	}
 }

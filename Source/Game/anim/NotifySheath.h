@@ -19,16 +19,20 @@ class GAME_API UNotifySheath : public UAnimNotify
 	virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	bool IsSheathLeft=false;
+	bool IsLeft = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	bool IsSheathRight = false;
+	bool IsRight = true;
+
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	bool IsSheathBackLeft = false;
+	bool IsLeftBack = false;
+
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	bool IsSheathBackRight = false;
+	bool IsRightBack = false;
+
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	bool IsUnsheathLeft = false;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	bool IsUnsheathRight = false;
+	bool IsUnsheath = false;
 };

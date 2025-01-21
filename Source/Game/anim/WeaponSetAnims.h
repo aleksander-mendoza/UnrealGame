@@ -28,7 +28,34 @@ struct GAME_API FWeaponSetAnims
 	FWeaponAnims DoubleHanded;
 
 
-
+	FWeaponAnim * getSheathAnim(EMeleeAttackClass attackClass) {
+		switch (attackClass) {
+		case EMeleeAttackClass::DOUBLE_HANDED_WEAPON:
+			return DoubleHanded.Sheath.getItself();
+		case EMeleeAttackClass::SINGLE_HANDED_WEAPON:
+			return SingleHanded.Sheath.getItself();
+		case EMeleeAttackClass::BARE_HANDED:
+			return BareHands.Sheath.getItself();
+		default:
+			check(false);
+		case EMeleeAttackClass::NONE:
+			return nullptr;
+		}
+	}
+	FWeaponAnim* getUnsheathAnim(EMeleeAttackClass attackClass) {
+		switch (attackClass) {
+		case EMeleeAttackClass::DOUBLE_HANDED_WEAPON:
+			return DoubleHanded.Unsheath.getItself();
+		case EMeleeAttackClass::SINGLE_HANDED_WEAPON:
+			return SingleHanded.Unsheath.getItself();
+		case EMeleeAttackClass::BARE_HANDED:
+			return BareHands.Unsheath.getItself();
+		default:
+			check(false);
+		case EMeleeAttackClass::NONE:
+			return nullptr;
+		}
+	}
 	FWeaponAnims & getAttackAnim(EMeleeAttackClass attackClass) {
 		switch (attackClass) {
 		case EMeleeAttackClass::DOUBLE_HANDED_WEAPON:
@@ -42,14 +69,14 @@ struct GAME_API FWeaponSetAnims
 			return BareHands;
 		}
 	}
-	inline TObjectPtr<UAnimMontage> getAttackAnim(EMeleeAttackClass attackClass, bool leftHand, int idx) {
+	inline FWeaponAnim* getAttackAnim(EMeleeAttackClass attackClass, int idx) {
 		switch (attackClass) {
 		case EMeleeAttackClass::DOUBLE_HANDED_WEAPON:
-			return DoubleHanded.GetAnim(leftHand, idx);
+			return DoubleHanded.GetAnim(idx);
 		case EMeleeAttackClass::SINGLE_HANDED_WEAPON:
-			return SingleHanded.GetAnim(leftHand, idx);
+			return SingleHanded.GetAnim(idx);
 		case EMeleeAttackClass::BARE_HANDED:
-			return BareHands.GetAnim(leftHand, idx);
+			return BareHands.GetAnim(idx);
 		default:
 			check(false);
 		case EMeleeAttackClass::NONE:

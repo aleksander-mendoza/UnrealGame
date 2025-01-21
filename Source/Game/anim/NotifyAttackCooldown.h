@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Animation/AnimNotifies/AnimNotify.h"
 #include "../GameCharacter.h"
+#include "AttackHandedness.h"
 #include "NotifyAttackCooldown.generated.h"
 
 //DECLARE_MULTICAST_DELEGATE_OneParam(FOnComboNotifySignature, bool);
@@ -18,6 +19,5 @@ class GAME_API UNotifyAttackCooldown : public UAnimNotify
 
 	virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	bool IsLeftHand = false;
+	
 };

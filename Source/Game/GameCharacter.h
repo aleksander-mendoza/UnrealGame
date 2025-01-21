@@ -13,6 +13,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Logging/LogMacros.h"
 #include "ui/TargetLockWidgetActor.h"
+#include "anim/AttackHandedness.h"
 #include "items/ActorInventory.h" 
 #include "items/Container.h" 
 #include "character/Hittable.h" 
@@ -146,16 +147,22 @@ public:
 	inline void attackEnd(bool leftHanded) {
 		GameMovement->attackEnd(leftHanded);
 	}
-
+	void attackStart() {
+		attackStart(GameMovement->WantsToAttackLeft());
+	}
 	void attackStart(bool leftHanded) {
 		EMeleeAttackClass weaponClass = GameMovement->attackStart(leftHanded, Inventory);
-		TObjectPtr<UAnimMontage> anim = Combat->getAttackAnim(weaponClass, leftHanded);
+		FWeaponAnim * anim = Combat->getAttackOrUnsheathAnim(weaponClass);
 		if (anim != nullptr) {
 			GameMovement->PlayAttackAnim(leftHanded, anim);
 		}
 	}
 	void attackCancel() {
-		GameMovement->attackCancel();
+		EMeleeAttackClass attackClass = GameMovement->attackCancel();
+		FWeaponAnim* anim = Combat->getSheathAnim(attackClass);
+		if (anim != nullptr) {
+			GameMovement->PlayAttackAnim(false, anim);
+		}
 	}
 	virtual bool OnInteract(class AGameCharacter* actor)  {
 		//TODO: start dialogue
@@ -272,12 +279,12 @@ public:
 	UCameraComponent* GetCurrentCamera() {
 		return FollowCamera->IsActive() ? FollowCamera : FirstPersonCamera;
 	}
-	void NotifyAttackAnimationFinished(bool leftHanded) {
-		Combat->NotifyAttackAnimationFinished(leftHanded);
-		GameMovement->NotifyAttackAnimationFinished(leftHanded);
+	void NotifyAttackAnimationFinished() {
+		Combat->NotifyAttackAnimationFinished();
+		GameMovement->NotifyAttackAnimationFinished();
 	}
-	void OnComboPartEnd(bool leftHand) {
-		GameMovement->OnComboPartEnd(leftHand);
+	void OnComboPartEnd() {
+		GameMovement->OnComboPartEnd();
 	}
 
 	void getRay(double length, Ray& ray);
@@ -292,14 +299,10 @@ public:
 		Combat->EnableWeaponTrace(enableLeftHandHitDetection, enableRightHandHitDetection, enableLeftFootHitDetection, enableRightFootHitDetection);
 	}
 	
-	void TickAttackCooldown(bool leftHand, float DeltaTime) {
-		if (GameMovement->TickCooldown(leftHand, DeltaTime)) {
-			attackStart(leftHand);
-		}
-	}
 	void TickAttackCooldown(float DeltaTime) {
-		//TickAttackCooldown(false, DeltaTime);
-		TickAttackCooldown(true, DeltaTime);
+		if (GameMovement->TickCooldown(DeltaTime)) {
+			attackStart();
+		}
 	}
 	void HitDetectHand(bool leftHand) {
 		TArray<FHitResult> OutHit;
@@ -342,22 +345,33 @@ public:
 		}
 	}
 	virtual void OnEquipBothHands(TObjectPtr < UItemObject > item) override {
-		OnEquipRightHand(item);
+		Combat->EquipItemRight(item);
+		Combat->sheathBackRight();
 	}
 	virtual void OnEquipLeftHand(TObjectPtr < UItemObject > item) override {
-		Combat->EquipItemLeft(item);
+		OnEquip(true, item);
 	}
 	virtual void OnEquipRightHand(TObjectPtr < UItemObject > item) override {
-		Combat->EquipItemRight(item);
+		OnEquip(false, item);
+	}
+	inline void OnEquip(bool leftHand, TObjectPtr < UItemObject > item) {
+		Combat->EquipItem(leftHand, item);
+		bool wasUnsheathed = !Combat->isSheathed(); 
+		Combat->sheath(false, item->isSheathedOnTheBack());
+		if (wasUnsheathed) {// this will happen if user changes weapon before unsheathing it
+			attackStart();
+		}
 	}
 	virtual void OnUnequipBothHands(TObjectPtr < UItemObject > item) override {
 		OnUnequipRightHand(item);
 	}
 	virtual void OnUnequipLeftHand(TObjectPtr < UItemObject > item) override {
 		Combat->UnequipLeftHand();
+		GameMovement->becomeUnarmed();
 	}
 	virtual void OnUnequipRightHand(TObjectPtr < UItemObject > item) override {
 		Combat->UnequipRightHand();
+		GameMovement->becomeUnarmed();
 	}
 	virtual void OnEquipClothes(TObjectPtr < UItemObject > item) override;
 	virtual void OnUnequipClothes(TObjectPtr < UItemObject > item) override {

@@ -50,13 +50,16 @@ void UInventoryEntry::NativeOnItemSelectionChanged(bool bIsSelected)
 
 FReply UInventoryEntry::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	check(Item->container != nullptr);
-	if (InMouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton)) {
-		Item->container->toggleItem(Item, true, true, false);
-		Item->container->currentWidget->refresh();
-	}else if (InMouseEvent.IsMouseButtonDown(EKeys::RightMouseButton)) {
-		Item->container->toggleItem(Item, false, true, false);
-		Item->container->currentWidget->refresh();
+	if (Item != nullptr) {
+		check(Item->container != nullptr);
+		if (InMouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton)) {
+			Item->container->toggleItem(Item, true, true, false);
+			Item->container->currentWidget->refresh();
+		}
+		else if (InMouseEvent.IsMouseButtonDown(EKeys::RightMouseButton)) {
+			Item->container->toggleItem(Item, false, true, false);
+			Item->container->currentWidget->refresh();
+		}
 	}
 	return FReply::Handled();
 }

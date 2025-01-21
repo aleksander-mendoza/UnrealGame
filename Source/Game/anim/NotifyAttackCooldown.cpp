@@ -8,6 +8,6 @@ void UNotifyAttackCooldown::Notify(USkeletalMeshComponent* MeshComp, UAnimSequen
 //	OnComboNotify.Broadcast(IsLast);
 	AGameCharacter * p = Cast<AGameCharacter>(MeshComp->GetOwner());
 	if (p) {
-		p->NotifyAttackAnimationFinished(IsLeftHand);
+		p->NotifyAttackAnimationFinished();
 	}
 }

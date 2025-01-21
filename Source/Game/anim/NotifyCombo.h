@@ -17,7 +17,5 @@ class GAME_API UNotifyCombo : public UAnimNotify
 	GENERATED_BODY()
 
 	virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
-public:
-	//FOnComboNotifySignature OnComboNotify;
-	bool IsLast = false;
+
 };

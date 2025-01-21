@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "WeaponAnim.h"
 #include "WeaponAnims.generated.h"
 
 
@@ -15,23 +16,20 @@ struct GAME_API FWeaponAnims
 	GENERATED_BODY()
 
 
-
-	/** left-handed attack combo Animation*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<TObjectPtr<UAnimMontage>> LeftHandedAnim;
+	FWeaponAnim Sheath;
 
-	/** left-handed attack combo Animation*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<TObjectPtr<UAnimMontage>> RightHandedAnim;
+	FWeaponAnim Unsheath;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FWeaponAnim> AttackAnims;
 
 
-	TArray<TObjectPtr<UAnimMontage>> & GetAnims(bool leftHand) {
-		return leftHand ? LeftHandedAnim : RightHandedAnim;
-	}
-	TObjectPtr<UAnimMontage> GetAnim(bool leftHand, int idx) {
-		TArray<TObjectPtr<UAnimMontage>>& anims = GetAnims(leftHand);
-		if (anims.Num() > 0) {
-			return anims[idx % anims.Num()];
+
+	FWeaponAnim * GetAnim(int idx) {
+		if (AttackAnims.Num() > 0) {
+			return AttackAnims[idx % AttackAnims.Num()].getItself();
 		}
 		return nullptr;
 	}

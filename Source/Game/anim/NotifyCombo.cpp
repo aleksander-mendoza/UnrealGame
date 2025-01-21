@@ -7,5 +7,5 @@
 void UNotifyCombo::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) {
 //	OnComboNotify.Broadcast(IsLast);
 	AGameCharacter * p = Cast<AGameCharacter>(MeshComp->GetOwner());
-	if (p)p->OnComboPartEnd(IsLast);
+	if (p)p->OnComboPartEnd();
 }

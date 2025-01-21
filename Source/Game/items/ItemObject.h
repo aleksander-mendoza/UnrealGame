@@ -50,4 +50,7 @@ public:
 	inline float isWearable() const {
 		return Instance.getRow()->isWearable();
 	}
+	inline bool isSheathedOnTheBack() {
+		return getItemClass() == EItemClass::SHIELD;
+	}
 };

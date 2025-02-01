@@ -63,10 +63,6 @@ AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Su
 
 	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
 
-	
-	Combat = CreateDefaultSubobject<UCombat>(TEXT("Combat"));
-	Combat->GameCharacter = this;
-	Health = CreateDefaultSubobject<UHealth>(TEXT("Health"));
 
 	Inventory = CreateDefaultSubobject<UActorInventory>(TEXT("PlayerInventory"));
 	Inventory->containerEvents = this;
@@ -235,14 +231,14 @@ void AGameCharacter::OnEquipClothes(TObjectPtr<UItemObject> item)
 	clothingComp->SetAnimInstanceClass(playerMesh->AnimClass);
 	clothingComp->SetLeaderPoseComponent(playerMesh, true);
 	const int idx = Clothes.Add(clothingComp);
-	Health->Defence += item->getItemArmor();
+	GameMovement->Health.Defence += item->getItemArmor();
 	checkf(item->equippedAt == idx, TEXT("%d != %d"), item->equippedAt, idx);
 	check(Inventory->Clothes[item->equippedAt] == item);
 }
 
 void AGameCharacter::OnDropItem(TObjectPtr<UItemObject> item) {
 	worldRef->spawnItem(item, GetActorLocation(), FRotator());
-	Health->CarriedWeight -= item->getItemWeight();
+	GameMovement->Health.CarriedWeight -= item->getItemWeight();
 }
 
 
@@ -258,27 +254,8 @@ void AGameCharacter::Tick(float DeltaTime) {
 		double3 pos = getRayEnd(physicshandleDistance);
 		PhysicsHandle->SetTargetLocation(pos);
 	}
-	if (GameMovement->IsRunning()) {
-		if (Health->UpdateRunning(DeltaTime)) {
-			GameMovement->StartWalking();
-		}
-		
-	}
-	if (GameMovement->isPlayingAttackAnim()) {
-		if (Combat->hitDetectionTimer > 0) {
-			Combat->hitDetectionTimer -= DeltaTime;
-		}
-		else {
-			HitDetect();
-			Combat->hitDetectionTimer = HIT_DETECTION_PERIOD;
-		}
-	}else{
-		TickAttackCooldown(DeltaTime);
-	}
 	
-	if (invincibilityDuration > 0) {
-		invincibilityDuration -= DeltaTime;
-	}
+	
 	
 }
 

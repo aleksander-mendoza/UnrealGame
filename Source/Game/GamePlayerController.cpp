@@ -99,7 +99,7 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 	GameCharacter = Cast<AGameCharacter>(pawn);
 	if (GameCharacter) {
 		if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
-			GameCharacter->Health->setWidget(hud->StatusWidget);
+			GameCharacter->GameMovement->Health.setWidget(hud->StatusWidget);
 			
 		}
 		if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent)) {

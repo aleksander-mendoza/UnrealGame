@@ -15,7 +15,7 @@ enum class EArmedPoseType : uint8
 	UNARMED UMETA(DisplayName = "Unarmed"),
 	BOW UMETA(DisplayName = "Holds bow"),
 	BOW_AIMED UMETA(DisplayName = "Aims bow"),
-	BARE_HANDED UMETA(DisplayName = "Holds bow"),
+	BARE_HANDED UMETA(DisplayName = "Bare-handed"),
 	SINGLE_HANDED UMETA(DisplayName = "Single-handed"),
 	DOUBLE_HANDED UMETA(DisplayName = "Double-handed"),
 };

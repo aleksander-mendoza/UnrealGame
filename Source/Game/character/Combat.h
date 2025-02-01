@@ -13,18 +13,17 @@
 
 #define HIT_DETECTION_PERIOD 0.1
 
-UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
-class GAME_API UCombat : public UActorComponent
+USTRUCT(BlueprintType)
+struct GAME_API FCombat
 {
 	GENERATED_BODY()
 
-	UCombat();
+	
 
 
-	virtual void BeginPlay() override;
-public:
 
 	unsigned int comboAnimIdx = 0;
+	FCombat();
 	class AGameCharacter* GameCharacter;
 	/** Death Animation*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
@@ -65,7 +64,7 @@ public:
 	inline FName & SheathedSocketName(bool leftHand, bool back) {
 		return leftHand ? (back? SheathedSocketBackL : SheathedSocketL) : (back ? SheathedSocketBackR : SheathedSocketR);
 	}
-	inline TObjectPtr<UStaticMeshComponent>  ItemMesh(bool leftHand) {
+	inline TObjectPtr<UStaticMeshComponent>  ItemMesh(bool leftHand) const {
 		return leftHand ? LeftHandMesh : RightHandMesh;
 	}
 
@@ -75,41 +74,41 @@ public:
 
 	bool enableHandHitDetection[2];
 	bool enableFootHitDetection[2];
-	inline bool HasWeaponEquipped(bool leftHand) {
+	inline bool HasWeaponEquipped(bool leftHand) const {
 		return BladeStart[leftHand]!=nullptr;
 	}
-	inline const FName & GetHandSocketName(bool leftHand) {
+	inline const FName & GetHandSocketName(bool leftHand) const {
 		return leftHand ? HandSocketL : HandSocketR;
 	}
-	inline const USkeletalMeshSocket* GetHandSocket(bool leftHand) {
+	inline const USkeletalMeshSocket* GetHandSocket(bool leftHand) const{
 		return BareHandSocket[leftHand];
 	}
-	inline const UStaticMeshSocket* GetBladeStart(bool leftHand) {
+	inline const UStaticMeshSocket* GetBladeStart(bool leftHand) const {
 		return BladeStart[leftHand];
 	}
-	inline const UStaticMeshSocket* GetBladeEnd(bool leftHand) {
+	inline const UStaticMeshSocket* GetBladeEnd(bool leftHand) const {
 		return BladeEnd[leftHand];
 	}
-	inline FVector GetHandLocation(bool leftHand) {
-		return GetHandSocket(leftHand)->GetSocketLocation(GetMesh());
+	inline FVector GetHandLocation(bool leftHand, const USkeletalMeshComponent*const mesh) const{
+		return GetHandSocket(leftHand)->GetSocketLocation(mesh);
 	}
-	inline FVector GetBladeStartLocation(bool leftHand) {
+	inline FVector GetBladeStartLocation(bool leftHand) const {
 		FTransform trans;
 		GetBladeStart(leftHand)->GetSocketTransform(trans, ItemMesh(leftHand));
 		return trans.GetLocation();
 	}
-	inline FVector GetBladeEndLocation(bool leftHand) {
+	inline FVector GetBladeEndLocation(bool leftHand) const {
 		FTransform trans;
 		GetBladeEnd(leftHand)->GetSocketTransform(trans, ItemMesh(leftHand));
 		return trans.GetLocation();
 	}
-	inline void GetStartEndLocation(bool leftHand, FVector & start, FVector& end) {
+	inline void GetStartEndLocation(bool leftHand, FVector & start, FVector& end, const USkeletalMeshComponent*const mesh) const{
 		if (HasWeaponEquipped(leftHand)) {
 			start = GetBladeStartLocation(leftHand);
 			end = GetBladeEndLocation(leftHand);
 		}
 		else {
-			end = start = GetHandLocation(leftHand);
+			end = start = GetHandLocation(leftHand, mesh);
 		}
 	}
 	inline void EnableHandHitDetection(bool leftHand, bool enabled=true) {
@@ -130,7 +129,6 @@ public:
 	
 	float hitDetectionTimer;
 	
-	USkeletalMeshComponent* GetMesh() const;
 
 	bool IsSheathed[2] = { true, true };
 	inline bool isSheathed() const {
@@ -139,33 +137,33 @@ public:
 	inline bool isSheathed(bool leftHand) const{
 		return IsSheathed[leftHand];
 	}
-	inline void unsheath(bool leftHand) {
+	inline void unsheath(bool leftHand, USkeletalMeshComponent* const mesh) {
 		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		ItemMesh(leftHand)->AttachToComponent(GetMesh(), atr, GetHandSocketName(leftHand));
+		ItemMesh(leftHand)->AttachToComponent(mesh, atr, GetHandSocketName(leftHand));
 		IsSheathed[leftHand] = false;
 	}
-	inline void sheath(bool leftHand, bool back) {
+	inline void sheath(bool leftHand, bool back, USkeletalMeshComponent* const mesh) {
 		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		ItemMesh(leftHand)->AttachToComponent(GetMesh(), atr, SheathedSocketName(leftHand, back));
+		ItemMesh(leftHand)->AttachToComponent(mesh, atr, SheathedSocketName(leftHand, back));
 		IsSheathed[leftHand] = true;
 	}
-	inline void sheathLeft(bool back=false) {
-		sheath(true, back);
+	inline void sheathLeft(USkeletalMeshComponent* const mesh, bool back=false) {
+		sheath(true, back, mesh);
 	}
-	inline void sheathRight(bool back = false) {
-		sheath(false, back);
+	inline void sheathRight(USkeletalMeshComponent* const mesh, bool back = false) {
+		sheath(false, back, mesh);
 	}
-	inline void sheathBackRight() {
-		sheath(false, true);
+	inline void sheathBackRight(USkeletalMeshComponent* const mesh) {
+		sheath(false, true, mesh);
 	}
-	inline void sheathBackLeft() {
-		sheath(true, true);
+	inline void sheathBackLeft(USkeletalMeshComponent* const mesh) {
+		sheath(true, true, mesh);
 	}
-	inline void unsheathLeft() {
-		unsheath(true);
+	inline void unsheathLeft(USkeletalMeshComponent* const mesh) {
+		unsheath(true, mesh);
 	}
-	inline void unsheathRight() {
-		unsheath(false);
+	inline void unsheathRight(USkeletalMeshComponent* const mesh) {
+		unsheath(false, mesh);
 	}
 	inline TObjectPtr<UAnimMontage> getHitAnim() {
 		return HitAnims.Num()==0?nullptr: HitAnims[comboAnimIdx++ % HitAnims.Num()];
@@ -181,6 +179,12 @@ public:
 	}
 	inline FWeaponAnim* getAttackAnim(EMeleeAttackClass weaponClass) {
 		return WeaponAnims.getAttackAnim(weaponClass, comboAnimIdx++);
+	}
+	inline FWeaponAnim* GetNextAnim(FWeaponAnims * anims) {
+		return anims->GetAnim(comboAnimIdx++);
+	}
+	inline FWeaponAnims* getAttackAnims(EMeleeAttackClass weaponClass) {
+		return WeaponAnims.getAttackAnims(weaponClass);
 	}
 	inline FWeaponAnim * getAttackOrUnsheathAnim(EMeleeAttackClass weaponClass) {
 		return isSheathed() ? getUnsheathAnim(weaponClass) : getAttackAnim(weaponClass);
@@ -245,23 +249,23 @@ public:
 	void NotifyAttackAnimationFinished() {
 		DisableWeaponTrace();
 	}
-	const float INVINCIBILITY_AFTER_HIT = 0.2;
+	
 	float invincibilityDuration = 0;
-	inline void HitDetectRightHand(TArray<FHitResult>& OutHit) {
-		HitDetectHand(false, OutHit);
+	inline void HitDetectRightHand(AActor* owner, UWorld* world, USkeletalMeshComponent* const mesh, TArray<FHitResult>& OutHit) {
+		HitDetectHand(false, owner, world, mesh, OutHit);
 	}
-	inline void HitDetectLeftHand(TArray<FHitResult>& OutHit) {
-		HitDetectHand(true, OutHit);
+	inline void HitDetectLeftHand(AActor* owner, UWorld* world, USkeletalMeshComponent* const mesh, TArray<FHitResult>& OutHit) {
+		HitDetectHand(true, owner, world, mesh, OutHit);
 	}
-	inline bool HitDetectHand(bool leftHand, TArray<FHitResult>& OutHit) {
+	inline bool HitDetectHand(bool leftHand, AActor*owner, UWorld * world, USkeletalMeshComponent* const mesh, TArray<FHitResult>& OutHit) {
 		if (IsEnabledHandHitDetection(leftHand)) {
 			TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
 			objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
 			TArray<AActor*> actorsToIgnore;
-			actorsToIgnore.Add(GetOwner());
+			actorsToIgnore.Add(owner);
 			FVector s, e;
-			GetStartEndLocation(leftHand, s, e);
-			return UKismetSystemLibrary::SphereTraceMultiForObjects(GetWorld(), s, e, 50., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true);
+			GetStartEndLocation(leftHand, s, e, mesh);
+			return UKismetSystemLibrary::SphereTraceMultiForObjects(world, s, e, 50., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true);
 		}
 		return false;
 	}

@@ -30,6 +30,5 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> Magic;
 
-	UPROPERTY()
-	TObjectPtr<class UHealth> healthComponenet;
+	struct FHealth * healthComponenet;
 };

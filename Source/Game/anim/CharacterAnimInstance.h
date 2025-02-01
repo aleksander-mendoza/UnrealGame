@@ -46,7 +46,7 @@ public:
 	EArmedPoseType ArmedPoseType;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
-	bool IsAttackCancelled;
+	bool IsBowShot;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
 	bool IsCrouching;

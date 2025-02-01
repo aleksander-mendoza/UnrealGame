@@ -22,7 +22,7 @@ void UCharacterAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaTime)
 		const FRotator rot = Character->GetActorRotation();
 		Direction = UKismetAnimationLibrary::CalculateDirection(Velocity, rot);
 		ArmedPoseType = MovementComponent->getArmedStatus();
-		IsAttackCancelled = MovementComponent->IsAttackCancelled();
+		IsBowShot = MovementComponent->IsBowShot();
 		IsCrouching = MovementComponent->IsCrouching();
 		IsSwimming = MovementComponent->IsSwimming();
 		IsRunning = MovementComponent->IsRunning();
@@ -31,7 +31,7 @@ void UCharacterAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaTime)
 		IsFalling = MovementComponent->IsFalling();
 		AimsBow = MovementComponent->AimsBow();
 		IsStrafe = MovementComponent->IsDirectionalMovement();
-		IsSheathed = Character->Combat->isSheathed();
+		IsSheathed = MovementComponent->Combat.isSheathed();
 	}
 }
 

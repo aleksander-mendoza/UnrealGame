@@ -6,9 +6,14 @@
 
 #include "CoreMinimal.h"
 
+namespace Dialogue {
+	extern const char* const SLAVE_NEW;
+	
+}
 
-class QuestDatabase 
+class DialogueDatabase 
 {
- 
-	TArray<int> quests;
+
+
+	
 };

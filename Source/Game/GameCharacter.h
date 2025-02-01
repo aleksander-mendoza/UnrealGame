@@ -7,7 +7,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Engine/SkeletalMeshSocket.h"
-#include "character/Combat.h"
+
 #include "Camera/CameraComponent.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -17,8 +17,8 @@
 #include "items/ActorInventory.h" 
 #include "items/Container.h" 
 #include "character/Hittable.h" 
-#include "character/Health.h" 
 #include "character/Interactable.h"
+
 #include "character/GameCharacterMovementComponent.h"
 #include "anim/CharacterAnimInstance.h"
 #include "anim/WeaponSetAnims.h"
@@ -107,8 +107,7 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<UCombat> Combat;
+	
 
 	UGameCharacterMovementComponent* GameMovement=nullptr;
 	
@@ -123,8 +122,6 @@ public:
 	TObjectPtr <UActorInventory> Inventory;
 
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr <UHealth> Health;
 
 	UCharacterAnimInstance* animInstane = nullptr;
 	UCharacterAnimInstance* getAnimInstance() {
@@ -147,22 +144,11 @@ public:
 	inline void attackEnd(bool leftHanded) {
 		GameMovement->attackEnd(leftHanded);
 	}
-	void attackStart() {
-		attackStart(GameMovement->WantsToAttackLeft());
-	}
 	void attackStart(bool leftHanded) {
-		EMeleeAttackClass weaponClass = GameMovement->attackStart(leftHanded, Inventory);
-		FWeaponAnim * anim = Combat->getAttackOrUnsheathAnim(weaponClass);
-		if (anim != nullptr) {
-			GameMovement->PlayAttackAnim(leftHanded, anim);
-		}
+		GameMovement->attackStart(leftHanded, Inventory);
 	}
 	void attackCancel() {
-		EMeleeAttackClass attackClass = GameMovement->attackCancel();
-		FWeaponAnim* anim = Combat->getSheathAnim(attackClass);
-		if (anim != nullptr) {
-			GameMovement->PlayAttackAnim(false, anim);
-		}
+		GameMovement->attackCancel();
 	}
 	virtual bool OnInteract(class AGameCharacter* actor)  {
 		//TODO: start dialogue
@@ -233,7 +219,7 @@ public:
 	}
 	void StartRun(const FInputActionValue& Value)
 	{
-		if(Health->CanRun()) GameMovement->StartRunning();
+		GameMovement->StartRunning();
 	}
 	void EndRun(const FInputActionValue& Value) {
 		GameMovement->StartWalking();
@@ -280,7 +266,6 @@ public:
 		return FollowCamera->IsActive() ? FollowCamera : FirstPersonCamera;
 	}
 	void NotifyAttackAnimationFinished() {
-		Combat->NotifyAttackAnimationFinished();
 		GameMovement->NotifyAttackAnimationFinished();
 	}
 	void OnComboPartEnd() {
@@ -292,61 +277,28 @@ public:
 
 
 	inline void DisableWeaponTrace() {
-		Combat->DisableWeaponTrace();
+		GameMovement->Combat.DisableWeaponTrace();
 	}
 	
 	inline void EnableWeaponTrace(bool enableLeftHandHitDetection, bool enableRightHandHitDetection, bool enableLeftFootHitDetection, bool enableRightFootHitDetection) {
-		Combat->EnableWeaponTrace(enableLeftHandHitDetection, enableRightHandHitDetection, enableLeftFootHitDetection, enableRightFootHitDetection);
+		GameMovement->Combat.EnableWeaponTrace(enableLeftHandHitDetection, enableRightHandHitDetection, enableLeftFootHitDetection, enableRightFootHitDetection);
 	}
 	
-	void TickAttackCooldown(float DeltaTime) {
-		if (GameMovement->TickCooldown(DeltaTime)) {
-			attackStart();
-		}
-	}
-	void HitDetectHand(bool leftHand) {
-		TArray<FHitResult> OutHit;
-		if (Combat->HitDetectHand(leftHand, OutHit)) {
-			UItemObject * item = Inventory->getHandItem(leftHand);
-			const float damage = Health->getDamage(item);
-			for (int i = 0; i < OutHit.Num(); i++) {
-				IHittable* c = Cast< IHittable>(OutHit[i].GetActor());
-				if(c)c->OnHit(this, item, damage);
-			}
-		}
-	}
-	void HitDetect() {
-		check(!Inventory->IsDoubleHanded() || Combat->GetBladeStart(true)==nullptr);
-		HitDetectHand(false);
-		HitDetectHand(true);
-	}
-
+	
 	void Kill(AGameCharacter* killer) {//TODO: kill moves that involve the killer
-		TObjectPtr<UAnimMontage> anim = Combat->getDeathAnim();
+		TObjectPtr<UAnimMontage> anim = GameMovement->Combat.getDeathAnim();
 		if (anim) {
 			getAnimInstance()->Montage_Play(anim);
 		}
 		GetMesh()->SetSimulatePhysics(true);
 	}
-	const float INVINCIBILITY_AFTER_HIT = 0.2;
-	float invincibilityDuration = 0;
+	
 	virtual void OnHit(AGameCharacter * actor, UItemObject* weaponUsed, float damage) override{
-		if (invincibilityDuration <= 0) {
-			if (Health->takeHealth(damage)) {
-				TObjectPtr<UAnimMontage> anim = Combat->getHitAnim();
-				if (anim) {
-					getAnimInstance()->Montage_Play(anim);
-				}
-				invincibilityDuration = INVINCIBILITY_AFTER_HIT;
-			}
-			else {
-				Kill(actor);
-			}
-		}
+		GameMovement->Hit(actor, weaponUsed, damage);
 	}
 	virtual void OnEquipBothHands(TObjectPtr < UItemObject > item) override {
-		Combat->EquipItemRight(item);
-		Combat->sheathBackRight();
+		GameMovement->Combat.EquipItemRight(item);
+		GameMovement->Combat.sheathBackRight(GetMesh());
 	}
 	virtual void OnEquipLeftHand(TObjectPtr < UItemObject > item) override {
 		OnEquip(true, item);
@@ -355,22 +307,22 @@ public:
 		OnEquip(false, item);
 	}
 	inline void OnEquip(bool leftHand, TObjectPtr < UItemObject > item) {
-		Combat->EquipItem(leftHand, item);
-		bool wasUnsheathed = !Combat->isSheathed(); 
-		Combat->sheath(false, item->isSheathedOnTheBack());
+		GameMovement->Combat.EquipItem(leftHand, item);
+		bool wasUnsheathed = !GameMovement->Combat.isSheathed();
+		GameMovement->Combat.sheath(false, item->isSheathedOnTheBack(), GetMesh());
 		if (wasUnsheathed) {// this will happen if user changes weapon before unsheathing it
-			attackStart();
+			GameMovement->becomeArmed(Inventory);
 		}
 	}
 	virtual void OnUnequipBothHands(TObjectPtr < UItemObject > item) override {
 		OnUnequipRightHand(item);
 	}
 	virtual void OnUnequipLeftHand(TObjectPtr < UItemObject > item) override {
-		Combat->UnequipLeftHand();
+		GameMovement->Combat.UnequipLeftHand();
 		GameMovement->becomeUnarmed();
 	}
 	virtual void OnUnequipRightHand(TObjectPtr < UItemObject > item) override {
-		Combat->UnequipRightHand();
+		GameMovement->Combat.UnequipRightHand();
 		GameMovement->becomeUnarmed();
 	}
 	virtual void OnEquipClothes(TObjectPtr < UItemObject > item) override;
@@ -378,10 +330,10 @@ public:
 		const int idx = item->equippedAt;
 		Clothes[idx]->UnregisterComponent();
 		Clothes.RemoveAtSwap(idx);
-		Health->Defence -= item->getItemArmor();
+		GameMovement->Health.Defence -= item->getItemArmor();
 	}
 	virtual void OnPutItem(TObjectPtr<UItemObject> item) override {
-		Health->CarriedWeight += item->getItemWeight();
+		GameMovement->Health.CarriedWeight += item->getItemWeight();
 	}
 	virtual void OnDropItem(TObjectPtr<UItemObject> item) override;
 	virtual bool CanWear(const FItem& item) override {

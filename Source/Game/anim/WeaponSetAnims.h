@@ -56,17 +56,18 @@ struct GAME_API FWeaponSetAnims
 			return nullptr;
 		}
 	}
-	FWeaponAnims & getAttackAnim(EMeleeAttackClass attackClass) {
+	FWeaponAnims * getAttackAnims(EMeleeAttackClass attackClass) {
 		switch (attackClass) {
 		case EMeleeAttackClass::DOUBLE_HANDED_WEAPON:
-			return DoubleHanded;
+			return &DoubleHanded;
 		case EMeleeAttackClass::SINGLE_HANDED_WEAPON:
-			return SingleHanded;
-		case EMeleeAttackClass::BARE_HANDED:
-			return BareHands;
+			return &SingleHanded;
 		default:
 			check(false);
-			return BareHands;
+		case EMeleeAttackClass::BARE_HANDED:
+			return &BareHands;
+		case EMeleeAttackClass::NONE:
+			return nullptr;
 		}
 	}
 	inline FWeaponAnim* getAttackAnim(EMeleeAttackClass attackClass, int idx) {

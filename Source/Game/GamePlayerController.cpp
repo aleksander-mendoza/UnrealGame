@@ -98,6 +98,7 @@ void AGamePlayerController::SetPawn(APawn* pawn)
 	Super::SetPawn(pawn);
 	GameCharacter = Cast<AGameCharacter>(pawn);
 	if (GameCharacter) {
+		GameCharacter->GameController = this;
 		if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
 			GameCharacter->GameMovement->Health.setWidget(hud->StatusWidget);
 			
@@ -173,7 +174,6 @@ void AGamePlayerController::TriggerBuildingInventory(const FInputActionValue& Va
 				Mode.SetHideCursorDuringCapture(false);
 				Mode.SetWidgetToFocus(hud->showBuildingInventory(GameCharacter)->TakeWidget());
 				SetInputMode(Mode);
-
 			}
 			SetShowMouseCursor(!openInv);
 			//SetPause(!openInv);
@@ -192,10 +192,9 @@ void AGamePlayerController::TriggerInventory(const FInputActionValue& Value)
 				SetInputMode(Mode);
 			}
 			else {
-				FInputModeGameAndUI Mode;
+				FInputModeUIOnly Mode;
 				Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
-				Mode.SetHideCursorDuringCapture(false);
-				Mode.SetWidgetToFocus(hud->showInventory(GameCharacter)->TakeWidget());
+				Mode.SetWidgetToFocus(hud->showInventory(GameCharacter, this)->TakeWidget());
 				SetInputMode(Mode);
 				
 			}
@@ -204,6 +203,51 @@ void AGamePlayerController::TriggerInventory(const FInputActionValue& Value)
 		}
 	}
 
+}
+
+void AGamePlayerController::CloseInventory()
+{
+	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
+		if (hud->isInventoryOpen()) {
+			hud->hideInventory();
+			FInputModeGameOnly Mode;
+			SetInputMode(Mode);
+			SetShowMouseCursor(false);
+		}
+	}
+}
+
+void AGamePlayerController::OpenDialogue(AGameCharacter * npc, AGameCharacter* player, const DialogueDatabase::DialogueStage * stage)
+{
+	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
+		if (hud->canOpenDialogue()) {
+			FInputModeUIOnly Mode;
+			Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+			Mode.SetWidgetToFocus(hud->showDialogue(npc, player, stage)->TakeWidget());
+			SetInputMode(Mode);
+			SetShowMouseCursor(true);
+		}
+	}
+
+}
+
+void AGamePlayerController::ShowDialogueLine(FText name, FText text)
+{
+	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
+		if (hud->canOpenDialogue()) {
+			hud->showLine(name, text);
+		}
+	}
+
+}
+void AGamePlayerController::CloseDialogue()
+{
+	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
+		hud->hideDialogue();
+		FInputModeGameOnly Mode;
+		SetInputMode(Mode);
+		SetShowMouseCursor(false);
+	}
 }
 
 void AGamePlayerController::TriggerRaceMenu(const FInputActionValue& Value)

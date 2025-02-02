@@ -8,6 +8,7 @@
 #include "../../items/ActorInventory.h"
 #include "Inventory.generated.h"
 
+class AGamePlayerController;
 /**
  * 
  */
@@ -19,8 +20,10 @@ class GAME_API UInventory : public UUserWidget
 	virtual void NativeConstruct() override;
 	//virtual void NativeOnInitialized() override;
 public:
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 	UActorInventory* Inventory;
-	void setInventory(UActorInventory * Inventory);
+	AGamePlayerController* GameController;
+	void setInventory(UActorInventory * Inventory, AGamePlayerController* GameController);
 	void removeItem(UItemObject* item) {
 		ItemListView->RemoveItem(item);
 	}

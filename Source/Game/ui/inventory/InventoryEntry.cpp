@@ -60,8 +60,9 @@ FReply UInventoryEntry::NativeOnMouseButtonDown(const FGeometry& InGeometry, con
 			Item->container->toggleItem(Item, false, true, false);
 			Item->container->currentWidget->refresh();
 		}
+		return FReply::Handled();
 	}
-	return FReply::Handled();
+	return FReply::Unhandled();
 }
 
 FReply UInventoryEntry::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
@@ -70,6 +71,7 @@ FReply UInventoryEntry::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyE
 		UInventory* inv = Item->container->currentWidget;
 		Item->container->dropItem<true>(Item);
 		inv->removeItem(Item);
+		return FReply::Handled();
 	}
-	return FReply::Handled();
+	return FReply::Unhandled();
 }

@@ -9,6 +9,9 @@
 #include "GameCharacter.h"
 #include "GamePlayerController.generated.h"
 
+namespace DialogueDatabase {
+	class DialogueStage;
+}
 /**
  * 
  */
@@ -89,12 +92,17 @@ class GAME_API AGamePlayerController : public APlayerController
 	virtual void SetPawn(APawn * pawn) override;
 
 	void Look(const FInputActionValue& Value);
-
+public:
 	void TriggerInventory(const FInputActionValue& Value);
+	void CloseInventory();
+	
 	void TriggerRaceMenu(const FInputActionValue& Value);
 	void TriggerBuildingInventory(const FInputActionValue& Value);
-public:
+
 	AGameCharacter* GameCharacter;
+	void OpenDialogue(AGameCharacter* npc, AGameCharacter* player, const DialogueDatabase::DialogueStage* stage);
+	void ShowDialogueLine(FText name, FText text);
+	void CloseDialogue();
 	UInputAction* MapKey(FKey key, EInputActionValueType type = EInputActionValueType::Boolean, bool triggerWhenPaused=false);
 	UInputAction* MapTapKey(FKey key);
 	void MapKey(UInputAction* act, FKey key, bool negateX, bool negateY, bool negateZ);

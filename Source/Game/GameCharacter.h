@@ -27,7 +27,9 @@
 class USpringArmComponent;
 
 struct FInputActionValue;
-
+namespace DialogueDatabase {
+	class DialogueStage;
+}
 struct Ray {
 	FVector start, end;
 };
@@ -40,6 +42,7 @@ UCLASS(config=Game)
 class AGameCharacter : public ACharacter , public ContainerEvents, public IHittable, public IInteractable
 {
 	GENERATED_BODY()
+
 
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -74,10 +77,12 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
 	class TSubclassOf<UCharacterAnimInstance> MaleAnimClass;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
+	FText CharacterName;
+
 	/** Is the character male or female */
 	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	bool IsFemale=true;
-
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -107,7 +112,14 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 
 
 public:
-	
+	class AGamePlayerController* GameController = nullptr;
+	bool IsPlayer() const{
+		return GameController != nullptr;
+	}
+
+	inline const FText & GetCharacterName() const {
+		return CharacterName;
+	}
 
 	UGameCharacterMovementComponent* GameMovement=nullptr;
 	
@@ -150,10 +162,11 @@ public:
 	void attackCancel() {
 		GameMovement->attackCancel();
 	}
-	virtual bool OnInteract(class AGameCharacter* actor)  {
-		//TODO: start dialogue
-		return true;
+	const DialogueDatabase::DialogueStage* dialogueStage;
+	const DialogueDatabase::DialogueStage* getDialogueStage() {
+		return dialogueStage;
 	}
+	bool OnInteract(class AGameCharacter* actor) override;
 	/** Called for lock-on input */
 	void LockOntoEnemy(const FInputActionValue& Value);
 	AActor* interactedActor;

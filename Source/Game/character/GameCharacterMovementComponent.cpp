@@ -74,6 +74,7 @@ void UGameCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevel
 	if (invincibilityDuration > 0) {
 		invincibilityDuration -= DeltaTime;
 	}
+	Health.tick(DeltaTime);
 	if (IsRunning()) {
 		if (Health.UpdateRunning(DeltaTime)) {
 			StartWalking();

@@ -2,18 +2,29 @@
 
 
 #include "Inventory.h"
+#include "../../GamePlayerController.h"
 
 void UInventory::NativeConstruct()
 {
     Super::NativeConstruct();
-
+    SetIsFocusable(true);
     // Bind delegates here.
 }
 
-void UInventory::setInventory(UActorInventory * inventory)
+FReply UInventory::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+    if (InKeyEvent.GetKey() == EKeys::C) {
+        GameController->CloseInventory();
+        return FReply::Handled();
+    }
+    return FReply::Unhandled();
+}
+
+void UInventory::setInventory(UActorInventory * inventory, AGamePlayerController* gameController)
 {
 
     check(inventory != nullptr);
+    GameController = gameController;
     inventory->currentWidget = this;
     this->Inventory = inventory;
     ItemListView->SetListItems(inventory->Items);

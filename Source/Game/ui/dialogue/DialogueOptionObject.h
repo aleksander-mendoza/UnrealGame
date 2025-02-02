@@ -3,8 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "../../structures/BuildingSystem.h"
+
 #include "DialogueOptionObject.generated.h"
+class UDialogue;
 
 UCLASS()
 class GAME_API UDialogueOptionObject : public UObject
@@ -12,7 +13,7 @@ class GAME_API UDialogueOptionObject : public UObject
 	GENERATED_BODY()
 
 public:
-
-	FText text;
+	int i;
+	UDialogue * parent;
 	
 };

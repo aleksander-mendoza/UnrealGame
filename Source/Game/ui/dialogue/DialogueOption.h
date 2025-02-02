@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Blueprint/IUserObjectListEntry.h"
+#include "DialogueOptionObject.h"
 #include "DialogueOption.generated.h"
 
 /**
@@ -23,5 +25,13 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* TextOption;
 
-	
+
+	UPROPERTY(meta = (BindWidget))
+	UButton* OptionButton;
+
+	UPROPERTY()
+	class UDialogueOptionObject* Option;
+
+	UFUNCTION()
+	void OnOptionClick();
 };

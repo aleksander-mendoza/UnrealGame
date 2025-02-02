@@ -14,7 +14,10 @@
 #include "Logging/StructuredLog.h"
 #include "open_world/OpenWorld.h"
 #include "Kismet/GameplayStatics.h"
+#include "GamePlayerController.h"
+#include "quest/DialogueDatabase.h"
 #include "anim/NotifyCombo.h"
+
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -73,6 +76,8 @@ AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Su
 	GameMovement = Cast<UGameCharacterMovementComponent>(GetMovementComponent());
 	check(IsValid(GameMovement));
 	GameMovement->GameCharacter = this;
+
+	dialogueStage = &DialogueDatabase::INITIALIZE_GENERIC_CONVERSATION;
 }
 
 
@@ -145,6 +150,15 @@ void AGameCharacter::LockOntoTarget(AActor* target) {
 	}
 	ToggleDirectionalMovement(target != nullptr);
 }
+bool AGameCharacter::OnInteract(AGameCharacter* actor){
+	if (actor->IsPlayer()) {
+		actor->GameController->OpenDialogue(this, actor, this->getDialogueStage());
+	}
+	else if (IsPlayer()) {
+		GameController->OpenDialogue(actor, this, actor->getDialogueStage());
+	}
+	return true;
+}
 void AGameCharacter::LockOntoEnemy(const FInputActionValue& Value) {
 	
 	
@@ -171,6 +185,7 @@ void AGameCharacter::InteractStart(const FInputActionValue& Value) {
 	getRay(InteractDistance, ray);
 	TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
 	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Visibility));
+	objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
 	TArray<AActor*> actorsToIgnore;
 	actorsToIgnore.Add(this);
 	FHitResult OutHit;

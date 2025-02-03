@@ -78,6 +78,10 @@ AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Su
 	GameMovement->GameCharacter = this;
 
 	dialogueStage = &DialogueDatabase::INITIALIZE_GENERIC_CONVERSATION;
+
+	HairMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HairSkeletalMesh"));
+	HairMeshComponent->SetupAttachment(playerMesh, "hairSocket");
+	HairMeshComponent->SetSimulatePhysics(true);
 }
 
 
@@ -87,6 +91,10 @@ void AGameCharacter::BeginPlay()
 	Super::BeginPlay();	
 	ToggleDirectionalMovement(true);
 	Inventory->ResetToDefault(GetWorld());
+
+	if (IsValid(HairMesh)) {
+		HairMeshComponent->SetSkeletalMesh(HairMesh);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -235,6 +243,8 @@ double3 AGameCharacter::getRayEnd(double length) {
 
 void AGameCharacter::OnEquipClothes(TObjectPtr<UItemObject> item)
 {
+	
+
 	USkeletalMesh* clothingMesh = item->getSkeletalMesh();
 	check(clothingMesh != nullptr);
 	check(item->isWearable());

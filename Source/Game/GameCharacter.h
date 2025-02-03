@@ -69,6 +69,11 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMesh> MaleMesh;
 
+
+	/** The male skeletal mesh associated with this Character (optional sub-object). */
+	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMesh> HairMesh;
+
 	/* The AnimBlueprint class to use. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
 	class TSubclassOf<UCharacterAnimInstance> FemaleAnimClass;
@@ -80,6 +85,7 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
 	FText CharacterName;
 
+	
 	/** Is the character male or female */
 	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	bool IsFemale=true;
@@ -104,6 +110,8 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	float MinZoomOut = 80.0;
 	
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> HairMeshComponent;
 
 	UPROPERTY()
 	TArray<TObjectPtr<USkeletalMeshComponent>> Clothes;

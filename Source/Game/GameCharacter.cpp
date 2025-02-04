@@ -156,7 +156,7 @@ void AGameCharacter::LockOntoTarget(AActor* target) {
 		FAttachmentTransformRules rules(EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, true);
 		TargetLockActor->AttachToActor(target, rules);
 	}
-	ToggleDirectionalMovement(target != nullptr);
+	ToggleDirectionalMovement(target == nullptr);
 }
 bool AGameCharacter::OnInteract(AGameCharacter* actor){
 	if (actor->IsPlayer()) {

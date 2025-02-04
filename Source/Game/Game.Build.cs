@@ -10,6 +10,16 @@ public class Game : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         OptimizeCode = CodeOptimization.Never;
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "ProceduralMeshComponent", "UMG"});
+        PublicDependencyModuleNames.AddRange(new string[] { 
+            "Core", 
+            "CoreUObject", 
+            "Engine", 
+            "InputCore", 
+            "EnhancedInput", 
+            "ProceduralMeshComponent", 
+            "UMG",
+            "AIModule",
+            "NavigationSystem"
+        });
     }
 }

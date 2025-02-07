@@ -1,8 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
+#include "HumanNpcAIController.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
-#include "HumanNpcAIController.h"
+
 void AHumanNpcAIController::OnConstruction(const FTransform& Transform) {
 	UPathFollowingComponent* const e = GetPathFollowingComponent();
 	e->OnRequestFinished.AddUObject(this, &AHumanNpcAIController::OnMoveComplete);

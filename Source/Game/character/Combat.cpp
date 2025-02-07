@@ -11,5 +11,6 @@ FCombat::FCombat() {
 	SheathedSocketR = TEXT("sheathed_rSocket");
 	SheathedSocketBackL = TEXT("sheathed_back_lSocket");
 	SheathedSocketBackR = TEXT("sheathed_back_rSocket");
+	ItemHandleSocketName = TEXT("Handle");
 }
 

@@ -19,7 +19,9 @@ public class Game : ModuleRules
             "ProceduralMeshComponent", 
             "UMG",
             "AIModule",
-            "NavigationSystem"
+            "NavigationSystem",
+            "SlateCore",
+            "Synthesis"
         });
     }
 }

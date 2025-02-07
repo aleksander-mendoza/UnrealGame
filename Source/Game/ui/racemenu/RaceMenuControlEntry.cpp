@@ -19,6 +19,7 @@ void URaceMenuControlEntry::NativeOnListItemObjectSet(UObject* ListItemObject)
 	ValueSlider->SetMinValue(Item->MinValue);
 	ValueSlider->SetMaxValue(Item->MaxValue);
 	ValueSlider->SetValue(Item->Value);
+	ValueSlider->SetStepSize(Item->StepSize);
 	//ValueSlider->OnValueChanged.AddUniqueDynamic(Item, &URaceMenuEntryObject::SetValue); // idk why it doesnt work
 }
 

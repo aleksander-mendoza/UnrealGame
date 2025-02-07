@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/ListView.h"
 #include "../../GameCharacter.h"
+#include "ColorPicker.h"
 #include "RaceMenu.generated.h"
 
 /**
@@ -23,6 +24,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
 	UListView* ControlListView;
+
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UColorPicker* ColorPicker;
 public:
 	void setSliderValues(AGameCharacter* character);
 private:

@@ -56,6 +56,11 @@ struct GAME_API FCombat
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
 	FName SheathedSocketBackR;
 
+	/** Sheathed weapon socket (back right)*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
+	FName ItemHandleSocketName;
+	
+
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> LeftHandMesh;
 
@@ -137,14 +142,30 @@ struct GAME_API FCombat
 	inline bool isSheathed(bool leftHand) const{
 		return IsSheathed[leftHand];
 	}
-	inline void unsheath(bool leftHand, USkeletalMeshComponent* const mesh) {
+	inline void attach(bool leftHand, USkeletalMeshComponent* const characterMesh, const FName& itemSocket, const FName & characterSocket) {
+		TObjectPtr<UStaticMeshComponent> itemComp = ItemMesh(leftHand);
+		UStaticMesh * const itemMesh = itemComp->GetStaticMesh();
+		if (itemMesh) {
+			const UStaticMeshSocket* const socket = itemMesh->FindSocket(itemSocket);
+			if (socket) {
+				itemComp->SetRelativeLocation(socket->RelativeLocation);
+				itemComp->SetRelativeRotation(socket->RelativeRotation);
+			}
+			else {
+				itemComp->SetRelativeLocation(FVector());
+				itemComp->SetRelativeRotation(FRotator());
+			}
+		}
 		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		ItemMesh(leftHand)->AttachToComponent(mesh, atr, GetHandSocketName(leftHand));
+		itemComp->AttachToComponent(characterMesh, atr, characterSocket);
+		
+	}
+	inline void unsheath(bool leftHand, USkeletalMeshComponent* const characterMesh) {
+		attach(leftHand, characterMesh, ItemHandleSocketName, GetHandSocketName(leftHand));
 		IsSheathed[leftHand] = false;
 	}
-	inline void sheath(bool leftHand, bool back, USkeletalMeshComponent* const mesh) {
-		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		ItemMesh(leftHand)->AttachToComponent(mesh, atr, SheathedSocketName(leftHand, back));
+	inline void sheath(bool leftHand, bool back, USkeletalMeshComponent* const characterMesh) {
+		attach(leftHand, characterMesh, ItemHandleSocketName, SheathedSocketName(leftHand, back));
 		IsSheathed[leftHand] = true;
 	}
 	inline void sheathLeft(USkeletalMeshComponent* const mesh, bool back=false) {

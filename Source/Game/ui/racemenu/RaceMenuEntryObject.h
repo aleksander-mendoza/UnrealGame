@@ -17,7 +17,7 @@ public:
 
 	FName MorphTarget;
 
-	float MinValue=0, MaxValue=1, Value=0, DefaultValue = 0;
+	float MinValue=0, MaxValue=1, Value=0, DefaultValue = 0, StepSize=0.001;
 
 	USkeletalMeshComponent* Mesh;
 

@@ -38,6 +38,12 @@ float URaceMenuEntryObjectScalar::SetScalarValue(float val)
 }
 
 
+void URaceMenuEntryObjectHairColorPicker::InitHairColorPicker(AGameCharacter* player, URaceMenu* racemenu)
+{
+	InitColorPicker(FText::FromString("Hair color"), player, racemenu, player->getHairColor());
+}
+
+
 void URaceMenuEntryObjectColorPicker::Setup(URaceMenuControlEntry* entry)
 {
 	entry->ValueSlider->SetVisibility(ESlateVisibility::Collapsed);

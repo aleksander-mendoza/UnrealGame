@@ -97,7 +97,10 @@ public:
 	FLinearColor DefaultValue;
 
 
-	
+	void InitColorPicker(FText name, AGameCharacter* player, URaceMenu* racemenu, FLinearColor defaultValue) {
+		Init(name, player, racemenu);
+		DefaultValue = defaultValue;
+	}
 	virtual void Setup(URaceMenuControlEntry* entry) override;
 	virtual void ResetToDefault() override {
 		SetColorValue(DefaultValue);
@@ -112,6 +115,6 @@ class GAME_API URaceMenuEntryObjectHairColorPicker : public URaceMenuEntryObject
 
 public:
 
-
+	void InitHairColorPicker(AGameCharacter* player, URaceMenu* racemenu);
 	virtual void SetColorValue(FLinearColor rgb) override;
 };

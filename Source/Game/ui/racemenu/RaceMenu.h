@@ -44,7 +44,7 @@ protected:
 public:
 	void setSliderValues(AGameCharacter* character);
 	inline void openColorPicker(URaceMenuEntryObject* entry) {
-		if (ColorPickerSubscriber == entry) {
+		if (ColorPickerSubscriber == entry || entry ==nullptr) {
 			ColorPicker->SetVisibility(ESlateVisibility::Collapsed);
 			ColorPickerSubscriber = nullptr;
 		}

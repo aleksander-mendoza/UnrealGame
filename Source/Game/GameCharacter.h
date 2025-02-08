@@ -88,6 +88,9 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	bool IsFemale=true;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
+	FLinearColor HairColor = FLinearColor(0., 0., 1.);
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UClass * WidgetClass;
@@ -145,7 +148,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr <UActorInventory> Inventory;
 
-	
 
 	UCharacterAnimInstance* animInstane = nullptr;
 	UCharacterAnimInstance* getAnimInstance() {
@@ -376,22 +378,29 @@ public:
 				
 		}
 	}
+	UMaterialInstanceDynamic* DynamicHairMaterial=nullptr;
 	inline void setHairdo(FDataTableRowHandle hairdo) {
 		Hairdo = hairdo;
 		USkeletalMesh* mesh=nullptr;
 		if (!Hairdo.IsNull()) {
 			mesh = Hairdo.GetRow<FHairdo>("")->getSkeletalMesh();
+			if (DynamicHairMaterial == nullptr) {
+				FSkeletalMaterial& mat = mesh->GetMaterials()[0];
+				DynamicHairMaterial = UMaterialInstanceDynamic::Create(mat.MaterialInterface, this);
+				DynamicHairMaterial->SetVectorParameterValue("color", HairColor);
+			}
+			HairMeshComponent->SetMaterial(0, DynamicHairMaterial);
 		}
 		HairMeshComponent->SetSkeletalMesh(mesh);
 	}
+	inline FLinearColor getHairColor() {
+		return HairColor;
+	}
 	void setHairColor(FLinearColor rgb) {
-		
-		//UObject* Resource = HairMesh->
-		//// If we already have a dynamic material, return it.
-		//if (UMaterialInstanceDynamic* DynamicMaterial = Cast<UMaterialInstanceDynamic>(Resource))
-		//{
-		//	return DynamicMaterial;
-		//}
+		HairColor = rgb;
+		if (DynamicHairMaterial != nullptr) {
+			DynamicHairMaterial->SetVectorParameterValue("color", rgb);
+		}
 	}
 	
 	

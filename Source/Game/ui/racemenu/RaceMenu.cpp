@@ -19,11 +19,17 @@ void URaceMenu::OnColorChanged(FLinearColor rgb)
 {
 	if (ColorPickerSubscriber)ColorPickerSubscriber->SetColorValue(rgb);
 }
+
 void URaceMenu::setSliderValues(AGameCharacter* character) {
 	
-	URaceMenuEntryObjectHairdoPicker* entry = NewObject<URaceMenuEntryObjectHairdoPicker>();
-	entry->InitHairdoPicker(character, this);
-	ControlListView->AddItem(entry);
+	URaceMenuEntryObjectHairdoPicker* hairdoStyleEntry = NewObject<URaceMenuEntryObjectHairdoPicker>();
+	hairdoStyleEntry->InitHairdoPicker(character, this);
+	ControlListView->AddItem(hairdoStyleEntry);
+
+
+	URaceMenuEntryObjectHairColorPicker* hairColorEntry = NewObject<URaceMenuEntryObjectHairColorPicker>();
+	hairColorEntry->InitHairColorPicker(character, this);
+	ControlListView->AddItem(hairColorEntry);
 
 	AddMorphTargetEntry(character, TEXT("pJCMPelvisFwd_25"), TEXT("Pelvis Forward"), -0.25, 1.0, 0.0);
 	AddMorphTargetEntry(character, TEXT("Breast_Preset_1"), TEXT("Breast Preset 1"), 0.0, 1.0, 0.0);

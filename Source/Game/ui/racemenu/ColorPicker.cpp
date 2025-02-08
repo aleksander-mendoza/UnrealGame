@@ -66,11 +66,12 @@ void UColorPicker::OnColorValueChange(float x)
 	hsv.G = sat;
 	rgb = hsv.HSVToLinearRGB();
 	Color2DSlider->SetSliderHandleColor(rgb);
-	if (UMaterialInstanceDynamic* m = getDynamicMaterial(BrightnessSlider->WidgetStyle.NormalBarImage)) {
+	FSliderStyle & sty = BrightnessSlider->WidgetStyle;
+	if (UMaterialInstanceDynamic* m = getDynamicMaterial(sty.NormalBarImage)) {
 		m->SetScalarParameterValue(TEXT("hue"), hue);
 		m->SetScalarParameterValue(TEXT("sat"), sat);
 	}
-	if (UMaterialInstanceDynamic* m = getDynamicMaterial(BrightnessSlider->WidgetStyle.HoveredBarImage)) {
+	if (UMaterialInstanceDynamic* m = getDynamicMaterial(sty.HoveredBarImage)) {
 		m->SetScalarParameterValue(TEXT("hue"), hue);
 		m->SetScalarParameterValue(TEXT("sat"), sat);
 	}

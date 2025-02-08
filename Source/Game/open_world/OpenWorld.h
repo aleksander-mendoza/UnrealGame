@@ -19,6 +19,9 @@ class GAME_API AOpenWorld : public AActor
 	// Sets default values for this actor's properties
 	AOpenWorld();
 	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true", RowType = "Hairdo"))
+	UDataTable * Hairdos;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	class TSubclassOf<AGameCharacter> PlayerPawnClass;
@@ -73,6 +76,9 @@ class GAME_API AOpenWorld : public AActor
 		actor->SetEnabled(false);
 	}
 public:
+	UDataTable* getHairdos() const{
+		return Hairdos;
+	}
 	void despawnItem(TObjectPtr<AItemActor> item) {
 		despawnActor(usedStaticActorPool, unusedStaticActorPool, item);
 	}

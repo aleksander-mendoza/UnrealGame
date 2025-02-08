@@ -9,6 +9,7 @@
 #include "ColorPicker.h"
 #include "RaceMenu.generated.h"
 
+class URaceMenuEntryObject;
 /**
  * 
  */
@@ -21,6 +22,11 @@ class GAME_API URaceMenu : public UUserWidget
 
 	//virtual void NativeOnInitialized() override;
 protected:
+	virtual void NativeConstruct() override;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true", RowType = "Hairdo"))
+	UDataTable* Hairdos;
 
 	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
 	UListView* ControlListView;
@@ -28,10 +34,27 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
 	UColorPicker* ColorPicker;
+
+	URaceMenuEntryObject* ColorPickerSubscriber;
+
+	UFUNCTION()
+	void OnColorChanged(FLinearColor rgb);
+
+
 public:
 	void setSliderValues(AGameCharacter* character);
+	inline void openColorPicker(URaceMenuEntryObject* entry) {
+		if (ColorPickerSubscriber == entry) {
+			ColorPicker->SetVisibility(ESlateVisibility::Collapsed);
+			ColorPickerSubscriber = nullptr;
+		}
+		else {
+			ColorPicker->SetVisibility(ESlateVisibility::Visible);
+			ColorPickerSubscriber = entry;
+		}
+	}
 private:
-	void AddEntry(USkeletalMeshComponent* mesh, FName morphTarget, FString name, float minValue = 0, float maxValue = 1, float defaultValue = 0);
+	void AddMorphTargetEntry(AGameCharacter* player, FName morphTarget, FString name, float minValue = 0, float maxValue = 1, float defaultValue = 0);
 
 	
 };

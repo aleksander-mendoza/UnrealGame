@@ -125,16 +125,10 @@ struct GAME_API FItem : public FTableRowBase
 		return isDevious() && conflictsWith(other);
 	}
 	inline USkeletalMesh* getSkeletalMesh() {
-		if (!WearableMesh.IsValid()) {
-			WearableMesh.LoadSynchronous();
-		}
-		return WearableMesh.Get();
+		return WearableMesh.LoadSynchronous();
 	}
 	inline UStaticMesh* getMesh() {
-		if (!Mesh.IsValid()) {
-			Mesh.LoadSynchronous();
-		}
-		return Mesh.Get();
+		return Mesh.LoadSynchronous();
 	}
 	inline bool isDoubleHanded() const {
 		return ::isDoubleHanded(Class);

@@ -2,12 +2,14 @@
 
 
 #include "RaceMenuControlEntry.h"
+#include "../../GameCharacter.h"
+#include "RaceMenu.h"
 
 void URaceMenuControlEntry::NativeConstruct()
 {
 	Super::NativeConstruct();
-	ValueSlider->OnValueChanged.AddUniqueDynamic(this, &URaceMenuControlEntry::OnValueChange);
-	
+	ValueSlider->OnValueChanged.AddUniqueDynamic(this, &URaceMenuControlEntry::OnScalarValueChange);
+	OpenColorPickerButton->OnClicked.AddUniqueDynamic(this, &URaceMenuControlEntry::OpenColorPicker);
 }
 
 void URaceMenuControlEntry::NativeOnListItemObjectSet(UObject* ListItemObject)
@@ -16,14 +18,21 @@ void URaceMenuControlEntry::NativeOnListItemObjectSet(UObject* ListItemObject)
 	
 	EntryObject = Item;
 	NameLabel->SetText(Item->Name);
-	ValueSlider->SetMinValue(Item->MinValue);
-	ValueSlider->SetMaxValue(Item->MaxValue);
-	ValueSlider->SetValue(Item->Value);
-	ValueSlider->SetStepSize(Item->StepSize);
+	Item->Setup(this);
 	//ValueSlider->OnValueChanged.AddUniqueDynamic(Item, &URaceMenuEntryObject::SetValue); // idk why it doesnt work
 }
 
-void URaceMenuControlEntry::OnValueChange(float v)
+void URaceMenuControlEntry::OnScalarValueChange(float v)
 {
-	if (EntryObject)EntryObject->SetValue(v);
+	if (EntryObject) {
+		this->ValueSlider->SetValue(EntryObject->SetScalarValue(v));
+	}
 }
+
+void URaceMenuControlEntry::OpenColorPicker()
+{
+	if (EntryObject) {
+		EntryObject->menu->openColorPicker(EntryObject);
+	}
+}
+

@@ -47,6 +47,7 @@ void UColorPicker::OnBrightnessValueChange(float val)
 	hsv.B = val;
 	rgb = hsv.HSVToLinearRGB();
 	Color2DSlider->SetSliderHandleColor(rgb);
+	OnColorValueChanged.Broadcast(rgb);
 }
 void UColorPicker::OnColorValueChange(float x)
 {
@@ -61,7 +62,8 @@ void UColorPicker::OnColorValueChange(float x)
 		Color2DSlider->SetValue(FVector2D(newX, newY));
 	}
 	double sat = len * 2.1;
-	hsv = FLinearColor(hue * 360.,sat,1.);
+	hsv.R = hue * 360.;
+	hsv.G = sat;
 	rgb = hsv.HSVToLinearRGB();
 	Color2DSlider->SetSliderHandleColor(rgb);
 	if (UMaterialInstanceDynamic* m = getDynamicMaterial(BrightnessSlider->WidgetStyle.NormalBarImage)) {
@@ -72,6 +74,6 @@ void UColorPicker::OnColorValueChange(float x)
 		m->SetScalarParameterValue(TEXT("hue"), hue);
 		m->SetScalarParameterValue(TEXT("sat"), sat);
 	}
-	
+	OnColorValueChanged.Broadcast(rgb);
 
 }

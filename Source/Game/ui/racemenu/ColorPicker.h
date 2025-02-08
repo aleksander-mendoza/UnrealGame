@@ -8,6 +8,7 @@
 #include "Components/Slider.h"
 #include "ColorPicker.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnColorValueChangedEvent, FLinearColor, rgb);
 /**
  * 
  */
@@ -34,5 +35,10 @@ class GAME_API UColorPicker : public UUserWidget
 
 	FLinearColor rgb;
 	FLinearColor hsv;
+
+public:
+	/** Called when the value is changed by slider or typing. */
+	UPROPERTY(BlueprintAssignable, Category = "Widget Event")
+	FOnColorValueChangedEvent OnColorValueChanged;
 
 };

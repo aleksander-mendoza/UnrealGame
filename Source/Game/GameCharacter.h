@@ -18,6 +18,7 @@
 #include "items/Container.h" 
 #include "character/Hittable.h" 
 #include "character/Interactable.h"
+#include "character/Hairdo.h"
 
 #include "character/GameCharacterMovementComponent.h"
 #include "anim/CharacterAnimInstance.h"
@@ -70,9 +71,6 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 	TObjectPtr<USkeletalMesh> MaleMesh;
 
 
-	/** The male skeletal mesh associated with this Character (optional sub-object). */
-	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<USkeletalMesh> HairMesh;
 
 	/* The AnimBlueprint class to use. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
@@ -110,6 +108,9 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	float MinZoomOut = 80.0;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true", RowType = "Hairdo"))
+	FDataTableRowHandle Hairdo;
+
 	UPROPERTY()
 	TObjectPtr<USkeletalMeshComponent> HairMeshComponent;
 
@@ -121,6 +122,9 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 
 public:
 	class AGamePlayerController* GameController = nullptr;
+	FDataTableRowHandle getHairdo() const {
+		return Hairdo;
+	}
 	bool IsPlayer() const{
 		return GameController != nullptr;
 	}
@@ -371,6 +375,23 @@ public:
 			animInstane = nullptr;
 				
 		}
+	}
+	inline void setHairdo(FDataTableRowHandle hairdo) {
+		Hairdo = hairdo;
+		USkeletalMesh* mesh=nullptr;
+		if (!Hairdo.IsNull()) {
+			mesh = Hairdo.GetRow<FHairdo>("")->getSkeletalMesh();
+		}
+		HairMeshComponent->SetSkeletalMesh(mesh);
+	}
+	void setHairColor(FLinearColor rgb) {
+		
+		//UObject* Resource = HairMesh->
+		//// If we already have a dynamic material, return it.
+		//if (UMaterialInstanceDynamic* DynamicMaterial = Cast<UMaterialInstanceDynamic>(Resource))
+		//{
+		//	return DynamicMaterial;
+		//}
 	}
 	
 	

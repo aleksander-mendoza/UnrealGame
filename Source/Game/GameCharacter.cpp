@@ -92,9 +92,7 @@ void AGameCharacter::BeginPlay()
 	ToggleDirectionalMovement(true);
 	Inventory->ResetToDefault(GetWorld());
 
-	if (IsValid(HairMesh)) {
-		HairMeshComponent->SetSkeletalMesh(HairMesh);
-	}
+	
 }
 
 //////////////////////////////////////////////////////////////////////////

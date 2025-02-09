@@ -380,9 +380,9 @@ public:
 	inline void OnEquip(bool leftHand, TObjectPtr < UItemObject > item) {
 		USkeletalMeshComponent * mesh = GetMesh();
 		GameMovement->Combat.GetSide(leftHand).EquipItem(this, mesh , item);
-		if (GameMovement->Combat.isSheathed()) {// this will happen if user changes weapon before unsheathing it
+		if (GameMovement->Combat.isSheathed()) {
 			GameMovement->becomeArmed(Inventory);
-		}else{
+		}else{// this will happen if user changes weapon before unsheathing it
 			GameMovement->Combat.GetSide(leftHand).sheath(mesh);
 			
 		}

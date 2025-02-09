@@ -15,14 +15,6 @@ UGameCharacterMovementComponent::UGameCharacterMovementComponent() {
 	GetNavAgentPropertiesRef().bCanSwim = true;
 
 
-	Combat.LeftHandMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftHandMesh"));
-	Combat.RightHandMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightHandMesh"));
-	Combat.LeftHandMesh->SetSimulatePhysics(false);
-	Combat.RightHandMesh->SetSimulatePhysics(false);
-	Combat.LeftHandMesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
-	Combat.RightHandMesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
-	Combat.RightHandMesh->RegisterComponent();
-	Combat.LeftHandMesh->RegisterComponent();
 }
 
 void UGameCharacterMovementComponent::BeginPlay()
@@ -35,8 +27,8 @@ void UGameCharacterMovementComponent::InitializeComponent()
 	Super::InitializeComponent();
 	WalkSpeed = MaxWalkSpeed;
 	USkeletalMeshComponent* Mesh = GetMesh();
-	Combat.BareHandSocket[true] = Mesh->GetSocketByName(Combat.HandSocketL);
-	Combat.BareHandSocket[false] = Mesh->GetSocketByName(Combat.HandSocketR);
+	Combat.Left.BareHandSocket = Mesh->GetSocketByName(Combat.Left.HandSocket);
+	Combat.Right.BareHandSocket = Mesh->GetSocketByName(Combat.Right.HandSocket);
 }
 
 USkeletalMeshComponent* UGameCharacterMovementComponent::GetMesh() const
@@ -51,9 +43,8 @@ UAnimInstance* UGameCharacterMovementComponent::getAnimInstance()
 
 void UGameCharacterMovementComponent::HitDetectHand(bool leftHand)
 {
-	check(!GameCharacter->Inventory->IsDoubleHanded() || Combat.GetBladeStart(true) == nullptr);
 	TArray<FHitResult> OutHit;
-	if (Combat.HitDetectHand(leftHand, GetOwner(), GetWorld(), GetMesh(), OutHit)) {
+	if (Combat.GetSide(leftHand).HitDetectHand(GetOwner(), GetWorld(), GetMesh(), OutHit)) {
 		UItemObject* item = GameCharacter->Inventory->getHandItem(leftHand);
 		const float damage = Health.getDamage(item);
 		for (int i = 0; i < OutHit.Num(); i++) {
@@ -63,10 +54,6 @@ void UGameCharacterMovementComponent::HitDetectHand(bool leftHand)
 	}
 }
 
-void UGameCharacterMovementComponent::Kill(AGameCharacter* actor)
-{
-	GameCharacter->Kill(actor);
-}
 
 void UGameCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {

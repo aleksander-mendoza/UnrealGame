@@ -76,15 +76,15 @@ public:
 	inline bool WantsToAttackRight() {
 		return wantsToAttack && !wantsToAttackLeftHanded;
 	}
-	inline void sheath(bool unsheath, bool left, bool right, bool leftBack, bool rightBack) {
+	inline void sheath(bool unsheath, bool left, bool right) {
 		USkeletalMeshComponent* mesh = GetMesh();
 		if (unsheath) {
-			if (left)Combat.unsheathLeft(mesh);
-			if (right)Combat.unsheathRight(mesh);
+			if (left)Combat.Left.unsheath(mesh);
+			if (right)Combat.Right.unsheath(mesh);
 		}
 		else {
-			if (left)Combat.sheathLeft(mesh, leftBack);
-			if (right)Combat.sheathRight(mesh, rightBack);
+			if (left)Combat.Left.sheath(mesh);
+			if (right)Combat.Right.sheath(mesh);
 		}
 	}
 	/*inline TObjectPtr<UAnimMontage>  GetCurrentAttackAnim() {
@@ -213,8 +213,8 @@ public:
 		FWeaponAnim & unsheathAnim = CurrentAttackAnims->Unsheath;
 		if (unsheathAnim.Anim == nullptr) {
 			USkeletalMeshComponent * const mesh  = GetMesh();
-			Combat.unsheathLeft(mesh);
-			Combat.unsheathRight(mesh);
+			Combat.Left.unsheath(mesh);
+			Combat.Right.unsheath(mesh);
 			EnableAttacking(GetAttackCooldown());
 			if (CurrentAttackAnim != nullptr) {
 				check(CurrentAttackAnim->Anim != nullptr);
@@ -298,8 +298,8 @@ public:
 			FWeaponAnim& sheathAnim = CurrentAttackAnims->Sheath;
 			if (sheathAnim.Anim == nullptr) {
 				USkeletalMeshComponent* const mesh = GetMesh();
-				Combat.sheathLeft(mesh);
-				Combat.sheathRight(mesh);
+				Combat.Left.sheath(mesh);
+				Combat.Right.sheath(mesh);
 				EnableAttacking(0);
 				CurrentAttackAnim = nullptr;
 			}
@@ -381,18 +381,13 @@ public:
 	float invincibilityDuration = 0;
 	void Hit(AGameCharacter* actor, UItemObject* weaponUsed, float damage) {
 		if (invincibilityDuration <= 0) {
-			if (Health.takeHealth(damage)) {
-				TObjectPtr<UAnimMontage> anim = Combat.getHitAnim();
-				if (anim) {
-					getAnimInstance()->Montage_Play(anim);
-				}
+			if (Health.damage(actor, damage)) {
 				invincibilityDuration = INVINCIBILITY_AFTER_HIT;
-			}
-			else {
-				Kill(actor);
 			}
 		}
 	}
-	void Kill(AGameCharacter* actor);
+	void Kill(AGameCharacter* killer) {
+		Health.kill(killer);
+	}
 	void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 };

@@ -9,22 +9,290 @@
 #include "../items/ActorInventory.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "../anim/AttackHandedness.h"
+#include "SheathSocketType.h"
 #include "Combat.generated.h"
 
 #define HIT_DETECTION_PERIOD 0.1
+
+
+USTRUCT(BlueprintType)
+struct FAnyMesh {
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> ztatic;
+
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> skeletal;
+	bool isSkeletal;
+	TObjectPtr<UItemObject> Item;
+	bool sheathesOnBack = false;
+
+	inline UPrimitiveComponent * getComponent() {
+		return isSkeletal ? (UPrimitiveComponent *) skeletal : ztatic;
+	}
+	inline bool create(TObjectPtr<UObject> outer) {
+		if (isSkeletal) {
+			if (skeletal == nullptr) {
+				skeletal = NewObject<USkeletalMeshComponent>(outer, USkeletalMeshComponent::StaticClass());
+				skeletal->SetSimulatePhysics(false);
+				skeletal->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
+				skeletal->RegisterComponent();
+				return true;
+			}
+		}
+		else {
+			if (ztatic == nullptr) {
+				ztatic = NewObject<UStaticMeshComponent>(outer, UStaticMeshComponent::StaticClass());
+				ztatic->SetSimulatePhysics(false);
+				ztatic->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
+				ztatic->RegisterComponent();
+				return true;
+			}
+		}
+		return false;
+	}
+	inline bool equip(TObjectPtr<UObject> outer, TObjectPtr<UItemObject> item) {
+		bool wasNewlyCreated = false;
+		if (item == nullptr) {
+			if (Item != nullptr) {
+				if (isSkeletal) {
+					skeletal->SetSkeletalMesh(nullptr);
+				}
+				else {
+					ztatic->SetStaticMesh(nullptr);
+				}
+			}
+		}else{
+			FItem* row = item->Instance.getRow();
+			isSkeletal = row->Mesh.IsNull();
+			sheathesOnBack = row->isSheathedOnTheBack();
+			wasNewlyCreated = create(outer);
+			if (isSkeletal) {
+				skeletal->SetSkeletalMesh(row->getSkeletalMesh());
+			}
+			else {
+				ztatic->SetStaticMesh(row->getMesh());
+			}
+		}
+		Item = item;
+		return wasNewlyCreated;
+	}
+	
+	inline UPrimitiveComponent* findSocket(FVector & location, FRotator & rotation, const FName& itemSocket) {
+		if (isSkeletal) {
+			USkeletalMesh* const itemMesh = skeletal->SkeletalMesh;
+			if (itemMesh) {
+				const USkeletalMeshSocket* const socket = itemMesh->FindSocket(itemSocket);
+				if (socket) {
+					location = socket->RelativeLocation;
+					rotation = socket->RelativeRotation;
+				}
+			}
+			return skeletal;
+		}
+		else {
+			UStaticMesh* const itemMesh = ztatic->GetStaticMesh();
+			if (itemMesh) {
+				const UStaticMeshSocket* const socket = itemMesh->FindSocket(itemSocket);
+				if (socket) {
+					location = socket->RelativeLocation;
+					rotation = socket->RelativeRotation;
+				}
+			}
+			return ztatic;
+		}
+	}
+	inline void setTransform(FVector location, FRotator rotation) {
+		UPrimitiveComponent* c = getComponent();
+		c->SetRelativeLocation(location);
+		c->SetRelativeRotation(rotation);
+	}
+	inline void attach(USkeletalMeshComponent* const characterMesh, const FName& itemSocket, const FName& characterSocket) {
+		if (Item) {
+			FVector location;
+			FRotator rotation;
+			UPrimitiveComponent* comp = findSocket(location, rotation, itemSocket);
+			const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
+			comp->SetRelativeLocation(location);
+			comp->SetRelativeRotation(rotation);
+			comp->AttachToComponent(characterMesh, atr, characterSocket);
+		}
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FAnySocketh {
+	GENERATED_BODY()
+
+	UPROPERTY()
+	const UStaticMeshSocket* ztatic;
+
+	UPROPERTY()
+	const USkeletalMeshSocket* skeletal;
+
+	inline bool isNull(const FAnyMesh& meshComp) const {
+		return meshComp.isSkeletal ? skeletal == nullptr : ztatic == nullptr;
+	}
+	inline FTransform GetSocketTransform(const FAnyMesh& meshComp) const {
+		if (meshComp.isSkeletal) {
+			return skeletal->GetSocketTransform(meshComp.skeletal);
+		}
+		else {
+			FTransform trans;
+			ztatic->GetSocketTransform(trans, meshComp.ztatic);
+			return trans;
+		}
+	}
+	inline void set(FName socketName, FAnyMesh & source) {
+		if (source.isSkeletal) {
+			USkeletalMesh* const itemMesh = source.skeletal->SkeletalMesh;
+			if (itemMesh) {
+				skeletal = itemMesh->FindSocket(socketName);
+			}
+		}
+		else {
+			UStaticMesh* const itemMesh = source.ztatic->GetStaticMesh();
+			if (itemMesh) {
+				const UStaticMeshSocket* const socket = itemMesh->FindSocket(socketName);
+			}
+		}
+	}
+	inline void unset(const FAnyMesh& source) {
+		if (source.isSkeletal)skeletal = nullptr;
+		else ztatic = nullptr;
+	}
+
+};
+USTRUCT(BlueprintType)
+struct GAME_API FCombatOneSide
+{
+	GENERATED_BODY()
+
+	/** Hand socket (right)*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
+	FName HandSocket;
+	/** Sheathed weapon socket (right)*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
+	FName SheathedSocket;
+	/** Sheathed weapon socket (back right)*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
+	FName SheathedSocketBack;
+
+	UPROPERTY()
+	FAnyMesh HandMesh;
+
+	FAnySocketh BladeStart;
+	FAnySocketh BladeEnd;
+	const USkeletalMeshSocket* BareHandSocket;
+
+	bool enableHandHitDetection;
+	bool enableFootHitDetection;
+
+	bool isSheathed = true;
+	inline FName& getSheathedSocketName() {
+		return HandMesh.sheathesOnBack ? SheathedSocketBack : SheathedSocket;
+	}
+	inline FAnySocketh& getBladeSocket(bool start) {
+		return start ? BladeStart : BladeEnd;
+	}
+	inline const FAnySocketh& getBladeSocket(bool start) const{
+		return start ? BladeStart : BladeEnd;
+	}
+
+	inline FVector getHandLocation(const USkeletalMeshComponent* const playerMesh) const {
+		return BareHandSocket->GetSocketLocation(playerMesh);
+	}
+	inline FTransform getBladeTransform(bool start) const {
+		return getBladeSocket(start).GetSocketTransform(HandMesh);
+	}
+	inline FVector getBladeLocation(bool start) const {
+		return getBladeTransform(start).GetLocation();
+	}
+	inline void GetStartEndLocation(FVector& start, FVector& end, const USkeletalMeshComponent* const playerMesh) const {
+		if (BladeStart.isNull(HandMesh)) {
+			end = start = getHandLocation(playerMesh);	
+		}
+		else {
+			start = getBladeLocation(true);
+			end = getBladeLocation(false);
+		}
+	}
+
+	inline void unsheath(USkeletalMeshComponent* const characterMesh) {
+		HandMesh.attach(characterMesh, "Handle", HandSocket);
+	}
+	inline void sheath(USkeletalMeshComponent* const characterMesh) {
+		HandMesh.attach(characterMesh, "Handle", getSheathedSocketName());
+	}
+	inline void EquipItem(TObjectPtr<UObject> outer, USkeletalMeshComponent* const characterMesh, TObjectPtr<UItemObject> item) {
+		if (item == nullptr) {
+			Unequip();
+		}
+		else {
+			if (HandMesh.equip(outer, item)) {
+				HandMesh.attach(characterMesh, "Handle", isSheathed ? getSheathedSocketName() : HandSocket);
+			}
+			BladeStart.set("BladeStart", HandMesh);
+			BladeEnd.set("BladeEnd", HandMesh);
+			check(BladeStart.isNull(HandMesh) == BladeEnd.isNull(HandMesh));
+		}
+	}
+	void Unequip() {
+		BladeStart.unset(HandMesh);
+		BladeEnd.unset(HandMesh);
+		HandMesh.equip(nullptr, nullptr);
+	}
+	inline bool isEquipped() {
+		return HandMesh.Item != nullptr;
+	}
+	void EnableWeaponTrace(bool EnableHandHitDetection, bool EnableFootHitDetection) {
+		enableHandHitDetection |= EnableHandHitDetection;
+		enableFootHitDetection |= EnableFootHitDetection;
+	}
+	inline bool IsSheathed() const {
+		return isSheathed;
+	}
+	void DisableWeaponTrace() {
+		enableHandHitDetection = false;
+		enableFootHitDetection = false;
+	}
+	
+
+	inline bool HitDetectHand(AActor* owner, UWorld* world, USkeletalMeshComponent* const mesh, TArray<FHitResult>& OutHit) {
+		if (enableHandHitDetection) {
+			TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
+			objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
+			TArray<AActor*> actorsToIgnore;
+			actorsToIgnore.Add(owner);
+			FVector s, e;
+			GetStartEndLocation(s, e, mesh);
+			return UKismetSystemLibrary::SphereTraceMultiForObjects(world, s, e, 50., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true);
+		}
+		return false;
+	}
+
+	
+};
 
 USTRUCT(BlueprintType)
 struct GAME_API FCombat
 {
 	GENERATED_BODY()
 
-	
-
-
 
 	unsigned int comboAnimIdx = 0;
 	FCombat();
 	class AGameCharacter* GameCharacter;
+
+	/** Hand socket (right)*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
+	FCombatOneSide Left;
+
+	/** Hand socket (right)*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
+	FCombatOneSide Right;
+
 	/** Death Animation*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UAnimMontage>> DeathAnims;
@@ -36,158 +304,24 @@ struct GAME_API FCombat
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
 	FWeaponSetAnims WeaponAnims;
 
-	/** Hand socket (right)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
-	FName HandSocketR;
-	/** Hand socket (right)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
-	FName HandSocketL ;
-	/** Sheathed weapon socket (left)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
-	FName SheathedSocketL;
-	/** Sheathed weapon socket (right)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
-	FName SheathedSocketR ;
-	/** Sheathed weapon socket (back left)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
-	FName SheathedSocketBackL;
-
-	/** Sheathed weapon socket (back right)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
-	FName SheathedSocketBackR;
-
-	/** Sheathed weapon socket (back right)*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
-	FName ItemHandleSocketName;
-	
-
-	UPROPERTY()
-	TObjectPtr<UStaticMeshComponent> LeftHandMesh;
-
-	UPROPERTY()
-	TObjectPtr<UStaticMeshComponent> RightHandMesh;
-	inline FName & SheathedSocketName(bool leftHand, bool back) {
-		return leftHand ? (back? SheathedSocketBackL : SheathedSocketL) : (back ? SheathedSocketBackR : SheathedSocketR);
-	}
-	inline TObjectPtr<UStaticMeshComponent>  ItemMesh(bool leftHand) const {
-		return leftHand ? LeftHandMesh : RightHandMesh;
-	}
-
-	const UStaticMeshSocket* BladeStart[2];
-	const UStaticMeshSocket* BladeEnd[2];
-	const USkeletalMeshSocket* BareHandSocket[2];
-
-	bool enableHandHitDetection[2];
-	bool enableFootHitDetection[2];
-	inline bool HasWeaponEquipped(bool leftHand) const {
-		return BladeStart[leftHand]!=nullptr;
-	}
-	inline const FName & GetHandSocketName(bool leftHand) const {
-		return leftHand ? HandSocketL : HandSocketR;
-	}
-	inline const USkeletalMeshSocket* GetHandSocket(bool leftHand) const{
-		return BareHandSocket[leftHand];
-	}
-	inline const UStaticMeshSocket* GetBladeStart(bool leftHand) const {
-		return BladeStart[leftHand];
-	}
-	inline const UStaticMeshSocket* GetBladeEnd(bool leftHand) const {
-		return BladeEnd[leftHand];
-	}
-	inline FVector GetHandLocation(bool leftHand, const USkeletalMeshComponent*const mesh) const{
-		return GetHandSocket(leftHand)->GetSocketLocation(mesh);
-	}
-	inline FVector GetBladeStartLocation(bool leftHand) const {
-		FTransform trans;
-		GetBladeStart(leftHand)->GetSocketTransform(trans, ItemMesh(leftHand));
-		return trans.GetLocation();
-	}
-	inline FVector GetBladeEndLocation(bool leftHand) const {
-		FTransform trans;
-		GetBladeEnd(leftHand)->GetSocketTransform(trans, ItemMesh(leftHand));
-		return trans.GetLocation();
-	}
-	inline void GetStartEndLocation(bool leftHand, FVector & start, FVector& end, const USkeletalMeshComponent*const mesh) const{
-		if (HasWeaponEquipped(leftHand)) {
-			start = GetBladeStartLocation(leftHand);
-			end = GetBladeEndLocation(leftHand);
-		}
-		else {
-			end = start = GetHandLocation(leftHand, mesh);
-		}
-	}
-	inline void EnableHandHitDetection(bool leftHand, bool enabled=true) {
-		enableHandHitDetection[leftHand] = enabled;
-	}
-	inline void EnableFootHitDetection(bool leftFoot, bool enabled = true) {
-		enableFootHitDetection[leftFoot] = true;
-	}
-	inline bool IsEnabledHandHitDetection(bool leftHand) {
-		return enableHandHitDetection[leftHand];
-	}
-	inline bool IsEnabledRightHandHitDetection() {
-		return IsEnabledHandHitDetection(false);
-	}
-	inline bool IsEnabledLeftHandHitDetection() {
-		return IsEnabledHandHitDetection(true);
-	}
-	
 	float hitDetectionTimer;
-	
+	float invincibilityDuration = 0;
 
-	bool IsSheathed[2] = { true, true };
-	inline bool isSheathed() const {
-		return IsSheathed[0]|| IsSheathed[1];
+	inline FCombatOneSide& getDominantSide(TObjectPtr<UItemObject> item) {
+		return GetSide(item->isLeftTheDominantHand());
 	}
-	inline bool isSheathed(bool leftHand) const{
-		return IsSheathed[leftHand];
+	inline FCombatOneSide& GetSide(bool leftHand) {
+		return leftHand ? Left: Right;
 	}
-	inline void attach(bool leftHand, USkeletalMeshComponent* const characterMesh, const FName& itemSocket, const FName & characterSocket) {
-		TObjectPtr<UStaticMeshComponent> itemComp = ItemMesh(leftHand);
-		UStaticMesh * const itemMesh = itemComp->GetStaticMesh();
-		if (itemMesh) {
-			const UStaticMeshSocket* const socket = itemMesh->FindSocket(itemSocket);
-			if (socket) {
-				itemComp->SetRelativeLocation(socket->RelativeLocation);
-				itemComp->SetRelativeRotation(socket->RelativeRotation);
-			}
-			else {
-				itemComp->SetRelativeLocation(FVector());
-				itemComp->SetRelativeRotation(FRotator());
-			}
-		}
-		const FAttachmentTransformRules atr(EAttachmentRule::KeepRelative, false);
-		itemComp->AttachToComponent(characterMesh, atr, characterSocket);
-		
+	inline FName& SheathedSocketName(bool leftHand) {
+		return GetSide(leftHand).getSheathedSocketName();
 	}
-	inline void unsheath(bool leftHand, USkeletalMeshComponent* const characterMesh) {
-		attach(leftHand, characterMesh, ItemHandleSocketName, GetHandSocketName(leftHand));
-		IsSheathed[leftHand] = false;
+	inline FAnyMesh & ItemMesh(bool leftHand)  {
+		return GetSide(leftHand).HandMesh;
 	}
-	inline void sheath(bool leftHand, bool back, USkeletalMeshComponent* const characterMesh) {
-		attach(leftHand, characterMesh, ItemHandleSocketName, SheathedSocketName(leftHand, back));
-		IsSheathed[leftHand] = true;
-	}
-	inline void sheathLeft(USkeletalMeshComponent* const mesh, bool back=false) {
-		sheath(true, back, mesh);
-	}
-	inline void sheathRight(USkeletalMeshComponent* const mesh, bool back = false) {
-		sheath(false, back, mesh);
-	}
-	inline void sheathBackRight(USkeletalMeshComponent* const mesh) {
-		sheath(false, true, mesh);
-	}
-	inline void sheathBackLeft(USkeletalMeshComponent* const mesh) {
-		sheath(true, true, mesh);
-	}
-	inline void unsheathLeft(USkeletalMeshComponent* const mesh) {
-		unsheath(true, mesh);
-	}
-	inline void unsheathRight(USkeletalMeshComponent* const mesh) {
-		unsheath(false, mesh);
-	}
+
 	inline TObjectPtr<UAnimMontage> getHitAnim() {
-		return HitAnims.Num()==0?nullptr: HitAnims[comboAnimIdx++ % HitAnims.Num()];
+		return HitAnims.Num() == 0 ? nullptr : HitAnims[comboAnimIdx++ % HitAnims.Num()];
 	}
 	inline TObjectPtr<UAnimMontage> getDeathAnim() {
 		return DeathAnims.Num() == 0 ? nullptr : DeathAnims[comboAnimIdx++ % DeathAnims.Num()];
@@ -201,101 +335,31 @@ struct GAME_API FCombat
 	inline FWeaponAnim* getAttackAnim(EMeleeAttackClass weaponClass) {
 		return WeaponAnims.getAttackAnim(weaponClass, comboAnimIdx++);
 	}
-	inline FWeaponAnim* GetNextAnim(FWeaponAnims * anims) {
+	inline FWeaponAnim* GetNextAnim(FWeaponAnims* anims) {
 		return anims->GetAnim(comboAnimIdx++);
 	}
 	inline FWeaponAnims* getAttackAnims(EMeleeAttackClass weaponClass) {
 		return WeaponAnims.getAttackAnims(weaponClass);
 	}
-	inline FWeaponAnim * getAttackOrUnsheathAnim(EMeleeAttackClass weaponClass) {
+	inline FWeaponAnim* getAttackOrUnsheathAnim(EMeleeAttackClass weaponClass) {
 		return isSheathed() ? getUnsheathAnim(weaponClass) : getAttackAnim(weaponClass);
 	}
-	inline void EquipItem(bool leftHand, TObjectPtr < UItemObject > item) {
-		EquipItem(leftHand, item->getMesh());
-	}
-	inline void EquipItem(bool leftHand, UStaticMesh* m) {
-		ItemMesh(leftHand)->SetStaticMesh(m);
-		BladeStart[leftHand] = m->FindSocket("BladeStart");
-		BladeEnd[leftHand] = m->FindSocket("BladeEnd");
-		check((BladeStart[leftHand] == nullptr) == (BladeEnd[leftHand] == nullptr));
-	}
-	inline void EquipItemDoubleHanded(TObjectPtr < UItemObject > item) {
-		UnequipLeftHand();
-		EquipItemRight(item);
-	}
-	inline void EquipItemDoubleHanded(UStaticMesh* m) {
-		EquipItemRight(m);
-	}
-	inline void EquipItemRight(TObjectPtr < UItemObject > item) {
-		EquipItem(false, item);
-	}
-	inline void EquipItemRight(UStaticMesh* m) {
-		EquipItem(false, m);
-	}
-	inline void EquipItemLeft(TObjectPtr < UItemObject > item) {
-		EquipItem(true, item);
-	}
-	inline void EquipItemLeft(UStaticMesh* m) {
-		EquipItem(true, m);
-	}
-	void Unequip(bool leftHand) {
-		ItemMesh(leftHand)->SetStaticMesh(nullptr);
-		BladeStart[leftHand] = nullptr;
-		BladeEnd[leftHand] = nullptr;
-	}
-	void UnequipDoubleHanded() {
-		check(BladeStart[true]==nullptr);
-		UnequipRightHand();
-	}
-	void UnequipLeftHand() {
-		Unequip(true);
-	}
-	void UnequipRightHand() {
-		Unequip(false);
+	inline bool isSheathed() const {
+		return Left.IsSheathed() || Right.IsSheathed();
 	}
 	void EnableWeaponTrace(bool enableLeftHandHitDetection, bool enableRightHandHitDetection, bool enableLeftFootHitDetection, bool enableRightFootHitDetection) {
-		enableHandHitDetection[true] |= enableLeftHandHitDetection;
-		enableHandHitDetection[false] |= enableRightHandHitDetection;
-		enableFootHitDetection[true] |= enableLeftFootHitDetection;
-		enableFootHitDetection[false] |= enableRightFootHitDetection;
+		Left.EnableWeaponTrace(enableLeftHandHitDetection, enableLeftFootHitDetection);
+		Right.EnableWeaponTrace(enableRightHandHitDetection, enableRightFootHitDetection);
 		hitDetectionTimer = 0;
 	}
 	void DisableWeaponTrace() {
-		enableHandHitDetection[0] = false;
-		enableHandHitDetection[1] = false;
-		enableFootHitDetection[0] = false;
-		enableFootHitDetection[1] = false;
+		Left.DisableWeaponTrace();
+		Right.DisableWeaponTrace();
 		hitDetectionTimer = INFINITY;
 	}
+
 	void NotifyAttackAnimationFinished() {
 		DisableWeaponTrace();
 	}
-	
-	float invincibilityDuration = 0;
-	inline void HitDetectRightHand(AActor* owner, UWorld* world, USkeletalMeshComponent* const mesh, TArray<FHitResult>& OutHit) {
-		HitDetectHand(false, owner, world, mesh, OutHit);
-	}
-	inline void HitDetectLeftHand(AActor* owner, UWorld* world, USkeletalMeshComponent* const mesh, TArray<FHitResult>& OutHit) {
-		HitDetectHand(true, owner, world, mesh, OutHit);
-	}
-	inline bool HitDetectHand(bool leftHand, AActor*owner, UWorld * world, USkeletalMeshComponent* const mesh, TArray<FHitResult>& OutHit) {
-		if (IsEnabledHandHitDetection(leftHand)) {
-			TArray<TEnumAsByte<EObjectTypeQuery>> objectTypesArray;
-			objectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
-			TArray<AActor*> actorsToIgnore;
-			actorsToIgnore.Add(owner);
-			FVector s, e;
-			GetStartEndLocation(leftHand, s, e, mesh);
-			return UKismetSystemLibrary::SphereTraceMultiForObjects(world, s, e, 50., objectTypesArray, false, actorsToIgnore, EDrawDebugTrace::None, OutHit, true);
-		}
-		return false;
-	}
-	void HitDetectRightFoot() {
 
-	}
-	void HitDetectLeftFoot() {
-
-	}
-	
-	
 };

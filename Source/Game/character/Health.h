@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "../ui/Status.h"
 #include "../items/ItemObject.h"
+#include "HealthEvents.h"
 #include "Health.generated.h"
 
 
@@ -23,6 +24,7 @@ struct GAME_API FHealth
 	//////////////// SURVIVAL         //////////////
 	////////////////////////////////////////////////
 
+	HealthEvents * listener;
 	float PreventStaminaRegen = 0;
 	float PreventHealthRegen = 0;
 	float PreventMagicRegen = 0;
@@ -84,19 +86,43 @@ struct GAME_API FHealth
 		return false;
 	}
 
-	void setHealth(float hp) {
+	inline void setHealth(float hp) {
 		if (hp > MaxHealth) hp = MaxHealth;
 		if (Widget)Widget->Stamina->SetPercent(hp / MaxHealth);
+		if (listener)listener->OnHealthChanged(hp, MaxHealth);
 		Health = hp;
 	}
 
-	bool takeHealth(float health) {
+	void takeHealth( float health) {
+		check(health >= 0);
+		setHealth(Health - health);
+	}
+	bool damage(class AGameCharacter* attacker, float health) {
+		check(health >= 0);
 		if (Health >= health) {
 			setHealth(Health - health);
+			if (listener)listener->OnDamage(attacker, Health);
 			return true;
 		}
-		return false;
+		else {
+			if (listener)listener->OnKilled(attacker);
+			return false;
+		}
 
+
+	}
+	inline void kill(class AGameCharacter* killer) {
+		Health = 0;
+		if(listener)listener->OnKilled(killer);
+	}
+	inline void heal(float health) {
+		check(health >= 0);
+		if (Health < MaxHealth) {
+			setHealth(Health + health);
+			if (Health >= MaxHealth) {
+				if (listener)listener->OnFullHealth();
+			}
+		}
 	}
 
 	void setMagic(float m) {
@@ -439,7 +465,7 @@ struct GAME_API FHealth
 				PreventHealthRegen -= DeltaTime;
 			}
 			else {
-				setHealth(Health + HealthRegenSpeed * DeltaTime);
+				heal(HealthRegenSpeed * DeltaTime);
 			}
 		}
 

@@ -35,6 +35,9 @@ public:
 	inline FItem* getRow() const {
 		return Instance.getRow();
 	}
+	inline bool isLeftTheDominantHand() {
+		return Instance.getRow()->isLeftTheDominantHand();
+	}
 	inline EItemClass getItemClass() const {
 		return Instance.getRow()->Class;
 	}
@@ -51,6 +54,6 @@ public:
 		return Instance.getRow()->isWearable();
 	}
 	inline bool isSheathedOnTheBack() {
-		return getItemClass() == EItemClass::SHIELD;
+		return Instance.getRow()->isSheathedOnTheBack();
 	}
 };

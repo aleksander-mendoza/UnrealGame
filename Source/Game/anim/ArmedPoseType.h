@@ -28,6 +28,9 @@ inline EMeleeAttackClass poseToAttack(EArmedPoseType pose) {
 		return EMeleeAttackClass::BARE_HANDED;
 	case EArmedPoseType::SINGLE_HANDED:
 		return EMeleeAttackClass::SINGLE_HANDED_WEAPON;
+	case EArmedPoseType::BOW:
+	case EArmedPoseType::BOW_AIMED:
+		return EMeleeAttackClass::BOW;
 	default:
 		return EMeleeAttackClass::NONE;
 	}

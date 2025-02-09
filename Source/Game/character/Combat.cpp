@@ -5,12 +5,11 @@
 #include "../GameCharacter.h"
 
 FCombat::FCombat() {
-	HandSocketR = TEXT("hand_rSocket");
-	HandSocketL = TEXT("hand_lSocket");
-	SheathedSocketL = TEXT("sheathed_lSocket");
-	SheathedSocketR = TEXT("sheathed_rSocket");
-	SheathedSocketBackL = TEXT("sheathed_back_lSocket");
-	SheathedSocketBackR = TEXT("sheathed_back_rSocket");
-	ItemHandleSocketName = TEXT("Handle");
+	Left.HandSocket = TEXT("hand_lSocket");
+	Right.HandSocket = TEXT("hand_rSocket");
+	Left.SheathedSocket = TEXT("sheathed_lSocket");
+	Right.SheathedSocket = TEXT("sheathed_rSocket");
+	Left.SheathedSocketBack = TEXT("sheathed_back_lSocket");
+	Right.SheathedSocketBack = TEXT("sheathed_back_rSocket");
 }
 

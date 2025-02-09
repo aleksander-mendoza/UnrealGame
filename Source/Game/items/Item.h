@@ -133,4 +133,15 @@ struct GAME_API FItem : public FTableRowBase
 	inline bool isDoubleHanded() const {
 		return ::isDoubleHanded(Class);
 	}
+	inline bool isSheathedOnTheBack() {
+		return ::isSheathedOnTheBack(Class);
+	}
+	/**If the weapon is double-handed then one of the hands is dominant. 
+	It determines which socket the mesh is actually attached to. 
+	So if animation requires the weapon to be temporarily held in just one hand,
+	that is the hand that will hold it. Bows are held in left hand. 
+	Great swords are held in right hand.*/
+	inline bool isLeftTheDominantHand() {
+		return ::isLeftTheDominantHand(Class);
+	}
 };

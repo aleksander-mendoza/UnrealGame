@@ -76,6 +76,7 @@ AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Su
 	GameMovement = Cast<UGameCharacterMovementComponent>(GetMovementComponent());
 	check(IsValid(GameMovement));
 	GameMovement->GameCharacter = this;
+	GameMovement->Health.listener = this;
 
 	dialogueStage = &DialogueDatabase::INITIALIZE_GENERIC_CONVERSATION;
 
@@ -236,6 +237,21 @@ double3 AGameCharacter::getRayEnd(double length) {
 	Ray ray;
 	getRay(length, ray);
 	return ray.end;
+}
+
+void AGameCharacter::showHealthBar(bool visible)
+{
+	if (visible && HealthBarComponent == nullptr) {
+		HealthBarComponent = NewObject<UWidgetComponent>(this, UWidgetComponent::StaticClass());
+		HealthBarComponent->SetWidgetClass(HealthBarClass);
+		UCapsuleComponent* capsule = GetCapsuleComponent();
+		HealthBarComponent->SetRelativeLocation(FVector(0, capsule->GetScaledCapsuleHalfHeight(), 0));
+		HealthBarComponent->RegisterComponent();
+		HealthBarComponent->AttachToComponent(capsule, FAttachmentTransformRules::SnapToTargetIncludingScale);
+
+		HealthBar = Cast<UNpcHealthBar>(HealthBarComponent->GetWidget());
+	}
+	HealthBarComponent->SetHiddenInGame(!visible);
 }
 
 

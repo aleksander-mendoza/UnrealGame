@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/WidgetComponent.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Engine/SkeletalMeshSocket.h"
 
@@ -19,6 +20,7 @@
 #include "character/Hittable.h" 
 #include "character/Interactable.h"
 #include "character/Hairdo.h"
+#include "ui/NpcHealthBar.h"
 
 #include "character/GameCharacterMovementComponent.h"
 #include "anim/CharacterAnimInstance.h"
@@ -40,10 +42,20 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 
 UCLASS(config=Game)
-class AGameCharacter : public ACharacter , public ContainerEvents, public IHittable, public IInteractable
+class AGameCharacter : public ACharacter , public ContainerEvents, public IHittable, public IInteractable, public HealthEvents
 {
 	GENERATED_BODY()
 
+
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UWidgetComponent> HealthBarComponent;
+
+	UNpcHealthBar * HealthBar;
+
+	/* The AnimBlueprint class to use. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	class TSubclassOf<UNpcHealthBar> HealthBarClass;
 
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -313,19 +325,51 @@ public:
 	
 	
 	void Kill(AGameCharacter* killer) {//TODO: kill moves that involve the killer
-		TObjectPtr<UAnimMontage> anim = GameMovement->Combat.getDeathAnim();
-		if (anim) {
-			getAnimInstance()->Montage_Play(anim);
-		}
-		GetMesh()->SetSimulatePhysics(true);
+		GameMovement->Kill(killer);
 	}
 	
 	virtual void OnHit(AGameCharacter * actor, UItemObject* weaponUsed, float damage) override{
 		GameMovement->Hit(actor, weaponUsed, damage);
 	}
+
+	void showHealthBar(bool visible);
+
+
+	virtual void OnFullMagic() override {
+	}
+	virtual void OnFullStamina() override {
+	}
+	virtual void OnFullHealth() override {
+		if (!IsPlayer()) showHealthBar(false);
+	}
+	virtual void OnDamage(AGameCharacter* attacker, float health) override {
+		if(!IsPlayer()) showHealthBar(true);
+		TObjectPtr<UAnimMontage> anim = GameMovement->Combat.getHitAnim();
+		if (anim) {
+			getAnimInstance()->Montage_Play(anim);
+		}
+		
+	}
+	virtual void OnKilled(AGameCharacter* killer) override {
+		TObjectPtr<UAnimMontage> anim = GameMovement->Combat.getDeathAnim();
+		if (anim) {
+			getAnimInstance()->Montage_Play(anim);
+		}
+		GetMesh()->SetSimulatePhysics(true);
+
+	}
+	
+	virtual void OnHealthChanged(float health, float maxHealth) override{
+		if (HealthBar)HealthBar->Health->SetPercent(health / maxHealth);
+	}
+	virtual void OnMagicChanged(float magic, float maxMagic) override {
+
+	}
+	virtual void OnStaminaChanged(float stamina, float maxStamina) override {
+
+	}
 	virtual void OnEquipBothHands(TObjectPtr < UItemObject > item) override {
-		GameMovement->Combat.EquipItemRight(item);
-		GameMovement->Combat.sheathBackRight(GetMesh());
+		OnEquip(item->isLeftTheDominantHand(), item);
 	}
 	virtual void OnEquipLeftHand(TObjectPtr < UItemObject > item) override {
 		OnEquip(true, item);
@@ -334,22 +378,26 @@ public:
 		OnEquip(false, item);
 	}
 	inline void OnEquip(bool leftHand, TObjectPtr < UItemObject > item) {
-		GameMovement->Combat.EquipItem(leftHand, item);
-		bool wasUnsheathed = !GameMovement->Combat.isSheathed();
-		GameMovement->Combat.sheath(false, item->isSheathedOnTheBack(), GetMesh());
-		if (wasUnsheathed) {// this will happen if user changes weapon before unsheathing it
+		USkeletalMeshComponent * mesh = GetMesh();
+		GameMovement->Combat.GetSide(leftHand).EquipItem(this, mesh , item);
+		if (GameMovement->Combat.isSheathed()) {// this will happen if user changes weapon before unsheathing it
 			GameMovement->becomeArmed(Inventory);
+		}else{
+			GameMovement->Combat.GetSide(leftHand).sheath(mesh);
+			
 		}
 	}
 	virtual void OnUnequipBothHands(TObjectPtr < UItemObject > item) override {
-		OnUnequipRightHand(item);
+		GameMovement->Combat.Left.Unequip();
+		GameMovement->Combat.Right.Unequip();
+		GameMovement->becomeUnarmed();
 	}
 	virtual void OnUnequipLeftHand(TObjectPtr < UItemObject > item) override {
-		GameMovement->Combat.UnequipLeftHand();
+		GameMovement->Combat.Left.Unequip();
 		GameMovement->becomeUnarmed();
 	}
 	virtual void OnUnequipRightHand(TObjectPtr < UItemObject > item) override {
-		GameMovement->Combat.UnequipRightHand();
+		GameMovement->Combat.Right.Unequip();
 		GameMovement->becomeUnarmed();
 	}
 	virtual void OnEquipClothes(TObjectPtr < UItemObject > item) override;

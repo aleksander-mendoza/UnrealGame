@@ -30,9 +30,17 @@ enum class EItemClass : uint8
 	NONE UMETA(DisplayName = "placeholder when no item exists"),
 	
 };
+
+inline bool isLeftTheDominantHand(EItemClass c) {
+	return c == EItemClass::BOW;
+}
 inline bool isDoubleHanded(EItemClass c){
 	return c == EItemClass::DOUBLE_HANDED_WEAPON || c == EItemClass::BOW;
 }
+inline bool isSheathedOnTheBack(EItemClass c) {
+	return c == EItemClass::DOUBLE_HANDED_WEAPON || c == EItemClass::BOW || c == EItemClass::SHIELD;
+}
+
 inline bool isWearable(EItemClass c) {
 	return c == EItemClass::FEMALE_CLOTHES
 		|| c == EItemClass::MALE_CLOTHES

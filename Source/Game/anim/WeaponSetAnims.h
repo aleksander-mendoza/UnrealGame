@@ -22,6 +22,9 @@ struct GAME_API FWeaponSetAnims
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FWeaponAnims SingleHanded;
 
+	/** Bow animation*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FWeaponAnims Bow;
 
 	/** Single-handed fighting animation*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -62,6 +65,8 @@ struct GAME_API FWeaponSetAnims
 			return &DoubleHanded;
 		case EMeleeAttackClass::SINGLE_HANDED_WEAPON:
 			return &SingleHanded;
+		case EMeleeAttackClass::BOW:
+			return &Bow;
 		default:
 			check(false);
 		case EMeleeAttackClass::BARE_HANDED:

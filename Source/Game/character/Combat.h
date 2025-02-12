@@ -24,9 +24,13 @@ struct FAnyMesh {
 
 	UPROPERTY()
 	TObjectPtr<USkeletalMeshComponent> skeletal;
+	
 	bool isSkeletal;
+
+	UPROPERTY()
 	TObjectPtr<UItemObject> Item;
-	bool sheathesOnBack = false;
+	
+	EItemClass itemClass;
 
 	inline UPrimitiveComponent * getComponent() {
 		return isSkeletal ? (UPrimitiveComponent *) skeletal : ztatic;
@@ -65,8 +69,8 @@ struct FAnyMesh {
 			}
 		}else{
 			FItem* row = item->Instance.getRow();
-			isSkeletal = row->Mesh.IsNull();
-			sheathesOnBack = row->isSheathedOnTheBack();
+			isSkeletal = row->isSkeletal();
+			itemClass = row->Class;
 			wasNewlyCreated = create(outer);
 			if (isSkeletal) {
 				skeletal->SetSkeletalMesh(row->getSkeletalMesh());
@@ -79,7 +83,7 @@ struct FAnyMesh {
 		return wasNewlyCreated;
 	}
 	
-	inline UPrimitiveComponent* findSocket(FVector & location, FRotator & rotation, const FName& itemSocket) {
+	inline UPrimitiveComponent* findSocket(FVector & location, FRotator & rotation, const FName itemSocket) {
 		if (isSkeletal) {
 			USkeletalMesh* const itemMesh = skeletal->SkeletalMesh;
 			if (itemMesh) {
@@ -108,7 +112,7 @@ struct FAnyMesh {
 		c->SetRelativeLocation(location);
 		c->SetRelativeRotation(rotation);
 	}
-	inline void attach(USkeletalMeshComponent* const characterMesh, const FName& itemSocket, const FName& characterSocket) {
+	inline void attach(USkeletalMeshComponent* const characterMesh, const FName& itemSocket, const FName characterSocket) {
 		if (Item) {
 			FVector location;
 			FRotator rotation;
@@ -179,6 +183,19 @@ struct GAME_API FCombatOneSide
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
 	FName SheathedSocketBack;
 
+
+	inline FName getSheathedSocketName() const {
+		switch (HandMesh.itemClass) {
+		default:
+			return SheathedSocket;
+		case EItemClass::BOW:
+			return TEXT("bowSocket");
+		case EItemClass::DOUBLE_HANDED_WEAPON:
+		case EItemClass::SHIELD:
+			return SheathedSocketBack;
+		}
+	}
+
 	UPROPERTY()
 	FAnyMesh HandMesh;
 
@@ -190,9 +207,7 @@ struct GAME_API FCombatOneSide
 	bool enableFootHitDetection;
 
 	bool isSheathed = true;
-	inline FName& getSheathedSocketName() {
-		return HandMesh.sheathesOnBack ? SheathedSocketBack : SheathedSocket;
-	}
+	
 	inline FAnySocketh& getBladeSocket(bool start) {
 		return start ? BladeStart : BladeEnd;
 	}
@@ -285,6 +300,12 @@ struct GAME_API FCombat
 	FCombat();
 	class AGameCharacter* GameCharacter;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> BowDrawArrow;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Animations, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> BowShootArrow;
+
 	/** Hand socket (right)*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Sockets, meta = (AllowPrivateAccess = "true"))
 	FCombatOneSide Left;
@@ -313,7 +334,7 @@ struct GAME_API FCombat
 	inline FCombatOneSide& GetSide(bool leftHand) {
 		return leftHand ? Left: Right;
 	}
-	inline FName& SheathedSocketName(bool leftHand) {
+	inline const FName& SheathedSocketName(bool leftHand) {
 		return GetSide(leftHand).getSheathedSocketName();
 	}
 	inline FAnyMesh & ItemMesh(bool leftHand)  {

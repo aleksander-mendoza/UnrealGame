@@ -27,21 +27,28 @@ void UInventoryEntry::NativeOnListItemObjectSet(UObject* ListItemObject)
 	DamageLabel->SetText(FText::AsNumber(row->Damage));
 }
 void UInventoryEntry::setStatus() {
-	if (Item->equippedAt == -4) {
-		StatusLabel->SetText(FText::FromString("LR"));
+	const char* c;
+	switch (Item->equippedAt) {
+		case EQUIPPED_AT_PROJECTILE:
+			c = ">";
+			break;
+		case EQUIPPED_AT_DOUBLEHANDED:
+			c = "LR";
+			break;
+		case EQUIPPED_AT_NONE:
+			c = "";
+			break;
+		case EQUIPPED_AT_LEFT_HAND:
+			c = "L";
+			break;
+		case EQUIPPED_AT_RIGHT_HAND:
+			c = "R";
+			break;
+		default:
+			c = "*";
+			break;
 	}
-	else if (Item->equippedAt == -3) {
-		StatusLabel->SetText(FText::FromString(""));
-	}
-	else if (Item->equippedAt == -2) {
-		StatusLabel->SetText(FText::FromString("L"));
-	}
-	else if (Item->equippedAt == -1) {
-		StatusLabel->SetText(FText::FromString("R"));
-	}
-	else if (Item->equippedAt >= 0) {
-		StatusLabel->SetText(FText::FromString("*"));
-	}
+	StatusLabel->SetText(FText::FromString(c));
 }
 void UInventoryEntry::NativeOnItemSelectionChanged(bool bIsSelected)
 {

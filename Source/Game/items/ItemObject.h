@@ -6,7 +6,11 @@
 #include "ItemInstance.h"
 #include "ItemObject.generated.h"
  
-
+#define EQUIPPED_AT_PROJECTILE -5
+#define EQUIPPED_AT_DOUBLEHANDED -4
+#define EQUIPPED_AT_NONE -3
+#define EQUIPPED_AT_LEFT_HAND -2
+#define EQUIPPED_AT_RIGHT_HAND -1
 UCLASS()
 class GAME_API UItemObject : public UObject
 {
@@ -17,15 +21,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FItemInstance Instance;
 
+	// -5 = selected as projectile
 	// -4 = held in both hands
 	// -3 = not equipped
 	// -2 = held in left hand
 	// -1 = held in right hand
 	// n>=0 = equipped as clothes at n-th index in clothes stack
 	UPROPERTY(BlueprintReadOnly)
-	int equippedAt = -3;
+	int equippedAt = EQUIPPED_AT_NONE;
+
 
 	class UActorInventory* container=nullptr;
+
+	
 	inline USkeletalMesh* getSkeletalMesh() {
 		return Instance.getSkeletalMesh();
 	}

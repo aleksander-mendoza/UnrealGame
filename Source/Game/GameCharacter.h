@@ -21,7 +21,7 @@
 #include "character/Interactable.h"
 #include "character/Hairdo.h"
 #include "ui/NpcHealthBar.h"
-
+#include "character/HealthEvents.h"
 #include "character/GameCharacterMovementComponent.h"
 #include "anim/CharacterAnimInstance.h"
 #include "anim/WeaponSetAnims.h"
@@ -42,7 +42,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 
 UCLASS(config=Game)
-class AGameCharacter : public ACharacter , public ContainerEvents, public IHittable, public IInteractable, public HealthEvents
+class AGameCharacter : public ACharacter , public ContainerEvents, public IHittable, public IInteractable, public IHealthEvents
 {
 	GENERATED_BODY()
 
@@ -137,6 +137,13 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 
 public:
 	class AGamePlayerController* GameController = nullptr;
+
+	AGameCharacter* getPlayerCharacter() const;
+
+	inline FVector getPlayerCameraLocation() const {
+		return getPlayerCharacter()->GetCurrentCamera()->GetComponentLocation();
+	}
+
 	FDataTableRowHandle getHairdo() const {
 		return Hairdo;
 	}
@@ -164,6 +171,7 @@ public:
 	UCharacterAnimInstance* animInstane = nullptr;
 	UCharacterAnimInstance* getAnimInstance() {
 		if (animInstane == nullptr)animInstane = Cast<UCharacterAnimInstance>(GetMesh()->GetAnimInstance());
+		check(GetMesh()->GetAnimInstance());
 		check(animInstane);
 		return animInstane;
 	}
@@ -171,7 +179,9 @@ public:
 
 	explicit AGameCharacter(const FObjectInitializer & ObjectInitializer);
 	
-
+	inline FVector getHeadLocation() {
+		return GetPawnViewLocation(); //FirstPersonCamera->GetComponentLocation();
+	}
 	inline bool isEnabled() const {
 		return this->IsHidden();
 	}
@@ -304,8 +314,12 @@ public:
 	UCameraComponent* GetCurrentCamera() {
 		return FollowCamera->IsActive() ? FollowCamera : FirstPersonCamera;
 	}
+	class AItemActorProjectile * Shoot(double speed);
 	void NotifyAttackAnimationFinished() {
 		GameMovement->NotifyAttackAnimationFinished();
+	}
+	void NotifyBowReadyToShoot() {
+		GameMovement->NotifyBowReadyToShoot();
 	}
 	void OnComboPartEnd() {
 		GameMovement->OnComboPartEnd();
@@ -328,8 +342,8 @@ public:
 		GameMovement->Kill(killer);
 	}
 	
-	virtual void OnHit(AGameCharacter * actor, UItemObject* weaponUsed, float damage) override{
-		GameMovement->Hit(actor, weaponUsed, damage);
+	virtual void OnHit(AGameCharacter* actor, UItemObject* weaponUsed, UItemObject* projectile, float damage) override {
+		GameMovement->Hit(actor, weaponUsed, projectile, damage);
 	}
 
 	void showHealthBar(bool visible);
@@ -351,6 +365,11 @@ public:
 		
 	}
 	virtual void OnKilled(AGameCharacter* killer) override {
+		if (HealthBarComponent != nullptr) {
+			HealthBarComponent->DestroyComponent();
+			HealthBarComponent = nullptr;
+			HealthBar = nullptr;
+		}
 		TObjectPtr<UAnimMontage> anim = GameMovement->Combat.getDeathAnim();
 		if (anim) {
 			getAnimInstance()->Montage_Play(anim);

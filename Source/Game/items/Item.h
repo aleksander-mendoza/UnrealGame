@@ -136,6 +136,9 @@ struct GAME_API FItem : public FTableRowBase
 	inline bool isSheathedOnTheBack() {
 		return ::isSheathedOnTheBack(Class);
 	}
+	inline bool isSkeletal() {
+		return Mesh.IsNull();
+	}
 	/**If the weapon is double-handed then one of the hands is dominant. 
 	It determines which socket the mesh is actually attached to. 
 	So if animation requires the weapon to be temporarily held in just one hand,

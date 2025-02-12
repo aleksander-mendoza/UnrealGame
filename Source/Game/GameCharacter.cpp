@@ -24,6 +24,12 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 //////////////////////////////////////////////////////////////////////////
 // AGameCharacter
 
+AGameCharacter* AGameCharacter::getPlayerCharacter() const
+{
+	check(worldRef != nullptr);
+	return worldRef->PlayerPawn;
+}
+
 AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer.SetDefaultSubobjectClass<UGameCharacterMovementComponent>(CharacterMovementComponentName))
 {
 	// Set size for collision capsule
@@ -76,7 +82,6 @@ AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Su
 	GameMovement = Cast<UGameCharacterMovementComponent>(GetMovementComponent());
 	check(IsValid(GameMovement));
 	GameMovement->GameCharacter = this;
-	GameMovement->Health.listener = this;
 
 	dialogueStage = &DialogueDatabase::INITIALIZE_GENERIC_CONVERSATION;
 
@@ -90,6 +95,10 @@ void AGameCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();	
+	if (worldRef == nullptr) {
+		worldRef = Cast<AOpenWorld>(UGameplayStatics::GetActorOfClass(GetWorld(), AOpenWorld::StaticClass()));
+		check(worldRef != nullptr);
+	}
 	ToggleDirectionalMovement(true);
 	Inventory->ResetToDefault(GetWorld());
 
@@ -106,6 +115,13 @@ void AGameCharacter::SetCameraDistance(float distance) {
 		ToggleCamera(false);
 		this->GetCameraBoom()->TargetArmLength = math::min(MaxZoomOut, distance);
 	}
+}
+AItemActorProjectile* AGameCharacter::Shoot(double speed) {
+	UItemObject * projectileItem = Inventory->decrementProjectileCount();
+	if (projectileItem) {
+		return worldRef->shootProjectile(this, projectileItem, speed);
+	}
+	return nullptr;
 }
 void AGameCharacter::CameraZoomOut(const FInputActionValue& Value) {
 	if (this->FirstPersonCamera->IsActive()) {
@@ -239,17 +255,26 @@ double3 AGameCharacter::getRayEnd(double length) {
 	return ray.end;
 }
 
+
 void AGameCharacter::showHealthBar(bool visible)
 {
+	check(IsValid(GetWorld()));
 	if (visible && HealthBarComponent == nullptr) {
 		HealthBarComponent = NewObject<UWidgetComponent>(this, UWidgetComponent::StaticClass());
 		HealthBarComponent->SetWidgetClass(HealthBarClass);
 		UCapsuleComponent* capsule = GetCapsuleComponent();
-		HealthBarComponent->SetRelativeLocation(FVector(0, capsule->GetScaledCapsuleHalfHeight(), 0));
+		float radius, halfHeight;
+		capsule->GetScaledCapsuleSize(radius, halfHeight);
+		HealthBarComponent->SetRelativeLocation(FVector(0, 0, 0));
+		HealthBarComponent->SetDrawSize(FVector2D(radius*4, halfHeight*2));
+		check(IsValid(HealthBarComponent->GetWorld()));
+		HealthBarComponent->InitWidget();
 		HealthBarComponent->RegisterComponent();
 		HealthBarComponent->AttachToComponent(capsule, FAttachmentTransformRules::SnapToTargetIncludingScale);
+		
 
 		HealthBar = Cast<UNpcHealthBar>(HealthBarComponent->GetWidget());
+		HealthBar->Health->SetPercent(GameMovement->Health.getHealthPercentage());
 	}
 	HealthBarComponent->SetHiddenInGame(!visible);
 }
@@ -293,7 +318,11 @@ void AGameCharacter::Tick(float DeltaTime) {
 		double3 pos = getRayEnd(physicshandleDistance);
 		PhysicsHandle->SetTargetLocation(pos);
 	}
-	
+	if (HealthBar!=nullptr && HealthBar->IsVisible()) {
+		FVector camPos = getPlayerCameraLocation();
+		FRotator rot = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), camPos);
+		HealthBarComponent->SetWorldRotation(rot);
+	}
 	
 	
 }

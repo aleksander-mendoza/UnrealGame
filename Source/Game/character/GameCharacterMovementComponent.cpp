@@ -41,6 +41,21 @@ UAnimInstance* UGameCharacterMovementComponent::getAnimInstance()
 	return GameCharacter->getAnimInstance();
 }
 
+void UGameCharacterMovementComponent::attackEnd() {
+	if (ArmedPoseType == EArmedPoseType::BOW_AIMED) {
+		ArmedPoseType = EArmedPoseType::BOW;
+		if (bowReadyToShoot) {
+			if (Combat.BowShootArrow != nullptr) {
+				getAnimInstance()->Montage_Play(Combat.BowShootArrow);
+			}
+			GameCharacter->Shoot(1000);
+		}
+		bowShot = true;
+		EnableAttacking(BowAttackCooldown);
+	}
+	wantsToAttack = false;
+}
+
 void UGameCharacterMovementComponent::HitDetectHand(bool leftHand)
 {
 	TArray<FHitResult> OutHit;
@@ -49,11 +64,20 @@ void UGameCharacterMovementComponent::HitDetectHand(bool leftHand)
 		const float damage = Health.getDamage(item);
 		for (int i = 0; i < OutHit.Num(); i++) {
 			IHittable* c = Cast< IHittable>(OutHit[i].GetActor());
-			if (c)c->OnHit(GameCharacter, item, damage);
+			if (c)c->OnHit(GameCharacter, item, nullptr, damage);
 		}
 	}
 }
 
+
+void UGameCharacterMovementComponent::Hit(AGameCharacter* actor, UItemObject* weaponUsed, UItemObject* projectile, float damage)
+{
+	if (invincibilityDuration <= 0) {
+		if (Health.damage(GameCharacter, actor, damage)) {
+			invincibilityDuration = INVINCIBILITY_AFTER_HIT;
+		}
+	}
+}
 
 void UGameCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
@@ -61,7 +85,7 @@ void UGameCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevel
 	if (invincibilityDuration > 0) {
 		invincibilityDuration -= DeltaTime;
 	}
-	Health.tick(DeltaTime);
+	Health.tick(GameCharacter, DeltaTime);
 	if (IsRunning()) {
 		if (Health.UpdateRunning(DeltaTime)) {
 			StartWalking();

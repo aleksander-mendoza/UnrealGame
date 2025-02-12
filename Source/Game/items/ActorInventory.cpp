@@ -35,53 +35,87 @@ void UActorInventory::TickComponent(float DeltaTime, ELevelTick TickType, FActor
 	
 }
 
-bool UActorInventory::equipItem(UItemObject* item, bool leftHand, bool unequipClothesWithOverlappingSlots)
+bool UActorInventory::equipItem(TObjectPtr<UItemObject> item, bool leftHand, bool unequipClothesWithOverlappingSlots)
 {
 	const FItem* meta = item->Instance.getRow();
-	if (meta->isWearable()) {
-		if (containerEvents && !containerEvents->CanWear(*meta)) return false;
-		if (!canPutOn(*meta)) {
-			if (unequipClothesWithOverlappingSlots && canMakeSpaceFor(*meta)) {
-				const bool r = makeSpaceFor<true>(*meta);
-				check(r);
-			}
-			else {
-				return false;
-			}
+	const EItemClass itemClass = meta->Class;
+	switch (itemClass) {
+		case EItemClass::PROP:
+			break;
+		case EItemClass::DOUBLE_HANDED_WEAPON:
+		case EItemClass::SINGLE_HANDED_WEAPON:
+		case EItemClass::BOW:
+		case EItemClass::SPEAR:
+		case EItemClass::SINGLE_HANDED_QUIET_WEAPON:
+		case EItemClass::SHIELD: {
+			takeInHand(item, leftHand);
+			return true;
 		}
-		const bool r = addClothingItem<true>(item);
-		check(r);
-		return true;
+		case EItemClass::FEMALE_CLOTHES:
+		case EItemClass::MALE_CLOTHES:
+		case EItemClass::FEMALE_LIGHT_ARMOR:
+		case EItemClass::MALE_LIGHT_ARMOR:
+		case EItemClass::FEMALE_HEAVY_ARMOR:
+		case EItemClass::MALE_HEAVY_ARMOR: {
+			if (containerEvents && !containerEvents->CanWear(*meta)) return false;
+			if (!canPutOn(*meta)) {
+				if (unequipClothesWithOverlappingSlots && canMakeSpaceFor(*meta)) {
+					const bool r = makeSpaceFor<true>(*meta);
+					check(r);
+				}
+				else {
+					return false;
+				}
+			}
+			const bool r = addClothingItem<true>(item);
+			check(r);
+			return true;
+		}
+		case EItemClass::PROJECTILE: {
+			selectProjectile(item);
+			return true;
+		}
+		case EItemClass::BOOK:
+			break;
+		case EItemClass::POTION:
+			break;
+		case EItemClass::FOOD:
+			break;
+		case EItemClass::KEY:
+			break;
+		case EItemClass::NONE:
+			break;
 	}
-	else {
-		takeInHand(item, leftHand);
-		return true;
-	}
-	
+	return false;
 }
 
-bool UActorInventory::unequipItem(UItemObject* item, bool force)
+bool UActorInventory::unequipItem(TObjectPtr<UItemObject> item, bool force)
 {
 	check(item->container == this);
-	if (item->equippedAt >= 0) {
+	switch(item->equippedAt) {
+	default:
 		if (force)return removeClothingItem<false>(item);
 		else return removeClothingItem<true>(item);
-	}
-	else if (item->equippedAt == -1) {
+	case EQUIPPED_AT_RIGHT_HAND:
 		check(item == RightHand);
 		emptyRightHand();
 		return true;
-	}
-	else if (item->equippedAt == -2) {
+	case EQUIPPED_AT_LEFT_HAND:
 		check(item == LeftHand);
 		emptyLeftHand();
 		return true;
-	}
-	else if (item->equippedAt == -4) {
+	case EQUIPPED_AT_DOUBLEHANDED:
 		check(item == RightHand);
 		check(item == LeftHand);
 		emptyBothHands();
 		return true;
+	case EQUIPPED_AT_PROJECTILE:
+		check(SelectedProjectile == item);
+		SelectedProjectile = nullptr;
+		return true;
+	case EQUIPPED_AT_NONE:
+		check(false);
+		break;
 	}
 	return false;
 }

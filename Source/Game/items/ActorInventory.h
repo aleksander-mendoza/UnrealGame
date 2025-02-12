@@ -30,10 +30,14 @@ public:
 	UPROPERTY()
 	TArray< TObjectPtr<UItemObject>> Clothes;
 
+	/**The item that will be shot from a bow*/
+	UPROPERTY()
+	TObjectPtr < UItemObject> SelectedProjectile;
+
 	/**These is the item that is currently held in left hand*/
 	UPROPERTY()
 	TObjectPtr < UItemObject> LeftHand;
-
+	
 	/**These is the item that is currently held in right hand (it could be the same object as in left hand. This is the case for double-handed weapons)*/
 	UPROPERTY()
 	TObjectPtr < UItemObject> RightHand;
@@ -55,6 +59,25 @@ public:
 	ContainerEvents* containerEvents;
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	inline TObjectPtr<UItemObject> decrementProjectileCount() {
+		if (SelectedProjectile != nullptr) {
+			if (SelectedProjectile->Instance.Quantity > 1) {
+				SelectedProjectile->Instance.Quantity--;
+				TObjectPtr<UItemObject> p  = NewObject<UItemObject>(GetWorld(), UItemObject::StaticClass());
+				p->Instance = SelectedProjectile->Instance;
+				p->Instance.Quantity = 1;
+				return p;
+			}
+			else {
+				TObjectPtr<UItemObject> p = SelectedProjectile;
+				p->equippedAt = EQUIPPED_AT_NONE;
+				p->container = nullptr;
+				SelectedProjectile = nullptr;
+				return p;
+			}
+		}
+		return nullptr;
+	}
 	inline TObjectPtr < UItemObject>  getHandItem(bool leftHand) {
 		return leftHand ? LeftHand : RightHand;
 	}
@@ -259,6 +282,15 @@ public:
 			}
 		}
 	}
+	inline void selectProjectile(TObjectPtr<UItemObject> item) {
+		if (SelectedProjectile != nullptr) {
+			SelectedProjectile->equippedAt = EQUIPPED_AT_NONE;
+		}
+		if (item) {
+			SelectedProjectile = item;
+			SelectedProjectile->equippedAt = EQUIPPED_AT_PROJECTILE;
+		}
+	}
 	inline void takeInHand(TObjectPtr<UItemObject> item, bool left) {
 		check(item->container == this);
 		FItem * i = item->getRow();
@@ -267,39 +299,47 @@ public:
 			emptyLeftHand();
 			LeftHand = item;
 			RightHand = item;
-			item->equippedAt = -4;
+			item->equippedAt = EQUIPPED_AT_DOUBLEHANDED;
 			if (containerEvents)containerEvents->OnEquipBothHands(item);
 			check(isAllValid());
 		}
 		else if(left){
 			emptyLeftHand();
 			LeftHand = item;
-			item->equippedAt = -2;
+			item->equippedAt = EQUIPPED_AT_LEFT_HAND;
 			if (containerEvents)containerEvents->OnEquipLeftHand(item);
 		}
 		else {
 			emptyRightHand();
 			RightHand = item;
-			item->equippedAt = -1;
+			item->equippedAt = EQUIPPED_AT_RIGHT_HAND;
 			if (containerEvents)containerEvents->OnEquipRightHand(item);
 		}
 	}
 	template<bool onlyIfNotDevious>
 	inline bool dropItem(TObjectPtr<UItemObject> item) {
 		check(item->container == this);
-		if (item->equippedAt == -4) {
-			emptyBothHands();
-		}else if (item->equippedAt == -2) {
-			emptyLeftHand();
-		}else if (item->equippedAt == -1) {
-			emptyRightHand();
+		switch (item->equippedAt) {
+			case EQUIPPED_AT_PROJECTILE:
+				SelectedProjectile = nullptr;
+				break;
+			case EQUIPPED_AT_DOUBLEHANDED:
+				emptyBothHands();
+				break;
+			case EQUIPPED_AT_NONE:
+				break;
+			case EQUIPPED_AT_LEFT_HAND:
+				emptyLeftHand();
+				break;
+			case EQUIPPED_AT_RIGHT_HAND:
+				emptyRightHand();
+				break;
+			default:
+				if (!removeClothingItem<onlyIfNotDevious>(item)) {
+					return false;
+				}
 		}
-		else if (item->equippedAt >= 0) {
-			if (!removeClothingItem<onlyIfNotDevious>(item)) {
-				return false;
-			}
-		}
-		item->equippedAt = -3;
+		item->equippedAt = EQUIPPED_AT_NONE;
 		item->container = nullptr;
 		bool b = Items.RemoveSingleSwap(item)!=0;
 		check(b);
@@ -318,11 +358,11 @@ public:
 	1. it was clothing item but not for this character (mismatched geneder/race)
 	2. unequipClothesWithOverlappingSlots was set to false and the character was already wearing clothes with overlapping slots
 	3. unequipClothesWithOverlappingSlots was set to true but one of the already equipped conflicting items was devious */
-	bool equipItem(UItemObject* item, bool leftHand, bool unequipClothesWithOverlappingSlots = true);
+	bool equipItem(TObjectPtr<UItemObject> item, bool leftHand, bool unequipClothesWithOverlappingSlots = true);
 	/**Returns false if the item couldn't be unequipped. This can happend in case of clothes that are marked as devious. Use force=true to force the lock open*/
-	bool unequipItem(UItemObject* item, bool force = false);
+	bool unequipItem(TObjectPtr<UItemObject> item, bool force = false);
 
-	bool toggleItem(UItemObject* item, bool leftHand, bool unequipClothesWithOverlappingSlots = true, bool force = false) {
+	bool toggleItem(TObjectPtr<UItemObject> item, bool leftHand, bool unequipClothesWithOverlappingSlots = true, bool force = false) {
 		if (item->equippedAt == -3) {
 			return equipItem(item, leftHand, unequipClothesWithOverlappingSlots);
 		}

@@ -23,10 +23,11 @@ enum class EItemClass : uint8
 	MALE_LIGHT_ARMOR UMETA(DisplayName = "male light armor"),
 	FEMALE_HEAVY_ARMOR UMETA(DisplayName = "female heavy armor"),
 	MALE_HEAVY_ARMOR UMETA(DisplayName = "male heavy armor"),
+	PROJECTILE UMETA(DisplayName = "projectile"),
 	BOOK UMETA(DisplayName = "book"),
 	POTION UMETA(DisplayName = "potion"),
 	FOOD UMETA(DisplayName = "food"),
-	KEY UMETA(DisplayName = "food"),
+	KEY UMETA(DisplayName = "key"),
 	NONE UMETA(DisplayName = "placeholder when no item exists"),
 	
 };
@@ -39,6 +40,13 @@ inline bool isDoubleHanded(EItemClass c){
 }
 inline bool isSheathedOnTheBack(EItemClass c) {
 	return c == EItemClass::DOUBLE_HANDED_WEAPON || c == EItemClass::BOW || c == EItemClass::SHIELD;
+}
+inline bool isEquippable(EItemClass c) {
+	return c == EItemClass::DOUBLE_HANDED_WEAPON 
+		|| c == EItemClass::SINGLE_HANDED_WEAPON 
+		|| c == EItemClass::BOW 
+		|| c == EItemClass::SPEAR
+		|| c == EItemClass::SHIELD;
 }
 
 inline bool isWearable(EItemClass c) {

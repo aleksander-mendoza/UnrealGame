@@ -8,11 +8,6 @@
 // Sets default values
 AItemActor::AItemActor()
 {
-	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh"));
-	Mesh->SetMobility(EComponentMobility::Movable);
-	Mesh->SetSimulatePhysics(true);
-	//Mesh->RegisterComponent();
-	Mesh->SetupAttachment(RootComponent);
 	this->SetActorHiddenInGame(true);
 	PrimaryActorTick.bCanEverTick = false;
 
@@ -25,18 +20,3 @@ bool AItemActor::OnInteract(AGameCharacter* actor)
 	Item = nullptr;
 	return true;
 }
-
-// Called when the game starts or when spawned
-void AItemActor::BeginPlay()
-{
-	Super::BeginPlay();
-	
-}
-
-// Called every frame
-void AItemActor::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
-

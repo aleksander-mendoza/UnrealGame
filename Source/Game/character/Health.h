@@ -6,10 +6,10 @@
 #include "Components/ActorComponent.h"
 #include "../ui/Status.h"
 #include "../items/ItemObject.h"
-#include "HealthEvents.h"
+//#include "HealthEvents.h"
 #include "Health.generated.h"
 
-
+class AGameCharacter;
 
 USTRUCT(BlueprintType)
 struct GAME_API FHealth
@@ -24,7 +24,8 @@ struct GAME_API FHealth
 	//////////////// SURVIVAL         //////////////
 	////////////////////////////////////////////////
 
-	HealthEvents * listener;
+	
+	
 	float PreventStaminaRegen = 0;
 	float PreventHealthRegen = 0;
 	float PreventMagicRegen = 0;
@@ -71,7 +72,9 @@ struct GAME_API FHealth
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float Alcohol;
 
-
+	inline float getHealthPercentage() {
+		return Health / MaxHealth;
+	}
 	void setStamina(float stamina) {
 		if (stamina > MaxStamina) stamina = MaxStamina;
 		if (Widget)Widget->Stamina->SetPercent(stamina / MaxStamina);
@@ -86,44 +89,15 @@ struct GAME_API FHealth
 		return false;
 	}
 
-	inline void setHealth(float hp) {
-		if (hp > MaxHealth) hp = MaxHealth;
-		if (Widget)Widget->Stamina->SetPercent(hp / MaxHealth);
-		if (listener)listener->OnHealthChanged(hp, MaxHealth);
-		Health = hp;
-	}
+	void setHealth( AGameCharacter* character, float hp);
 
-	void takeHealth( float health) {
+	void takeHealth( AGameCharacter* character, float health) {
 		check(health >= 0);
-		setHealth(Health - health);
+		setHealth(character, Health - health);
 	}
-	bool damage(class AGameCharacter* attacker, float health) {
-		check(health >= 0);
-		if (Health >= health) {
-			setHealth(Health - health);
-			if (listener)listener->OnDamage(attacker, Health);
-			return true;
-		}
-		else {
-			if (listener)listener->OnKilled(attacker);
-			return false;
-		}
-
-
-	}
-	inline void kill(class AGameCharacter* killer) {
-		Health = 0;
-		if(listener)listener->OnKilled(killer);
-	}
-	inline void heal(float health) {
-		check(health >= 0);
-		if (Health < MaxHealth) {
-			setHealth(Health + health);
-			if (Health >= MaxHealth) {
-				if (listener)listener->OnFullHealth();
-			}
-		}
-	}
+	bool damage(AGameCharacter* character, AGameCharacter* attacker, float health);
+	void kill( AGameCharacter* character,  AGameCharacter* killer);
+	void heal( AGameCharacter* character, float health);
 
 	void setMagic(float m) {
 		if (m > MaxMagic) m = MaxMagic;
@@ -443,40 +417,12 @@ struct GAME_API FHealth
 	void resetWidget() {
 		if (IsValid(Widget)) {
 			if (Widget->Stamina)Widget->Stamina->SetPercent(Stamina / MaxStamina);
-			if (Widget->Health)Widget->Health->SetPercent(Health / MaxHealth);
+			if (Widget->Health)Widget->Health->SetPercent(getHealthPercentage());
 			if (Widget->Magic)Widget->Magic->SetPercent(Magic / MaxMagic);
 			if (Widget->Arousal)Widget->Arousal->SetPercent(Arousal);
 		}
 	}
 
 
-	inline void tick(float DeltaTime) {
-		if (Magic < MaxMagic) {
-			if (PreventMagicRegen > 0) {
-				PreventMagicRegen -= DeltaTime;
-			}
-			else {
-				setMagic(Magic + MagicRegenSpeed * DeltaTime);
-			}
-		}
-
-		if (Health < MaxHealth) {
-			if (PreventHealthRegen > 0) {
-				PreventHealthRegen -= DeltaTime;
-			}
-			else {
-				heal(HealthRegenSpeed * DeltaTime);
-			}
-		}
-
-		if (Stamina < MaxStamina) {
-			if (PreventStaminaRegen > 0) {
-				PreventStaminaRegen -= DeltaTime;
-			}
-			else {
-				setStamina(Stamina + StaminaRegenSpeed * DeltaTime);
-			}
-		}
-	}
-		
+	void tick( AGameCharacter * character, float DeltaTime);
 };

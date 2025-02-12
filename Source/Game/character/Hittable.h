@@ -22,5 +22,5 @@ class GAME_API IHittable
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void OnHit(class AGameCharacter* actor, class UItemObject* weaponUsed, float damage) = 0;
+	virtual void OnHit(class AGameCharacter* actor, class UItemObject* weaponUsed, class UItemObject* projectile, float damage) = 0;
 };

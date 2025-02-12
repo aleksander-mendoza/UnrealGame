@@ -268,6 +268,11 @@ public:
 			case EItemClass::BOW:
 				if (leftHand) {
 					ArmedPoseType = EArmedPoseType::BOW_AIMED;
+					bowReadyToShoot = false;
+					if (Combat.BowDrawArrow != nullptr) {
+						getAnimInstance()->Montage_Play(Combat.BowDrawArrow);
+					}
+					DisableAttacking();
 				}// TODO: right handed attack with bow allows for zoom-in
 				//if (listener)listener->OnBowAimStarted(weapon);
 				break;
@@ -314,14 +319,7 @@ public:
 			attackEnd();
 		}
 	}
-	void attackEnd() {
-		if (ArmedPoseType==EArmedPoseType::BOW_AIMED) {
-			ArmedPoseType = EArmedPoseType::BOW;
-			bowShot = true;
-			EnableAttacking(BowAttackCooldown);
-		}
-		wantsToAttack = false;
-	}
+	void attackEnd();
 	
 	void attackCancel() {
 		wantsToAttack = false;
@@ -359,6 +357,10 @@ public:
 			return SingleHandedAttackCooldown;
 		}
 	}
+	bool bowReadyToShoot = false;
+	void NotifyBowReadyToShoot() {
+		bowReadyToShoot = true;
+	}
 	void NotifyAttackAnimationFinished() {
 		Combat.NotifyAttackAnimationFinished();
 		EnableAttacking(GetAttackCooldown());
@@ -379,15 +381,9 @@ public:
 		HitDetectHand(true);
 	}
 	float invincibilityDuration = 0;
-	void Hit(AGameCharacter* actor, UItemObject* weaponUsed, float damage) {
-		if (invincibilityDuration <= 0) {
-			if (Health.damage(actor, damage)) {
-				invincibilityDuration = INVINCIBILITY_AFTER_HIT;
-			}
-		}
-	}
+	void Hit(AGameCharacter* actor, UItemObject* weaponUsed, UItemObject* projectile, float damage);
 	void Kill(AGameCharacter* killer) {
-		Health.kill(killer);
+		Health.kill(GameCharacter, killer);
 	}
 	void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 };

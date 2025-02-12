@@ -6,7 +6,9 @@
 #include "GameFramework/Actor.h"
 #include "Logging/StructuredLog.h"
 #include "../blender/utildefines.h"
-#include "../items/ItemActor.h"
+#include "../items/ItemActorStatic.h"
+#include "../items/ItemActorProjectile.h"
+#include "../items/ItemActorSkeletal.h"
 #include "../GameCharacter.h"
 #include "OpenWorld.generated.h"
 
@@ -26,26 +28,34 @@ class GAME_API AOpenWorld : public AActor
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	class TSubclassOf<AGameCharacter> PlayerPawnClass;
 
-	UPROPERTY()
-	AGameCharacter* PlayerPawn;
+	
 
 	void PostInitializeComponents() override;
 
 	UPROPERTY()
-	TArray<TObjectPtr<AItemActor>> usedStaticActorPool;
+	TArray<AItemActorProjectile*> usedProjectileActorPool;
 	UPROPERTY()
-	TArray<TObjectPtr<AItemActor>> unusedStaticActorPool;
+	TArray<AItemActorProjectile*> unusedProjectileActorPool;
 
+	UPROPERTY()
+	TArray<AItemActorStatic*> usedStaticActorPool;
+	UPROPERTY()
+	TArray<AItemActorStatic*> unusedStaticActorPool;
 
 	UPROPERTY()
-	TArray<TObjectPtr<AGameCharacter>> usedNPCPool;
+	TArray<AItemActorSkeletal*> usedSkeletalActorPool;
 	UPROPERTY()
-	TArray<TObjectPtr<AGameCharacter>> unusedNPCPool;
+	TArray<AItemActorSkeletal*> unusedSkeletalActorPool;
+
+	UPROPERTY()
+	TArray<AGameCharacter*> usedNPCPool;
+	UPROPERTY()
+	TArray<AGameCharacter*> unusedNPCPool;
 
 
 	template<typename T>
-	inline TObjectPtr<T> spawnActor(TArray<TObjectPtr<T>> & usedPool, TArray<TObjectPtr<T>> & unusedPool, double3 loc, FRotator rot, UClass * clazz) {
-		TObjectPtr<T> a;
+	inline T* spawnActor(TArray<T*> & usedPool, TArray<T *> & unusedPool, double3 loc, FRotator rot, UClass * clazz) {
+		T* a;
 		/*for (int i = 0; i < unusedPool.Num(); i++) {
 			a = unusedPool[i];
 			check(!a->isEnabled());
@@ -70,29 +80,74 @@ class GAME_API AOpenWorld : public AActor
 		return a;
 	}
 	template<typename T>
-	inline void despawnActor(TArray<TObjectPtr<T>>& usedPool, TArray<TObjectPtr<T>>& unusedPool, TObjectPtr<T> actor) {
+	inline void despawnActor(TArray<T*>& usedPool, TArray<T*>& unusedPool, T* actor) {
 		usedPool.RemoveSingleSwap(actor);
 		unusedPool.Add(actor);
 		actor->SetEnabled(false);
 	}
 public:
+	UPROPERTY()
+	AGameCharacter* PlayerPawn;
+
 	UDataTable* getHairdos() const{
 		return Hairdos;
 	}
-	void despawnItem(TObjectPtr<AItemActor> item) {
-		despawnActor(usedStaticActorPool, unusedStaticActorPool, item);
+	void despawnItemStatic(AItemActorStatic * item) {
+		if (item->isProjectile()) {
+			despawnItemProjectile((AItemActorProjectile*)item);
+		}
+		else {
+			despawnActor(usedStaticActorPool, unusedStaticActorPool, item);
+		}
 	}
-	TObjectPtr<AItemActor> spawnItem(TObjectPtr<UItemObject> item, double3 loc,FRotator rot) {
-		TObjectPtr<AItemActor> a = spawnActor(usedStaticActorPool, unusedStaticActorPool, loc, rot, AItemActor::StaticClass());
-		UStaticMesh* mesh = item->getMesh();
-		a->setItem(item, mesh);
+	AItemActorStatic* spawnItemStatic(UItemObject* item, double3 loc,FRotator rot) {
+		TObjectPtr<AItemActorStatic> a = spawnActor(usedStaticActorPool, unusedStaticActorPool, loc, rot, AItemActorStatic::StaticClass());
+		a->setItem(item);
+		a->worldRef = this;
 		return a;
 	}
-	void despawnNPC(TObjectPtr<AGameCharacter> item) {
-		despawnActor(usedNPCPool, unusedNPCPool, item);
+	void despawnItemProjectile(AItemActorProjectile * item) {
+		despawnActor(usedProjectileActorPool, unusedProjectileActorPool, item);
 	}
-	TObjectPtr<AGameCharacter> spawnNPC(TObjectPtr<AGameCharacter> npc, double3 loc, FRotator rot) {
-		TObjectPtr<AGameCharacter> a = spawnActor(usedNPCPool, unusedNPCPool, loc, rot, PlayerPawnClass);
+	AItemActorProjectile* spawnItemProjectile(UItemObject* item, double3 loc, FRotator rot) {
+		AItemActorProjectile * a = spawnActor(usedProjectileActorPool, unusedProjectileActorPool, loc, rot, AItemActorProjectile::StaticClass());
+		a->setItem(item);
+		a->worldRef = this;
+		return a;
+	}
+	void despawnItemSkeletal(AItemActorSkeletal * item) {
+		despawnActor(usedSkeletalActorPool, unusedSkeletalActorPool, item);
+	}
+	AItemActorSkeletal * spawnItemSkeletal(UItemObject * item, double3 loc, FRotator rot) {
+		AItemActorSkeletal * a = spawnActor(usedSkeletalActorPool, unusedSkeletalActorPool, loc, rot, AItemActorSkeletal::StaticClass());
+		a->setItem(item);
+		a->worldRef = this;
+		return a;
+	}
+
+
+	void despawnItem(AItemActor * item) {
+		if (item->isSkeletal()) {
+			despawnItemSkeletal((AItemActorSkeletal*)item);
+		}
+		else {
+			despawnItemStatic((AItemActorStatic*)item);
+		}
+	}
+	AItemActor * spawnItem(UItemObject * item, double3 loc, FRotator rot) {
+		if (item->Instance.getRow()->isSkeletal()) {
+			return spawnItemSkeletal(item, loc, rot);
+		}
+		else {
+			return spawnItemStatic(item, loc, rot);
+		}
+	}
+
+	void despawnNPC(AGameCharacter * npc) {
+		despawnActor(usedNPCPool, unusedNPCPool, npc);
+	}
+	AGameCharacter * spawnNPC(AGameCharacter * npc, double3 loc, FRotator rot) {
+		AGameCharacter * a = spawnActor(usedNPCPool, unusedNPCPool, loc, rot, PlayerPawnClass);
 		a->worldRef = this;
 		return a;
 	}
@@ -100,7 +155,16 @@ public:
 		if (PlayerPawn == nullptr)return double3(0, 0, 0);
 		return PlayerPawn->GetActorLocation();
 	}
-	
+	inline AItemActorProjectile* shootProjectile(AGameCharacter * shooter, UItemObject * projectile, double speed) {
+		FRotator rot = shooter->GetBaseAimRotation();
+		FVector loc = shooter->getHeadLocation() + rot.Vector() * 100;
+		//FVector loc(0, 0, 400);
+		AItemActorProjectile * item = spawnItemProjectile(projectile, loc, rot);
+		UItemObject * weapon = shooter->Inventory->LeftHand;
+		item->shoot(shooter, weapon, rot.Vector() * speed);
+		return item;
+	}
+
 
 protected:
 	// Called when the game starts or when spawned

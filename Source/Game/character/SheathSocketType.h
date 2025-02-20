@@ -10,8 +10,8 @@
 UENUM(BlueprintType)
 enum class ESheathSocketType : uint8
 {
-	UNSHEATHED     UMETA(DisplayName = "Unsheathed"),
-	SHEATHED_SIDE  UMETA(DisplayName = "Sheathed on the side"),
-	SHEATHED_BACK  UMETA(DisplayName = "Sheathed on the back")
+	BOW     UMETA(DisplayName = "Sheathed as a bow"),
+	SIDE  UMETA(DisplayName = "Sheathed on the side"),
+	BACK  UMETA(DisplayName = "Sheathed on the back")
 
 };

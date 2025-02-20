@@ -12,26 +12,11 @@
 UENUM(BlueprintType)
 enum class EArmedPoseType : uint8
 {
-	UNARMED UMETA(DisplayName = "Unarmed"),
-	BOW UMETA(DisplayName = "Holds bow"),
-	BOW_AIMED UMETA(DisplayName = "Aims bow"),
-	BARE_HANDED UMETA(DisplayName = "Bare-handed"),
-	SINGLE_HANDED UMETA(DisplayName = "Single-handed"),
-	DOUBLE_HANDED UMETA(DisplayName = "Double-handed"),
+	UNARMED=0 UMETA(DisplayName = "Unarmed"),
+	BARE_HANDED=1 UMETA(DisplayName = "Bare-handed"),
+	SINGLE_HANDED=2 UMETA(DisplayName = "Single-handed"),
+	MAGIC = 3 UMETA(DisplayName = "Single-handed"),
+	BOW=4 UMETA(DisplayName = "Holds bow"),
+	BOW_AIMED=5 UMETA(DisplayName = "Aims bow"),
+	DOUBLE_HANDED=6 UMETA(DisplayName = "Double-handed"),
 };
-
-inline EMeleeAttackClass poseToAttack(EArmedPoseType pose) {
-	switch (pose) {
-	case EArmedPoseType::DOUBLE_HANDED:
-		return EMeleeAttackClass::DOUBLE_HANDED_WEAPON;
-	case EArmedPoseType::BARE_HANDED:
-		return EMeleeAttackClass::BARE_HANDED;
-	case EArmedPoseType::SINGLE_HANDED:
-		return EMeleeAttackClass::SINGLE_HANDED_WEAPON;
-	case EArmedPoseType::BOW:
-	case EArmedPoseType::BOW_AIMED:
-		return EMeleeAttackClass::BOW;
-	default:
-		return EMeleeAttackClass::NONE;
-	}
-}

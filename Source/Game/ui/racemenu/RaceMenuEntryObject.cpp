@@ -72,7 +72,7 @@ float URaceMenuEntryObjectHairdoPicker::SetScalarValue(float val)
 
 void URaceMenuEntryObjectHairdoPicker::InitHairdoPicker(AGameCharacter* player, URaceMenu* racemenu)
 {
-	Hairdos = player->worldRef->getHairdos();
+	Hairdos = player->GameMovement->Inventory->worldRef->getHairdos();
 	HairdoNames = Hairdos->GetRowNames();
 	FDataTableRowHandle hairdo = player->getHairdo();
 	float value = -1;

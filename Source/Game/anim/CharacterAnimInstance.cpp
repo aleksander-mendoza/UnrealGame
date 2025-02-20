@@ -10,6 +10,7 @@
 void UCharacterAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaTime)
 {
 	if (IsValid(MovementComponent)) {
+		
 		Velocity = MovementComponent->Velocity;
 		if (MovementComponent->IsSwimming()) {
 			GroundSpeed = Velocity.Length();
@@ -31,7 +32,7 @@ void UCharacterAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaTime)
 		IsFalling = MovementComponent->IsFalling();
 		AimsBow = MovementComponent->AimsBow();
 		IsStrafe = MovementComponent->IsDirectionalMovement();
-		IsSheathed = MovementComponent->Combat.isSheathed();
+		IsSheathed = MovementComponent->IsSheathed();
 	}
 }
 

@@ -3,9 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "../items/ItemObject.h"
-#include "../anim/ArmedPoseType.h"
-#include "../anim/MeleeAttackClass.h"
 
 /**
  *

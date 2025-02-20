@@ -24,11 +24,6 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 //////////////////////////////////////////////////////////////////////////
 // AGameCharacter
 
-AGameCharacter* AGameCharacter::getPlayerCharacter() const
-{
-	check(worldRef != nullptr);
-	return worldRef->PlayerPawn;
-}
 
 AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer.SetDefaultSubobjectClass<UGameCharacterMovementComponent>(CharacterMovementComponentName))
 {
@@ -73,21 +68,23 @@ AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Su
 	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
 
 
-	Inventory = CreateDefaultSubobject<UActorInventory>(TEXT("PlayerInventory"));
-	Inventory->containerEvents = this;
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
-	SetGender(IsFemale);
+	
 
 	GameMovement = Cast<UGameCharacterMovementComponent>(GetMovementComponent());
 	check(IsValid(GameMovement));
 	GameMovement->GameCharacter = this;
+	GameMovement->Inventory->setPlayerMesh(playerMesh);
+	
 
 	dialogueStage = &DialogueDatabase::INITIALIZE_GENERIC_CONVERSATION;
 
 	HairMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HairSkeletalMesh"));
 	HairMeshComponent->SetupAttachment(playerMesh, "hairSocket");
 	HairMeshComponent->SetSimulatePhysics(true);
+
+	SetGender(GameMovement->Inventory->IsFemale());
 }
 
 
@@ -95,13 +92,9 @@ void AGameCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();	
-	if (worldRef == nullptr) {
-		worldRef = Cast<AOpenWorld>(UGameplayStatics::GetActorOfClass(GetWorld(), AOpenWorld::StaticClass()));
-		check(worldRef != nullptr);
-	}
+	
 	ToggleDirectionalMovement(true);
-	Inventory->ResetToDefault(GetWorld());
-
+	
 	
 }
 
@@ -115,13 +108,6 @@ void AGameCharacter::SetCameraDistance(float distance) {
 		ToggleCamera(false);
 		this->GetCameraBoom()->TargetArmLength = math::min(MaxZoomOut, distance);
 	}
-}
-AItemActorProjectile* AGameCharacter::Shoot(double speed) {
-	UItemObject * projectileItem = Inventory->decrementProjectileCount();
-	if (projectileItem) {
-		return worldRef->shootProjectile(this, projectileItem, speed);
-	}
-	return nullptr;
 }
 void AGameCharacter::CameraZoomOut(const FInputActionValue& Value) {
 	if (this->FirstPersonCamera->IsActive()) {
@@ -256,54 +242,7 @@ double3 AGameCharacter::getRayEnd(double length) {
 }
 
 
-void AGameCharacter::showHealthBar(bool visible)
-{
-	check(IsValid(GetWorld()));
-	if (visible && HealthBarComponent == nullptr) {
-		HealthBarComponent = NewObject<UWidgetComponent>(this, UWidgetComponent::StaticClass());
-		HealthBarComponent->SetWidgetClass(HealthBarClass);
-		UCapsuleComponent* capsule = GetCapsuleComponent();
-		float radius, halfHeight;
-		capsule->GetScaledCapsuleSize(radius, halfHeight);
-		HealthBarComponent->SetRelativeLocation(FVector(0, 0, 0));
-		HealthBarComponent->SetDrawSize(FVector2D(radius*4, halfHeight*2));
-		check(IsValid(HealthBarComponent->GetWorld()));
-		HealthBarComponent->InitWidget();
-		HealthBarComponent->RegisterComponent();
-		HealthBarComponent->AttachToComponent(capsule, FAttachmentTransformRules::SnapToTargetIncludingScale);
-		
 
-		HealthBar = Cast<UNpcHealthBar>(HealthBarComponent->GetWidget());
-		HealthBar->Health->SetPercent(GameMovement->Health.getHealthPercentage());
-	}
-	HealthBarComponent->SetHiddenInGame(!visible);
-}
-
-
-void AGameCharacter::OnEquipClothes(TObjectPtr<UItemObject> item)
-{
-	
-
-	USkeletalMesh* clothingMesh = item->getSkeletalMesh();
-	check(clothingMesh != nullptr);
-	check(item->isWearable());
-	USkeletalMeshComponent* clothingComp = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass());
-	USkeletalMeshComponent* playerMesh = GetMesh();
-	clothingComp->RegisterComponent();
-	clothingComp->AttachToComponent(playerMesh, FAttachmentTransformRules::SnapToTargetIncludingScale);
-	clothingComp->SetSkeletalMesh(clothingMesh);
-	clothingComp->SetAnimInstanceClass(playerMesh->AnimClass);
-	clothingComp->SetLeaderPoseComponent(playerMesh, true);
-	const int idx = Clothes.Add(clothingComp);
-	GameMovement->Health.Defence += item->getItemArmor();
-	checkf(item->equippedAt == idx, TEXT("%d != %d"), item->equippedAt, idx);
-	check(Inventory->Clothes[item->equippedAt] == item);
-}
-
-void AGameCharacter::OnDropItem(TObjectPtr<UItemObject> item) {
-	worldRef->spawnItem(item, GetActorLocation(), FRotator());
-	GameMovement->Health.CarriedWeight -= item->getItemWeight();
-}
 
 
 void AGameCharacter::Tick(float DeltaTime) {
@@ -318,11 +257,7 @@ void AGameCharacter::Tick(float DeltaTime) {
 		double3 pos = getRayEnd(physicshandleDistance);
 		PhysicsHandle->SetTargetLocation(pos);
 	}
-	if (HealthBar!=nullptr && HealthBar->IsVisible()) {
-		FVector camPos = getPlayerCameraLocation();
-		FRotator rot = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), camPos);
-		HealthBarComponent->SetWorldRotation(rot);
-	}
+	
 	
 	
 }

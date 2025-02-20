@@ -6,8 +6,8 @@
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/IUserObjectListEntry.h"
 #include "Components/TextBlock.h"
-#include "../../items/ItemObject.h"
 #include "InventoryEntry.generated.h"
+
 
 /**
  * 
@@ -17,8 +17,10 @@ class GAME_API UInventoryEntry : public UUserWidget, public IUserObjectListEntry
 {
 	GENERATED_BODY()
 
-	UItemObject* Item;
+	class UInventory * OwningInventory;
+	class UItemInstance* Item;
 protected:
+	virtual void NativeConstruct() override;
 	// IUserObjectListEntry
 	virtual void NativeOnListItemObjectSet(UObject* ListItemObject) override;
 	// IUserObjectListEntry
@@ -28,7 +30,7 @@ protected:
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
-
+public:
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* NameLabel;
 	UPROPERTY(meta = (BindWidget))

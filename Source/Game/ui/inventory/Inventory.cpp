@@ -20,12 +20,11 @@ FReply UInventory::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent&
     return FReply::Unhandled();
 }
 
-void UInventory::setInventory(UActorInventory * inventory, AGamePlayerController* gameController)
+void UInventory::setInventory(UCharacterInventory* inventory, AGamePlayerController* gameController)
 {
 
     check(inventory != nullptr);
     GameController = gameController;
-    inventory->currentWidget = this;
-    this->Inventory = inventory;
+    Inventory = inventory;
     ItemListView->SetListItems(inventory->Items);
 }

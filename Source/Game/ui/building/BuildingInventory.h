@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/ListView.h"
-#include "../../items/ActorInventory.h"
+#include "../../items/inv/ActorInventory.h"
 #include "BuildingInventory.generated.h"
 
 /**

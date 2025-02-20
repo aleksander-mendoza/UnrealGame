@@ -1,52 +1,62 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "InventoryEntry.h"
-#include "../../items/ActorInventory.h"
+#include "../../items/inv/CharacterInventory.h"
 #include "Inventory.h"
-#include "../../items/ItemObject.h"
+#include "../../items/item/Item.h"
 
+
+void UInventoryEntry::NativeConstruct()
+{
+	Super::NativeConstruct();
+	
+}
 
 void UInventoryEntry::NativeOnListItemObjectSet(UObject* ListItemObject)
 {
-	Item = Cast<UItemObject>(ListItemObject);
-	const FItem* row = Item->Instance.getRow();
-	if (Item->Instance.Quantity > 1) {
-		FString n = row->Name.ToString();
+	UListViewBase* parent = GetOwningListView();
+	OwningInventory = Cast<UInventory>(parent);
+	check(IsValid(OwningInventory));
+	Item = Cast<UItemInstance>(ListItemObject);
+	
+	if (Item->Quantity > 1) {
+		FString n = Item->ItemType->Name.ToString();
 		n.AppendChar('(');
-		n += FString::FromInt(Item->Instance.Quantity);
+		n += FString::FromInt(Item->Quantity);
 		n.AppendChar(')');
 		NameLabel->SetText(FText::FromString(n));
 	}
 	else {
-		NameLabel->SetText(row->Name);
+		NameLabel->SetText(Item->ItemType->Name);
 	}
 	setStatus();
-	WeightLabel->SetText(FText::AsNumber(row->Weight));
-	ValueLabel->SetText(FText::AsNumber(row->Value));
-	WarmthLabel->SetText(FText::AsNumber(row->Warmth));
-	DamageLabel->SetText(FText::AsNumber(row->Damage));
+	WeightLabel->SetText(FText::AsNumber(Item->ItemType->Weight));
+	ValueLabel->SetText(FText::AsNumber(Item->ItemType->Value));
+	WarmthLabel->SetText(FText::AsNumber(Item->ItemType->getWarmth()));
+	DamageLabel->SetText(FText::AsNumber(Item->ItemType->getDamage()));
+	
 }
 void UInventoryEntry::setStatus() {
 	const char* c;
-	switch (Item->equippedAt) {
-		case EQUIPPED_AT_PROJECTILE:
-			c = ">";
-			break;
-		case EQUIPPED_AT_DOUBLEHANDED:
-			c = "LR";
-			break;
-		case EQUIPPED_AT_NONE:
-			c = "";
-			break;
-		case EQUIPPED_AT_LEFT_HAND:
-			c = "L";
-			break;
-		case EQUIPPED_AT_RIGHT_HAND:
-			c = "R";
-			break;
-		default:
-			c = "*";
-			break;
+	switch (Item->EquippedAt) {
+	case EQUIPPED_AT_PROJECTILE:
+		c = ">";
+		break;
+	case EQUIPPED_AT_DOUBLEHANDED:
+		c = "LR";
+		break;
+	case EQUIPPED_AT_NONE:
+		c = "";
+		break;
+	case EQUIPPED_AT_LEFT_HAND:
+		c = "L";
+		break;
+	case EQUIPPED_AT_RIGHT_HAND:
+		c = "R";
+		break;
+	default:
+		c = "*";
+		break;
 	}
 	StatusLabel->SetText(FText::FromString(c));
 }
@@ -58,14 +68,15 @@ void UInventoryEntry::NativeOnItemSelectionChanged(bool bIsSelected)
 FReply UInventoryEntry::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
 	if (Item != nullptr) {
-		check(Item->container != nullptr);
 		if (InMouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton)) {
-			Item->container->toggleItem(Item, true, true, false);
-			Item->container->currentWidget->refresh();
+			if (Item->use(OwningInventory->Inventory, true)) {
+				OwningInventory->refresh();
+			}
 		}
 		else if (InMouseEvent.IsMouseButtonDown(EKeys::RightMouseButton)) {
-			Item->container->toggleItem(Item, false, true, false);
-			Item->container->currentWidget->refresh();
+			if (Item->use(OwningInventory->Inventory, false)) {
+				OwningInventory->refresh();
+			}
 		}
 		return FReply::Handled();
 	}
@@ -75,9 +86,9 @@ FReply UInventoryEntry::NativeOnMouseButtonDown(const FGeometry& InGeometry, con
 FReply UInventoryEntry::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	if (InKeyEvent.GetKey()==EKeys::R) {
-		UInventory* inv = Item->container->currentWidget;
-		Item->container->dropItem<true>(Item);
-		inv->removeItem(Item);
+		if (Item->drop(OwningInventory->Inventory)) {
+			OwningInventory->removeItem(Item);	
+		}
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();

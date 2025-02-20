@@ -4,11 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "../../items/ItemInstance.h"
 #include "Components/ListView.h"
-#include "../../items/ActorInventory.h"
 #include "Inventory.generated.h"
 
 class AGamePlayerController;
+class UCharacterInventory;
 /**
  * 
  */
@@ -21,16 +22,15 @@ class GAME_API UInventory : public UUserWidget
 	//virtual void NativeOnInitialized() override;
 public:
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
-	UActorInventory* Inventory;
+	UCharacterInventory* Inventory;
 	AGamePlayerController* GameController;
-	void setInventory(UActorInventory * Inventory, AGamePlayerController* GameController);
-	void removeItem(UItemObject* item) {
+	void setInventory(UCharacterInventory* Inventory, AGamePlayerController* GameController);
+	void removeItem(UItemInstance* item) {
 		ItemListView->RemoveItem(item);
 	}
 	void refresh() {
 		ItemListView->RegenerateAllEntries();
 	}
-protected:
 	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
 	UListView* ItemListView;
 };

@@ -9,7 +9,7 @@
 #include "../blender/proc_assets.h"
 #include "EntityParams.h"
 #include "WorldGenUtils.h"
-#include "../items/ItemActor.h"
+#include "../items/actor/ItemActor.h"
 #include "../blender/noise.h"
 #include "../GameCharacter.h"
 #include "MovingGrid.h"

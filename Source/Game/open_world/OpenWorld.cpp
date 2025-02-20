@@ -35,7 +35,7 @@ void AOpenWorld::BeginPlay()
 	FRotator startRot = start->GetActorRotation();
 	PlayerPawn = world->SpawnActor<AGameCharacter>(PlayerPawnClass, startLoc, startRot);
 	player->Possess(PlayerPawn);
-	PlayerPawn->worldRef = this;
+	PlayerPawn->GameMovement->Inventory->worldRef = this;
 
 }
 

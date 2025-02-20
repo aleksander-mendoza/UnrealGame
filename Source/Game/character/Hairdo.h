@@ -17,7 +17,7 @@ struct GAME_API FHairdo : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSoftObjectPtr<USkeletalMesh> Mesh;
 
-	inline USkeletalMesh* getSkeletalMesh() {
+	inline USkeletalMesh* getSkeletalMesh() const{
 		return Mesh.LoadSynchronous();
 	}
 };

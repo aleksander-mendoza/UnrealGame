@@ -2,11 +2,4 @@
 
 
 #include "Status.h"
-#include "../character/Health.h"
 
-void UStatus::NativeConstruct()
-{
-	if (healthComponenet != nullptr) {
-		healthComponenet->resetWidget();
-	}
-}

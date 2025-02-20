@@ -15,16 +15,14 @@
 #include "Logging/LogMacros.h"
 #include "ui/TargetLockWidgetActor.h"
 #include "anim/AttackHandedness.h"
-#include "items/ActorInventory.h" 
 #include "items/Container.h" 
 #include "character/Hittable.h" 
 #include "character/Interactable.h"
 #include "character/Hairdo.h"
 #include "ui/NpcHealthBar.h"
-#include "character/HealthEvents.h"
+
 #include "character/GameCharacterMovementComponent.h"
 #include "anim/CharacterAnimInstance.h"
-#include "anim/WeaponSetAnims.h"
 #include "GameCharacter.generated.h"
 
 class USpringArmComponent;
@@ -42,20 +40,13 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 
 UCLASS(config=Game)
-class AGameCharacter : public ACharacter , public ContainerEvents, public IHittable, public IInteractable, public IHealthEvents
+class AGameCharacter : public ACharacter, public IHittable, public IInteractable
 {
 	GENERATED_BODY()
 
 
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UWidgetComponent> HealthBarComponent;
 
-	UNpcHealthBar * HealthBar;
-
-	/* The AnimBlueprint class to use. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-	class TSubclassOf<UNpcHealthBar> HealthBarClass;
 
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -96,10 +87,7 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 	FText CharacterName;
 
 	
-	/** Is the character male or female */
-	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	bool IsFemale=true;
-
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
 	FLinearColor HairColor = FLinearColor(0., 0., 1.);
 
@@ -129,20 +117,11 @@ class AGameCharacter : public ACharacter , public ContainerEvents, public IHitta
 	UPROPERTY()
 	TObjectPtr<USkeletalMeshComponent> HairMeshComponent;
 
-	UPROPERTY()
-	TArray<TObjectPtr<USkeletalMeshComponent>> Clothes;
-
-	
 
 
 public:
 	class AGamePlayerController* GameController = nullptr;
 
-	AGameCharacter* getPlayerCharacter() const;
-
-	inline FVector getPlayerCameraLocation() const {
-		return getPlayerCharacter()->GetCurrentCamera()->GetComponentLocation();
-	}
 
 	FDataTableRowHandle getHairdo() const {
 		return Hairdo;
@@ -157,15 +136,11 @@ public:
 
 	UGameCharacterMovementComponent* GameMovement=nullptr;
 	
-	class AOpenWorld* worldRef;
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
-	/** Player Inventory */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr <UActorInventory> Inventory;
 
 
 	UCharacterAnimInstance* animInstane = nullptr;
@@ -189,14 +164,8 @@ public:
 		this->SetActorHiddenInGame(!enabled);
 		this->SetActorEnableCollision(enabled);
 	}
-	inline void attackEnd(bool leftHanded) {
-		GameMovement->attackEnd(leftHanded);
-	}
-	void attackStart(bool leftHanded) {
-		GameMovement->attackStart(leftHanded, Inventory);
-	}
 	void attackCancel() {
-		GameMovement->attackCancel();
+		GameMovement->cancelAttack();
 	}
 	const DialogueDatabase::DialogueStage* dialogueStage;
 	const DialogueDatabase::DialogueStage* getDialogueStage() {
@@ -225,22 +194,22 @@ public:
 
 	/** Called for attack input */
 	void LeftHandedAttackStart(const FInputActionValue& Value) {
-		attackStart(true);
+		GameMovement->startAttack(true);
 	}
 	/** Called for attack input */
 	void RightHandedAttackStart(const FInputActionValue& Value) {
-		attackStart(false);
+		GameMovement->startAttack(false);
 	}
 	/** Called for attack cancel input */
 	void AttackCancel(const FInputActionValue& Value) {
 		attackCancel();
 	}
 	void RightHandedAttackEnd(const FInputActionValue& Value) {
-		attackEnd(false);
+		GameMovement->endAttack(false);
 	}
 	/** Called for attack end input */
 	void LeftHandedAttackEnd(const FInputActionValue& Value) {
-		attackEnd(true);
+		GameMovement->endAttack(true);
 	}
 	void ToggleCrouch(const FInputActionValue& Value) {
 		if (this->bIsCrouched) {
@@ -316,13 +285,13 @@ public:
 	}
 	class AItemActorProjectile * Shoot(double speed);
 	void NotifyAttackAnimationFinished() {
-		GameMovement->NotifyAttackAnimationFinished();
+		GameMovement->Inventory->NotifyAttackAnimationFinished();
 	}
 	void NotifyBowReadyToShoot() {
-		GameMovement->NotifyBowReadyToShoot();
+		GameMovement->Inventory->NotifyBowReadyToShoot();
 	}
 	void OnComboPartEnd() {
-		GameMovement->OnComboPartEnd();
+		GameMovement->Inventory->OnComboPartEnd();
 	}
 
 	void getRay(double length, Ray& ray);
@@ -330,117 +299,29 @@ public:
 
 
 	inline void DisableWeaponTrace() {
-		GameMovement->Combat.DisableWeaponTrace();
+		GameMovement->Inventory->DisableWeaponTrace();
 	}
 	
 	inline void EnableWeaponTrace(bool enableLeftHandHitDetection, bool enableRightHandHitDetection, bool enableLeftFootHitDetection, bool enableRightFootHitDetection) {
-		GameMovement->Combat.EnableWeaponTrace(enableLeftHandHitDetection, enableRightHandHitDetection, enableLeftFootHitDetection, enableRightFootHitDetection);
+		GameMovement->Inventory->EnableWeaponTrace(enableLeftHandHitDetection, enableRightHandHitDetection, enableLeftFootHitDetection, enableRightFootHitDetection);
 	}
 	
-	
-	void Kill(AGameCharacter* killer) {//TODO: kill moves that involve the killer
-		GameMovement->Kill(killer);
+	void Kill() {//TODO: kill moves that involve the killer
+		GameMovement->Inventory->kill();
 	}
 	
-	virtual void OnHit(AGameCharacter* actor, UItemObject* weaponUsed, UItemObject* projectile, float damage) override {
-		GameMovement->Hit(actor, weaponUsed, projectile, damage);
+	virtual void OnHit(UInventoryAndHealth* actor, UItemInstance* weaponUsed, UItemInstance* projectile, float damage) override {
+		GameMovement->Inventory->onHit(actor, weaponUsed, projectile, damage);
 	}
 
-	void showHealthBar(bool visible);
 
-
-	virtual void OnFullMagic() override {
-	}
-	virtual void OnFullStamina() override {
-	}
-	virtual void OnFullHealth() override {
-		if (!IsPlayer()) showHealthBar(false);
-	}
-	virtual void OnDamage(AGameCharacter* attacker, float health) override {
-		if(!IsPlayer()) showHealthBar(true);
-		TObjectPtr<UAnimMontage> anim = GameMovement->Combat.getHitAnim();
-		if (anim) {
-			getAnimInstance()->Montage_Play(anim);
-		}
-		
-	}
-	virtual void OnKilled(AGameCharacter* killer) override {
-		if (HealthBarComponent != nullptr) {
-			HealthBarComponent->DestroyComponent();
-			HealthBarComponent = nullptr;
-			HealthBar = nullptr;
-		}
-		TObjectPtr<UAnimMontage> anim = GameMovement->Combat.getDeathAnim();
-		if (anim) {
-			getAnimInstance()->Montage_Play(anim);
-		}
-		GetMesh()->SetSimulatePhysics(true);
-
-	}
-	
-	virtual void OnHealthChanged(float health, float maxHealth) override{
-		if (HealthBar)HealthBar->Health->SetPercent(health / maxHealth);
-	}
-	virtual void OnMagicChanged(float magic, float maxMagic) override {
-
-	}
-	virtual void OnStaminaChanged(float stamina, float maxStamina) override {
-
-	}
-	virtual void OnEquipBothHands(TObjectPtr < UItemObject > item) override {
-		OnEquip(item->isLeftTheDominantHand(), item);
-	}
-	virtual void OnEquipLeftHand(TObjectPtr < UItemObject > item) override {
-		OnEquip(true, item);
-	}
-	virtual void OnEquipRightHand(TObjectPtr < UItemObject > item) override {
-		OnEquip(false, item);
-	}
-	inline void OnEquip(bool leftHand, TObjectPtr < UItemObject > item) {
-		USkeletalMeshComponent * mesh = GetMesh();
-		GameMovement->Combat.GetSide(leftHand).EquipItem(this, mesh , item);
-		if (GameMovement->Combat.isSheathed()) {
-			GameMovement->becomeArmed(Inventory);
-		}else{// this will happen if user changes weapon before unsheathing it
-			GameMovement->Combat.GetSide(leftHand).sheath(mesh);
-			
-		}
-	}
-	virtual void OnUnequipBothHands(TObjectPtr < UItemObject > item) override {
-		GameMovement->Combat.Left.Unequip();
-		GameMovement->Combat.Right.Unequip();
-		GameMovement->becomeUnarmed();
-	}
-	virtual void OnUnequipLeftHand(TObjectPtr < UItemObject > item) override {
-		GameMovement->Combat.Left.Unequip();
-		GameMovement->becomeUnarmed();
-	}
-	virtual void OnUnequipRightHand(TObjectPtr < UItemObject > item) override {
-		GameMovement->Combat.Right.Unequip();
-		GameMovement->becomeUnarmed();
-	}
-	virtual void OnEquipClothes(TObjectPtr < UItemObject > item) override;
-	virtual void OnUnequipClothes(TObjectPtr < UItemObject > item) override {
-		const int idx = item->equippedAt;
-		Clothes[idx]->UnregisterComponent();
-		Clothes.RemoveAtSwap(idx);
-		GameMovement->Health.Defence -= item->getItemArmor();
-	}
-	virtual void OnPutItem(TObjectPtr<UItemObject> item) override {
-		GameMovement->Health.CarriedWeight += item->getItemWeight();
-	}
-	virtual void OnDropItem(TObjectPtr<UItemObject> item) override;
-	virtual bool CanWear(const FItem& item) override {
-		if (IsFemale)return isFemaleWearable(item.Class);
-		else return isMaleWearable(item.Class);
-	}
 	
 	inline void SetGender(const  bool isFemale) {
-		if (isFemale != IsFemale) {
-			IsFemale = isFemale;
+		if (isFemale != GameMovement->Inventory->IsFemale()) {
 			USkeletalMeshComponent * mesh = GetMesh();
 			mesh->SetSkeletalMesh(isFemale ? FemaleMesh : MaleMesh);
 			mesh->SetAnimInstanceClass(isFemale ? FemaleAnimClass : MaleAnimClass);
+			GameMovement->Inventory->Health.IsFemale = isFemale;
 			animInstane = nullptr;
 				
 		}

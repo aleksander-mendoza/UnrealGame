@@ -16,7 +16,7 @@ class GAME_API UStatus : public UUserWidget
 {
 	GENERATED_BODY()
 
-	virtual void NativeConstruct() override;
+	//virtual void NativeConstruct() override;
 public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> Health;
@@ -30,5 +30,9 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> Magic;
 
-	struct FHealth * healthComponenet;
+	float HealthFullTime = 0;
+	float StaminaFullTime = 0;
+	float MagicFullTime = 0;
+
+	//struct FHealth * healthComponenet;
 };

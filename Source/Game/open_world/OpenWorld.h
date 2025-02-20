@@ -6,9 +6,9 @@
 #include "GameFramework/Actor.h"
 #include "Logging/StructuredLog.h"
 #include "../blender/utildefines.h"
-#include "../items/ItemActorStatic.h"
-#include "../items/ItemActorProjectile.h"
-#include "../items/ItemActorSkeletal.h"
+#include "../items/actor/ItemActorStatic.h"
+#include "../items/actor/ItemActorProjectile.h"
+#include "../items/actor/ItemActorSkeletal.h"
 #include "../GameCharacter.h"
 #include "OpenWorld.generated.h"
 
@@ -27,8 +27,6 @@ class GAME_API AOpenWorld : public AActor
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	class TSubclassOf<AGameCharacter> PlayerPawnClass;
-
-	
 
 	void PostInitializeComponents() override;
 
@@ -100,7 +98,7 @@ public:
 			despawnActor(usedStaticActorPool, unusedStaticActorPool, item);
 		}
 	}
-	AItemActorStatic* spawnItemStatic(UItemObject* item, double3 loc,FRotator rot) {
+	AItemActorStatic* spawnItemStatic(UItemInstance* item, double3 loc,FRotator rot) {
 		TObjectPtr<AItemActorStatic> a = spawnActor(usedStaticActorPool, unusedStaticActorPool, loc, rot, AItemActorStatic::StaticClass());
 		a->setItem(item);
 		a->worldRef = this;
@@ -109,7 +107,7 @@ public:
 	void despawnItemProjectile(AItemActorProjectile * item) {
 		despawnActor(usedProjectileActorPool, unusedProjectileActorPool, item);
 	}
-	AItemActorProjectile* spawnItemProjectile(UItemObject* item, double3 loc, FRotator rot) {
+	AItemActorProjectile* spawnItemProjectile(UItemInstance* item, double3 loc, FRotator rot) {
 		AItemActorProjectile * a = spawnActor(usedProjectileActorPool, unusedProjectileActorPool, loc, rot, AItemActorProjectile::StaticClass());
 		a->setItem(item);
 		a->worldRef = this;
@@ -118,7 +116,7 @@ public:
 	void despawnItemSkeletal(AItemActorSkeletal * item) {
 		despawnActor(usedSkeletalActorPool, unusedSkeletalActorPool, item);
 	}
-	AItemActorSkeletal * spawnItemSkeletal(UItemObject * item, double3 loc, FRotator rot) {
+	AItemActorSkeletal * spawnItemSkeletal(UItemInstance * item, double3 loc, FRotator rot) {
 		AItemActorSkeletal * a = spawnActor(usedSkeletalActorPool, unusedSkeletalActorPool, loc, rot, AItemActorSkeletal::StaticClass());
 		a->setItem(item);
 		a->worldRef = this;
@@ -134,8 +132,8 @@ public:
 			despawnItemStatic((AItemActorStatic*)item);
 		}
 	}
-	AItemActor * spawnItem(UItemObject * item, double3 loc, FRotator rot) {
-		if (item->Instance.getRow()->isSkeletal()) {
+	AItemActor * spawnItem(UItemInstance * item, double3 loc, FRotator rot) {
+		if (item->isSkeletal()) {
 			return spawnItemSkeletal(item, loc, rot);
 		}
 		else {
@@ -148,19 +146,20 @@ public:
 	}
 	AGameCharacter * spawnNPC(AGameCharacter * npc, double3 loc, FRotator rot) {
 		AGameCharacter * a = spawnActor(usedNPCPool, unusedNPCPool, loc, rot, PlayerPawnClass);
-		a->worldRef = this;
+		a->GameMovement->Inventory->worldRef = this;
 		return a;
 	}
 	inline const double3 getPlayerPos() {
 		if (PlayerPawn == nullptr)return double3(0, 0, 0);
 		return PlayerPawn->GetActorLocation();
 	}
-	inline AItemActorProjectile* shootProjectile(AGameCharacter * shooter, UItemObject * projectile, double speed) {
-		FRotator rot = shooter->GetBaseAimRotation();
-		FVector loc = shooter->getHeadLocation() + rot.Vector() * 100;
+	inline AItemActorProjectile* shootProjectile(UWorldEntityInventory * shooter,  UItemInstance * projectile, double speed) {
+		
+		FRotator rot = shooter->Pawn->GetBaseAimRotation();
+		FVector loc = shooter->Pawn->GetPawnViewLocation() + rot.Vector() * 100;
 		//FVector loc(0, 0, 400);
 		AItemActorProjectile * item = spawnItemProjectile(projectile, loc, rot);
-		UItemObject * weapon = shooter->Inventory->LeftHand;
+		UItemInstance * weapon = shooter->LeftHand;
 		item->shoot(shooter, weapon, rot.Vector() * speed);
 		return item;
 	}

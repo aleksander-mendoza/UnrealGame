@@ -61,7 +61,7 @@ public:
 	}
 	inline TObjectPtr<UInventory> showInventory(AGameCharacter* GameCharacter, AGamePlayerController * ctrl) {
 		InventoryInterface = CreateWidget<UInventory>(GetWorld(), InventoryWidgetClass);
-		InventoryInterface->setInventory(GameCharacter->Inventory, ctrl);
+		InventoryInterface->setInventory(GameCharacter->GameMovement->Inventory, ctrl);
 		InventoryInterface->AddToViewport(9999); // Z-order, this just makes it render on the very top.
 		InventoryInterface->SetKeyboardFocus();
 		return InventoryInterface;
@@ -84,7 +84,6 @@ public:
 		DialogueWidget->clearOptions();
 	}
 	inline void hideInventory() {
-		InventoryInterface->Inventory->currentWidget = nullptr;
 		InventoryInterface->RemoveFromParent();
 		InventoryInterface = nullptr;
 	}

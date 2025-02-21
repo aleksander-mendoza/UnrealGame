@@ -124,12 +124,12 @@ public:
 	}
 	inline void sheath(bool unsheath, bool left, bool right) {
 		if (unsheath) {
-			if (left)sheathLeft();
-			if (right)sheathRight();
-		}
-		else {
 			if (left)unsheathLeft();
 			if (right)unsheathRight();
+		}
+		else {
+			if (left)sheathLeft();
+			if (right)sheathRight();
 		}
 	}
 
@@ -152,7 +152,7 @@ public:
 		hitDetectionTimer = INFINITY;
 	}
 
-	void DetectHit();
+	
 
 
 	////////////////////////////////////////
@@ -168,26 +168,33 @@ public:
 
 	virtual void addClothingItem(const class UClothingItem* type, TObjectPtr < UItemInstance> item) override;
 
-	virtual bool unequipProjectile() override;
+	virtual bool onUnequipProjectile() override;
 
-	virtual bool unequipDoubleHanded() override;
+	virtual bool onUnequipDoubleHanded() override;
 
-	virtual bool unequipLeftHand() override;
+	virtual bool onUnequipLeftHand() override;
 
-	virtual bool unequipRightHand() override;
+	virtual bool onUnequipRightHand() override;
 
-	virtual bool equipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance>  owner) override;
+	virtual bool onEquipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance>  owner) override;
 
-	virtual bool equipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
+	virtual bool onEquipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
 
-	virtual bool equipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
+	virtual bool onEquipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
 
-	virtual bool equipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
-
+	virtual bool onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
 	
+	virtual void unequipProjectile() override;
+
+	virtual void unequipHands() override;
+
+	virtual void unequipClothes() override;
 
 	virtual void NotifyAttackAnimationFinished() {
 		DisableWeaponTrace();
+	}
+	inline void TickInvincibility(float DeltaTime) {
+		if(invincibilityDuration>0)invincibilityDuration -= DeltaTime;
 	}
 
 

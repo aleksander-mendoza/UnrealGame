@@ -12,3 +12,14 @@ void AGameHUD::BeginPlay()
 	if (DialogueWidget) DialogueWidget->AddToViewport(9998);
 }
 
+void AGameHUD::hideInventory()
+{
+	if (InventoryInterface != nullptr) {
+		if (InventoryInterface->Inventory != nullptr) {
+			InventoryInterface->Inventory->InventoryWidget = nullptr;
+		}
+		InventoryInterface->RemoveFromParent();
+		InventoryInterface = nullptr;
+	}
+}
+

@@ -24,3 +24,19 @@ TObjectPtr<UItemInstance> UItem::drop(UCharacterInventory* user, TObjectPtr<UIte
 	TObjectPtr<UItemInstance> dropped = user->dropItem(owner, count);
 	return dropped;
 }
+
+TObjectPtr<UItemInstance> UItem::spawn(UObject* outer, int count)
+{
+	TObjectPtr<UItemInstance> p = NewObject<UItemInstance>(outer, UItemInstance::StaticClass());
+	p->ItemType = this;
+	p->Quantity = count;
+	p->Durability = Durability;
+	return p;
+}
+
+void UItem::sample(UActorInventory* inv, int count)
+{
+	if (count > 0) {
+		inv->addItem(spawn(inv->GetWorld(), count));
+	}
+}

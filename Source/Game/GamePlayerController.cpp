@@ -95,13 +95,15 @@ void AGamePlayerController::SetupInputComponent()
 
 void AGamePlayerController::SetPawn(APawn* pawn)
 {
+	if (GameCharacter != nullptr) {
+		GameCharacter->GameMovement->Inventory->Health.Widget = nullptr;
+	}
 	Super::SetPawn(pawn);
 	GameCharacter = Cast<AGameCharacter>(pawn);
 	if (GameCharacter) {
 		GameCharacter->GameController = this;
 		if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
 			GameCharacter->GameMovement->Inventory->Health.setWidget(hud->StatusWidget);
-			
 		}
 		if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent)) {
 
@@ -217,7 +219,7 @@ void AGamePlayerController::CloseInventory()
 	}
 }
 
-void AGamePlayerController::OpenDialogue(AGameCharacter * npc, AGameCharacter* player, const DialogueDatabase::DialogueStage * stage)
+void AGamePlayerController::OpenDialogue(AGameCharacter * npc, AGameCharacter* player, const UDialogueStage * stage)
 {
 	if (AGameHUD* hud = Cast<AGameHUD>(GetHUD())) {
 		if (hud->canOpenDialogue()) {

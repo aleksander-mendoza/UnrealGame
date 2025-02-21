@@ -4,17 +4,20 @@
 
 #include "CoreMinimal.h"
 #include "../../anim/moveset/WeaponAnims.h"
+#include "../loot/Loot.h"
 #include "Item.generated.h"
 
 class UGameCharacterInventory;
 class UItemInstance;
 class UInventoryAndHealth;
 class UCharacterInventory;
+class UActorInventory;
+
 /**
  *
  */
 UCLASS(BlueprintType)
-class GAME_API UItem : public UPrimaryDataAsset
+class GAME_API UItem : public ULoot
 {
 	GENERATED_BODY()
 
@@ -27,7 +30,7 @@ public:
 	FText Description;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
-	float Durbility = 0;
+	float Durability = 0;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	float Value = 0;
@@ -126,5 +129,8 @@ public:
 	inline bool hardConflictsWith(const UItem& other) const {
 		return isDevious() && conflictsWith(other);
 	}
+	virtual TObjectPtr<UItemInstance> spawn(UObject* outer, int count = 1);
+
+	virtual void sample(UActorInventory* inv, int count) override;
 };
 

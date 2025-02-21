@@ -171,10 +171,10 @@ struct GAME_API FHealth
 	////////////////////////////////////////////////
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float BareHandDamage = 10;
+	float BareHandDamage = 1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float SingleHandedWeaponDamageMultiplier = 10;
+	float SingleHandedWeaponDamageMultiplier = 1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float DoubleHandedWeaponDamageMultiplier = 1;

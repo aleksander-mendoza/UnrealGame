@@ -14,6 +14,6 @@ class GAME_API UDialogueOptionObject : public UObject
 
 public:
 	int i;
-	UDialogue * parent;
+	FText text;
 	
 };

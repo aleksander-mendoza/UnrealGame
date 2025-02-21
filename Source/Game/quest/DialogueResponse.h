@@ -1,28 +1,25 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+//MIT 
+//Based on https://dev.epicgames.com/community/snippets/Qm2/unreal-engine-enhanced-input-double-tap-input-trigger
+//Thanks to user colorindarkness 
 
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ResponseAction.h"
 #include "DialogueResponse.generated.h"
 
+class UDialogueStage;
+class UDialogueSideEffect;
 
-/**
- * 
- */
 USTRUCT(BlueprintType)
-struct GAME_API FDialogueResponse : public FTableRowBase
-{
+struct FDialogueResponse {
 	GENERATED_BODY()
 
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FText ShortText;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FText Text;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FText LongText;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TSoftObjectPtr<UDialogueStage> Next;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<EResponseAction> Responses;
-
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TArray<TObjectPtr<UDialogueSideEffect>> SideEffects;
 };

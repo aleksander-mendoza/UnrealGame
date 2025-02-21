@@ -120,22 +120,24 @@ public:
 	/////////////// EVENTS  ////////////////
 	////////////////////////////////////////
 	
-	virtual bool unequipProjectile() override;
+	virtual bool onUnequipProjectile() override;
 
-	virtual bool unequipDoubleHanded() override;
+	virtual bool onUnequipDoubleHanded() override;
 
-	virtual bool unequipLeftHand() override;
+	virtual bool onUnequipLeftHand() override;
 
-	virtual bool unequipRightHand() override;
+	virtual bool onUnequipRightHand() override;
 
-	virtual bool equipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance>  owner) override;
+	virtual bool onEquipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance>  owner) override;
 
-	virtual bool equipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
+	virtual bool onEquipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
 
-	virtual bool equipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
+	virtual bool onEquipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
 
-	virtual bool equipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
+	virtual bool onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
 	
+	virtual void unequipHands() override;
+
 	////////////////////////////////////////
 	/////////////// TICKS   ////////////////
 	////////////////////////////////////////

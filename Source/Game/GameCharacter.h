@@ -28,9 +28,6 @@
 class USpringArmComponent;
 
 struct FInputActionValue;
-namespace DialogueDatabase {
-	class DialogueStage;
-}
 struct Ray {
 	FVector start, end;
 };
@@ -167,9 +164,8 @@ public:
 	void attackCancel() {
 		GameMovement->cancelAttack();
 	}
-	const DialogueDatabase::DialogueStage* dialogueStage;
-	const DialogueDatabase::DialogueStage* getDialogueStage() {
-		return dialogueStage;
+	const UDialogueStage* getDialogueStage() const {
+		return GameMovement->Inventory->DialogueStage;
 	}
 	bool OnInteract(class AGameCharacter* actor) override;
 	/** Called for lock-on input */

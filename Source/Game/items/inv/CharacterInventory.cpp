@@ -40,7 +40,7 @@ void UCharacterInventory::addClothingItem(const UClothingItem* type, TObjectPtr<
 	
 }
 
-bool UCharacterInventory::equipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
+bool UCharacterInventory::onEquipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
 {
 	check(owner->ItemType == type);
 	check(Items.Contains(owner));
@@ -60,14 +60,14 @@ bool UCharacterInventory::equipClothes(const UClothingItem* type, TObjectPtr<UIt
 	return true;
 }
 
-bool UCharacterInventory::unequipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
+bool UCharacterInventory::onUnequipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
 {
 	if (type->isDevious())return false;
 	removeClothingItem(type, owner);
 	return true;
 }
 
-bool UCharacterInventory::unequipProjectile()
+bool UCharacterInventory::onUnequipProjectile()
 {
 	check(SelectedProjectile !=nullptr);
 	check(SelectedProjectile->EquippedAt == EQUIPPED_AT_PROJECTILE);
@@ -76,7 +76,7 @@ bool UCharacterInventory::unequipProjectile()
 	return true;
 }
 
-bool UCharacterInventory::unequipDoubleHanded()
+bool UCharacterInventory::onUnequipDoubleHanded()
 {
 	check(LeftHand == RightHand);
 	LeftHand->EquippedAt = EQUIPPED_AT_NONE;
@@ -86,7 +86,7 @@ bool UCharacterInventory::unequipDoubleHanded()
 	return true;
 }
 
-bool UCharacterInventory::unequipLeftHand()
+bool UCharacterInventory::onUnequipLeftHand()
 {
 	check(LeftHand != RightHand);
 	LeftHand->EquippedAt = EQUIPPED_AT_NONE;
@@ -95,7 +95,7 @@ bool UCharacterInventory::unequipLeftHand()
 	return true;
 }
 
-bool UCharacterInventory::unequipRightHand()
+bool UCharacterInventory::onUnequipRightHand()
 {
 	check(LeftHand != RightHand);
 	RightHand->EquippedAt = EQUIPPED_AT_NONE;
@@ -104,12 +104,12 @@ bool UCharacterInventory::unequipRightHand()
 	return true;
 }
 
-bool UCharacterInventory::equipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance> owner)
+bool UCharacterInventory::onEquipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance> owner)
 {
 	check(owner->ItemType == type);
 	check(owner->EquippedAt == EQUIPPED_AT_NONE);
 	if (SelectedProjectile != nullptr) {
-		unequipProjectile();
+		onUnequipProjectile();
 	}
 	SelectedProjectile = owner;
 	SelectedProjectile->EquippedAt = EQUIPPED_AT_PROJECTILE;
@@ -117,20 +117,20 @@ bool UCharacterInventory::equipProjectile(const UProjectileItem* type, TObjectPt
 	return true;
 }
 
-bool UCharacterInventory::equipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UCharacterInventory::onEquipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
 	check(owner->ItemType == type);
 	check(owner->EquippedAt == EQUIPPED_AT_NONE);
 	if (LeftHand != nullptr) {
 		if (LeftHand == RightHand) {
-			unequipBothHands();
+			onUnequipDoubleHanded();
 		}
 		else {
-			unequipLeftHand();
+			onUnequipLeftHand();
 		}
 	}
 	if (RightHand != nullptr) {
-		unequipRightHand();
+		onUnequipRightHand();
 	}
 	LeftHand = owner;
 	RightHand = owner;
@@ -139,18 +139,18 @@ bool UCharacterInventory::equipDoubleHanded(const UDoubleHandedWeaponItem* type,
 	return true;
 }
 
-bool UCharacterInventory::equipSingleHanded(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner, bool leftHand)
+bool UCharacterInventory::onEquipSingleHanded(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner, bool leftHand)
 {
-	return leftHand ? equipLeftHand(type, owner) : equipRightHand(type, owner);
+	return leftHand ? onEquipLeftHand(type, owner) : onEquipRightHand(type, owner);
 }
 
-bool UCharacterInventory::equipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UCharacterInventory::onEquipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
 	check(owner->ItemType == (const UItem *) type);
 	check(owner->EquippedAt == EQUIPPED_AT_NONE);
 	check(isAllValid());
 	if (LeftHand != nullptr) {
-		unequipLeftHand();
+		onUnequipLeftHand();
 	}
 	LeftHand = owner;
 	LeftHand->EquippedAt = EQUIPPED_AT_LEFT_HAND;
@@ -158,16 +158,53 @@ bool UCharacterInventory::equipLeftHand(const UOneHandedWeaponItem* type, TObjec
 	return true;
 }
 
-bool UCharacterInventory::equipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UCharacterInventory::onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
 	check(owner->ItemType == (const UItem*)type);
 	check(owner->EquippedAt == EQUIPPED_AT_NONE);
 	check(isAllValid());
 	if (RightHand != nullptr) {
-		unequipRightHand();
+		onUnequipRightHand();
 	}
 	RightHand = owner;
 	RightHand->EquippedAt = EQUIPPED_AT_RIGHT_HAND;
 	check(isAllValid());
 	return true;
+}
+
+void UCharacterInventory::unequipProjectile()
+{
+	if (SelectedProjectile) {
+		SelectedProjectile->EquippedAt = EQUIPPED_AT_NONE;
+		SelectedProjectile = nullptr;
+	}
+
+}
+
+void UCharacterInventory::unequipHands()
+{
+	if (LeftHand) {
+		LeftHand->EquippedAt = EQUIPPED_AT_NONE;
+		LeftHand = nullptr;
+	}
+	if (RightHand) {
+		RightHand->EquippedAt = EQUIPPED_AT_NONE;
+		RightHand = nullptr;
+	}
+}
+
+void UCharacterInventory::unequipClothes()
+{
+	for (int i = 0; i < Clothes.Num(); i++) {
+		Clothes[i]->EquippedAt = EQUIPPED_AT_NONE;
+	}
+	Clothes.Empty();
+	occupiedClothingSlots = 0;
+	occupiedDeviousClothingSlots = 0;
+}
+
+void UCharacterInventory::clearInventory()
+{
+	Super::clearInventory();
+	unequipAll();
 }

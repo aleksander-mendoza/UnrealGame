@@ -10,7 +10,7 @@
 
 bool UOneHandedWeaponItem::equip(UCharacterInventory* user,  TObjectPtr<UItemInstance>  owner, bool leftHand) const
 {
-	return user->equipSingleHanded(this, owner, leftHand);
+	return user->onEquipSingleHanded(this, owner, leftHand);
 	
 }
 
@@ -19,12 +19,12 @@ bool UOneHandedWeaponItem::unequip(UCharacterInventory* user,  TObjectPtr<UItemI
 	check(owner->ItemType == this);
 	if (owner->EquippedAt==EQUIPPED_AT_LEFT_HAND) {
 		check(user->LeftHand == owner);
-		return user->unequipLeftHand();
+		return user->onUnequipLeftHand();
 	}
 	else {
 		check(owner->EquippedAt == EQUIPPED_AT_RIGHT_HAND);
 		check(user->RightHand == owner);
-		return user->unequipRightHand();
+		return user->onUnequipRightHand();
 	}
 }
 
@@ -35,7 +35,7 @@ float UOneHandedWeaponItem::getTotalDamage(UInventoryAndHealth* user) const
 
 bool UProjectileItem::equip(UCharacterInventory* user,  TObjectPtr<UItemInstance>  owner, bool leftHand) const
 {
-	return user->equipProjectile(this, owner);
+	return user->onEquipProjectile(this, owner);
 	
 }
 
@@ -44,12 +44,12 @@ bool UProjectileItem::unequip(UCharacterInventory* user,  TObjectPtr<UItemInstan
 	check(owner->ItemType == this);
 	check(owner->EquippedAt == EQUIPPED_AT_PROJECTILE);
 	check(user->SelectedProjectile == owner);
-	return user->unequipProjectile();
+	return user->onUnequipProjectile();
 }
 
 bool UDoubleHandedWeaponItem::equip(UCharacterInventory* user,  TObjectPtr<UItemInstance>  owner, bool leftHand) const
 {
-	return user->equipDoubleHanded(this, owner);
+	return user->onEquipDoubleHanded(this, owner);
 }
 
 bool UDoubleHandedWeaponItem::unequip(UCharacterInventory* user,  TObjectPtr<UItemInstance>  owner) const
@@ -58,7 +58,7 @@ bool UDoubleHandedWeaponItem::unequip(UCharacterInventory* user,  TObjectPtr<UIt
 	check(owner->EquippedAt == EQUIPPED_AT_DOUBLEHANDED);
 	check(user->LeftHand == owner);
 	check(user->RightHand == owner);
-	return user->unequipDoubleHanded();
+	return user->onUnequipDoubleHanded();
 }
 
 float UDoubleHandedWeaponItem::getTotalDamage(UInventoryAndHealth* user) const

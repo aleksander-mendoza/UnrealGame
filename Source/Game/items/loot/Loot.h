@@ -17,7 +17,7 @@ class GAME_API ULoot : public UPrimaryDataAsset
 public:
 
 	UFUNCTION()
-	virtual void sample(UActorInventory* inv) {}
+	virtual void sample(UActorInventory* inv, int count=1) {}
 
 	
 };

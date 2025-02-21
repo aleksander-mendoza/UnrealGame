@@ -28,6 +28,9 @@ public:
 	void removeItem(UItemInstance* item) {
 		ItemListView->RemoveItem(item);
 	}
+	void addItem(UItemInstance* item) {
+		ItemListView->AddItem(item);
+	}
 	void refresh() {
 		ItemListView->RegenerateAllEntries();
 	}

@@ -69,7 +69,7 @@ public:
 	inline void showLine(FText name, FText text) {
 		DialogueWidget->showLine(name, text);
 	}
-	inline TObjectPtr<UDialogue> showDialogue(AGameCharacter* npc, AGameCharacter* player, const DialogueDatabase::DialogueStage * stage) {
+	inline TObjectPtr<UDialogue> showDialogue(AGameCharacter* npc, AGameCharacter* player, const UDialogueStage* stage) {
 		DialogueWidget->setup(npc, player, stage);
 		return DialogueWidget;
 	}
@@ -83,10 +83,7 @@ public:
 	inline void hideDialogue() {
 		DialogueWidget->clearOptions();
 	}
-	inline void hideInventory() {
-		InventoryInterface->RemoveFromParent();
-		InventoryInterface = nullptr;
-	}
+	void hideInventory();
 	inline void hideBuildingInventory() {
 		BuildingInventoryInterface->RemoveFromParent();
 		BuildingInventoryInterface = nullptr;

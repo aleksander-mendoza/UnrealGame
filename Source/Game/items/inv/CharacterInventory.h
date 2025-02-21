@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "ActorInventory.h"
+#include "DialogueInventory.h"
 #include "CharacterInventory.generated.h"
 
 //DECLARE_DELEGATE_OneParam(FStringDelegate, FString);
@@ -12,7 +12,7 @@ class UDoubleHandedWeaponItem;
 class UOneHandedWeaponItem;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class GAME_API UCharacterInventory  : public UActorInventory
+class GAME_API UCharacterInventory  : public UDialogueInventory
 {
 	GENERATED_BODY()
 
@@ -86,36 +86,49 @@ public:
 	
 	virtual void addClothingItem(const class UClothingItem* type, TObjectPtr < UItemInstance> item);
 
-	virtual bool equipClothes(const class UClothingItem* type, TObjectPtr < UItemInstance > owner);
+	virtual bool onEquipClothes(const class UClothingItem* type, TObjectPtr < UItemInstance > owner);
 
-	virtual bool unequipClothes(const class UClothingItem* type, TObjectPtr < UItemInstance> owner);
+	virtual bool onUnequipClothes(const class UClothingItem* type, TObjectPtr < UItemInstance> owner);
 
-	virtual bool unequipProjectile();
+	virtual bool onUnequipProjectile();
 
-	virtual bool unequipDoubleHanded();
+	virtual bool onUnequipDoubleHanded();
 
-	virtual bool unequipSingleHanded(bool lefthand) {
-		return lefthand ? unequipLeftHand() : unequipRightHand();
+	virtual bool onUnequipSingleHanded(bool lefthand) {
+		return lefthand ? onUnequipLeftHand() : onUnequipRightHand();
 	}
 
-	virtual bool unequipBothHands() {
-		bool a = unequipLeftHand();
-		bool b = unequipRightHand();
+	virtual bool onUnequipBothHands() {
+		bool a = onUnequipLeftHand();
+		bool b = onUnequipRightHand();
 		return a && b;
 	}
 
-	virtual bool unequipLeftHand();
+	virtual bool onUnequipLeftHand();
 
-	virtual bool unequipRightHand();
+	virtual bool onUnequipRightHand();
 
-	virtual bool equipProjectile(const class UProjectileItem* type, TObjectPtr<UItemInstance>  owner);
+	virtual bool onEquipProjectile(const class UProjectileItem* type, TObjectPtr<UItemInstance>  owner);
 
-	virtual bool equipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner);
+	virtual bool onEquipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner);
 
-	virtual bool equipSingleHanded(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner, bool leftHand);
+	virtual bool onEquipSingleHanded(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner, bool leftHand);
 
-	virtual bool equipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner);
+	virtual bool onEquipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner);
 
-	virtual bool equipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner);
+	virtual bool onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner);
 
+	virtual void unequipProjectile();
+
+	virtual void unequipHands();
+
+	virtual void unequipClothes();
+
+	virtual void unequipAll() {
+		unequipHands();
+		unequipClothes();
+		unequipProjectile();
+	}
+
+	virtual void clearInventory() override;
 };

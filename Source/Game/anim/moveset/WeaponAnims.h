@@ -74,7 +74,7 @@ public:
 
 	const FWeaponAnim * GetAnim() const {
 		if (AttackAnims.Num() > 0) {
-			int idx = FMath::RandRange(0, AttackAnims.Num());
+			int idx = FMath::RandRange(0, AttackAnims.Num()-1);
 			const FWeaponAnim& anim = AttackAnims[idx];
 			check(IsValid(anim.Anim));
 			return &anim;

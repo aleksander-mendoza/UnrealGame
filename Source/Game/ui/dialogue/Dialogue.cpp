@@ -4,7 +4,7 @@
 #include "Dialogue.h"
 #include "../../GameCharacter.h"
 #include "../../GamePlayerController.h"
-#include "../../quest/DialogueDatabase.h"
+#include "../../quest/DialogueStage.h"
 
 void UDialogue::NativeConstruct()
 {
@@ -19,50 +19,65 @@ FReply UDialogue::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& 
 	return FReply::Unhandled();
 }
 
-void UDialogue::setup(AGameCharacter* Npc, AGameCharacter* Player, const DialogueDatabase::DialogueStage* Stage)
+void UDialogue::setup(AGameCharacter* npc, AGameCharacter* player, const UDialogueStage* stage)
 {
 	SetVisibility(ESlateVisibility::Visible);
-	this->npc = Npc;
-	this->player = Player;
+	this->Npc = npc;
+	this->Player = player;
 	SpeakerName->SetText(npc->GetCharacterName());
-	followUp(Stage);
+	followUp(stage);
 }
 
-void UDialogue::followUp(const DialogueDatabase::DialogueStage* const nextStage)
+void UDialogue::followUp(const UDialogueStage* const nextStage)
 {
-	stage = nextStage;
-	while (true) {
-		if (stage == nullptr) {
-			this->player->GameController->CloseDialogue();
+	Stage = nextStage;
+	if (Stage == nullptr) {
+		closeDialogue();
+	}
+	else {
+		nextStage->setup(Npc, Player, this);
+	}
+}
+
+void UDialogue::ensureCapacity(int responseItemCount)
+{
+	for (int j = EntryPool.Num(); j < responseItemCount; j++) {
+		UDialogueOptionObject* item = NewObject<UDialogueOptionObject>(this);
+		item->i = j;
+		EntryPool.Add(item);
+	}
+}
+
+void UDialogue::addResponseItem(FText text)
+{
+	int j = ResponseOptions->GetNumItems();
+	UDialogueOptionObject* item = EntryPool[j];
+	item->text = text;
+	check(item->i == j);
+	ResponseOptions->AddItem(item);
+
+}
+
+void UDialogue::closeDialogue()
+{
+	Player->GameController->CloseDialogue();
+}
+
+void UDialogue::chooseOption(int i)
+{
+	if (Stage) {
+		followUp(Stage->chooseOption(i, Npc, Player, this));
+		
+	}
+}
+
+void UDialogue::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (lineLifetime > 0) {
+		lineLifetime -= InDeltaTime;
+		if (lineLifetime <= 0) {
 			SetVisibility(ESlateVisibility::Collapsed);
-			lineLifetime = 0;
-			return;
-		}
-		else {
-			const int optionCount = stage->optionCount(this);
-			switch (optionCount ) {
-			case -1:
-				stage = stage->chooseOption(0, this);
-				break;
-			case 0:
-				showText(stage->getText(this));
-				lineLifetime = DIALOGUE_LINE_DURATION;
-				this->player->GameController->CloseDialogue();
-				return;
-			default:
-				clearOptions();
-				showText(stage->getText(this));
-				for (int j = EntryPool.Num(); j < optionCount; j++) {
-					UDialogueOptionObject* item = NewObject<UDialogueOptionObject>(this);
-					item->i = j;
-					item->parent = this;
-					EntryPool.Add(item);
-				}
-				for (int j = 0; j < optionCount; j++) {
-					ResponseOptions->AddItem(EntryPool[j]);
-				}
-				return;
-			}
 		}
 	}
 }

@@ -11,38 +11,35 @@
 
 void UGameCharacterInventory::becomeArmed()
 {
-	if (ArmedPoseType == EArmedPoseType::UNARMED) {
-		const UWeaponAnims* mov = getCurrentMoveset();
-		ArmedPoseType = mov->ArmedPose;
-		if (IsPlayingAttackAnim()) {
-			stopAnim();
-		}
-		const FWeaponAnim unsheathAnim = mov->Unsheath;
-		if (unsheathAnim.Anim == nullptr) {
-			unsheathBoth();
-			EnableAttacking(GetAttackCooldown());
-		}
-		else {
-			playAnim(&unsheathAnim);
-		}
+	//if (ArmedPoseType == EArmedPoseType::UNARMED) {
+	const UWeaponAnims* mov = getCurrentMoveset();
+	ArmedPoseType = mov->ArmedPose;
+	const FWeaponAnim unsheathAnim = mov->Unsheath;
+	if (unsheathAnim.Anim == nullptr) {
+		unsheathBoth();
+		EnableAttacking(GetAttackCooldown());
 	}
+	else {
+		playAnim(&unsheathAnim);
+	}
+	//}
 }
 
 void UGameCharacterInventory::becomeUnarmed()
 {
-	if (ArmedPoseType != EArmedPoseType::UNARMED) {
-		ArmedPoseType = EArmedPoseType::UNARMED;
-		wantsToAttack = false;
-		const FWeaponAnim& sheathAnim = getCurrentMoveset()->Sheath;
-		if (sheathAnim.Anim == nullptr) {
-			sheathBoth();
-			EnableAttacking(0);
-		}
-		else {
-			playAnim(&sheathAnim);
-		}
-
+	//if (ArmedPoseType != EArmedPoseType::UNARMED) {
+	ArmedPoseType = EArmedPoseType::UNARMED;
+	wantsToAttack = false;
+	const FWeaponAnim& sheathAnim = getCurrentMoveset()->Sheath;
+	if (sheathAnim.Anim == nullptr) {
+		sheathBoth();
+		EnableAttacking(0);
 	}
+	else {
+		playAnim(&sheathAnim);
+	}
+
+	//}
 }
 
 void UGameCharacterInventory::playAnim(const FWeaponAnim * anim)
@@ -111,45 +108,45 @@ void UGameCharacterInventory::OnComboPartEnd()
 }
 
 
-bool UGameCharacterInventory::unequipProjectile()
+bool UGameCharacterInventory::onUnequipProjectile()
 {
-	return Super::unequipProjectile();
+	return Super::onUnequipProjectile();
 }
 
-bool UGameCharacterInventory::unequipDoubleHanded()
+bool UGameCharacterInventory::onUnequipDoubleHanded()
 {
-	if (Super::unequipDoubleHanded()) {
+	if (Super::onUnequipDoubleHanded()) {
 		//becomeUnarmed();
 		return true;
 	}
 	return false;
 }
-bool UGameCharacterInventory::unequipLeftHand()
+bool UGameCharacterInventory::onUnequipLeftHand()
 {
-	if (Super::unequipLeftHand()) {
-		//becomeUnarmed();
-		return true;
-	}
-	return false;
-}
-
-bool UGameCharacterInventory::unequipRightHand()
-{
-	if (Super::unequipRightHand()) {
+	if (Super::onUnequipLeftHand()) {
 		//becomeUnarmed();
 		return true;
 	}
 	return false;
 }
 
-bool UGameCharacterInventory::equipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance> owner)
+bool UGameCharacterInventory::onUnequipRightHand()
 {
-	return Super::equipProjectile(type, owner);
+	if (Super::onUnequipRightHand()) {
+		//becomeUnarmed();
+		return true;
+	}
+	return false;
 }
 
-bool UGameCharacterInventory::equipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UGameCharacterInventory::onEquipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance> owner)
 {
-	if (Super::equipDoubleHanded(type, owner)) {
+	return Super::onEquipProjectile(type, owner);
+}
+
+bool UGameCharacterInventory::onEquipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+{
+	if (Super::onEquipDoubleHanded(type, owner)) {
 		bool wasSheathed = IsSheathed();
 		sheathBoth();
 		if (!wasSheathed) {
@@ -161,9 +158,9 @@ bool UGameCharacterInventory::equipDoubleHanded(const UDoubleHandedWeaponItem* t
 }
 
 
-bool UGameCharacterInventory::equipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UGameCharacterInventory::onEquipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
-	if (Super::equipLeftHand(type, owner)) {
+	if (Super::onEquipLeftHand(type, owner)) {
 		bool wasSheathed = IsSheathed();
 		sheathBoth();
 		if (!wasSheathed) {
@@ -174,9 +171,9 @@ bool UGameCharacterInventory::equipLeftHand(const UOneHandedWeaponItem* type, TO
 	return false;
 }
 
-bool UGameCharacterInventory::equipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UGameCharacterInventory::onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
-	if (Super::equipRightHand(type, owner)) {
+	if (Super::onEquipRightHand(type, owner)) {
 		bool wasSheathed = IsSheathed();
 		sheathBoth();
 		if (!wasSheathed) {
@@ -185,6 +182,15 @@ bool UGameCharacterInventory::equipRightHand(const UOneHandedWeaponItem* type, T
 		return true;
 	}
 	return false;
+}
+
+void UGameCharacterInventory::unequipHands()
+{
+	Super::unequipHands();
+	if (IsPlayingAttackAnim()) {
+		stopAnim(ATTACK_STOP_BLENDOUT);
+		EnableAttacking(ATTACK_STOP_BLENDOUT);
+	}
 }
 
 bool UGameCharacterInventory::TickCooldown(float DeltaTime)
@@ -199,13 +205,15 @@ bool UGameCharacterInventory::TickCooldown(float DeltaTime)
 }
 void UGameCharacterInventory::TickEverything(float DeltaTime)
 {
-	TickHealth(DeltaTime);
-	if (IsPlayingAttackAnim()) {
-		TickHitDetection(DeltaTime);
-	}
-	else {
-		if (TickCooldown(DeltaTime)) {
-			startAttack();
+	if (TickHealth(DeltaTime)) {
+		TickInvincibility(DeltaTime);
+		if (IsPlayingAttackAnim()) {
+			TickHitDetection(DeltaTime);
+		}
+		else {
+			if (TickCooldown(DeltaTime)) {
+				startAttack();
+			}
 		}
 	}
 }

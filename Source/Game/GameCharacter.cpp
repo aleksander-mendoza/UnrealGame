@@ -15,7 +15,6 @@
 #include "open_world/OpenWorld.h"
 #include "Kismet/GameplayStatics.h"
 #include "GamePlayerController.h"
-#include "quest/DialogueDatabase.h"
 #include "anim/NotifyCombo.h"
 
 
@@ -78,7 +77,6 @@ AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Su
 	GameMovement->Inventory->setPlayerMesh(playerMesh);
 	
 
-	dialogueStage = &DialogueDatabase::INITIALIZE_GENERIC_CONVERSATION;
 
 	HairMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HairSkeletalMesh"));
 	HairMeshComponent->SetupAttachment(playerMesh, "hairSocket");

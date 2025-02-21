@@ -7,6 +7,7 @@
 #include "../ItemInstance.h"
 #include "ActorInventory.generated.h"
 
+class ULoot;
 //DECLARE_DELEGATE_OneParam(FStringDelegate, FString);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -16,19 +17,25 @@ class GAME_API UActorInventory : public UActorComponent
 
 public:	
 	
+	UPROPERTY()
+	class UInventory* InventoryWidget;
+
 	// Sets default values for this component's properties
 	UActorInventory() {
 		PrimaryComponentTick.bCanEverTick = false;
+		bWantsInitializeComponent = true;
 	}
+
+	virtual void InitializeComponent() override;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<ULoot> Loot;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray< TObjectPtr<UItemInstance>> Items;
 
 	
-	virtual void addItem(TObjectPtr<UItemInstance> item) {
-		check(item->EquippedAt == EQUIPPED_AT_NONE);
-		Items.Add(item);
-	} 
+	virtual void addItem(TObjectPtr<UItemInstance> item);
 	virtual TObjectPtr<UItemInstance> removeItem(TObjectPtr<UItemInstance> item, int quantity = 1);
 	virtual TObjectPtr<UItemInstance> dropItem(TObjectPtr<UItemInstance> item, int quantity = 1) {
 		return removeItem(item, quantity);
@@ -36,5 +43,10 @@ public:
 
 	virtual TObjectPtr<UItemInstance> spawnItem(UItem* itemType, int quantity = 1);
 	
+	
+
+	virtual void clearInventory();
+
+	virtual void resetInventory();
 
 };

@@ -9,9 +9,6 @@
 #include "GameCharacter.h"
 #include "GamePlayerController.generated.h"
 
-namespace DialogueDatabase {
-	class DialogueStage;
-}
 /**
  * 
  */
@@ -100,7 +97,7 @@ public:
 	void TriggerBuildingInventory(const FInputActionValue& Value);
 
 	AGameCharacter* GameCharacter;
-	void OpenDialogue(AGameCharacter* npc, AGameCharacter* player, const DialogueDatabase::DialogueStage* stage);
+	void OpenDialogue(AGameCharacter* npc, AGameCharacter* player, const UDialogueStage* stage);
 	void ShowDialogueLine(FText name, FText text);
 	void CloseDialogue();
 	UInputAction* MapKey(FKey key, EInputActionValueType type = EInputActionValueType::Boolean, bool triggerWhenPaused=false);

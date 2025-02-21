@@ -13,7 +13,7 @@
 #define EQUIPPED_AT_RIGHT_HAND -1
 
 class UInventoryEntry;
-
+class UActorInventory;
 /**
  *
  */
@@ -28,7 +28,7 @@ public:
 	UItem * ItemType = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float Durbility = 0;
+	float Durability = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int Quantity = 1;
@@ -42,8 +42,11 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	int EquippedAt = EQUIPPED_AT_NONE;
 	
+	UPROPERTY()
+	UActorInventory* Owner = nullptr;
+
 	inline bool IsEquipped() const {
-		return EquippedAt == EQUIPPED_AT_NONE;
+		return EquippedAt != EQUIPPED_AT_NONE;
 	}
 	inline float getDamage() const {
 		return ItemType->getDamage();
@@ -78,27 +81,23 @@ public:
 	inline bool use(UCharacterInventory* user, bool leftHand) {
 		return ItemType->use(user, this, leftHand);
 	}
+	bool use(bool leftHand);
 	inline bool unequip(UCharacterInventory* user) {
 		return ItemType->unequip(user, this);
 	}
 	inline bool equip(UCharacterInventory* user, bool leftHand) {
 		return ItemType->equip(user, this, leftHand);
 	}
-	inline TObjectPtr<UItemInstance> drop(UCharacterInventory* user, int count=1) {
-		return ItemType->drop(user, this, count);
-	}
-	
+	TObjectPtr<UItemInstance> drop(int count = 1);
 	inline bool affect(UCharacterInventory* user, UCharacterInventory* affected)  {
 		return ItemType->affect(user, affected, this);
 	}
 
+	
 	inline TObjectPtr<UItemInstance> popCount(UObject * outer, int count=1) {
 		if (Quantity > count) {
 			Quantity -= count;
-			TObjectPtr<UItemInstance> p = NewObject<UItemInstance>(outer, UItemInstance::StaticClass());
-			p->ItemType = ItemType;
-			p->Quantity = count;
-			return p;
+			return ItemType->spawn(outer, count);
 		}
 		else {
 			EquippedAt = EQUIPPED_AT_NONE;

@@ -48,51 +48,51 @@ void UInventoryAndHealth::addClothingItem(const UClothingItem* type, TObjectPtr<
 	Health.Defence -= type->Armor;
 }
 
-bool UInventoryAndHealth::equipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
+bool UInventoryAndHealth::onEquipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
 {
 	if (Health.IsFemale != type->IsFemale) return false;
-	return Super::equipClothes(type, owner);
+	return Super::onEquipClothes(type, owner);
 }
 
-bool UInventoryAndHealth::unequipProjectile()
+bool UInventoryAndHealth::onUnequipProjectile()
 {
-	return Super::unequipProjectile();
+	return Super::onUnequipProjectile();
 }
 
-bool UInventoryAndHealth::unequipDoubleHanded()
+bool UInventoryAndHealth::onUnequipDoubleHanded()
 {
-	return Super::unequipDoubleHanded();
+	return Super::onUnequipDoubleHanded();
 }
 
-bool UInventoryAndHealth::unequipLeftHand()
+bool UInventoryAndHealth::onUnequipLeftHand()
 {
-	return Super::unequipLeftHand();
+	return Super::onUnequipLeftHand();
 }
 
-bool UInventoryAndHealth::unequipRightHand()
+bool UInventoryAndHealth::onUnequipRightHand()
 {
-	return Super::unequipRightHand();
+	return Super::onUnequipRightHand();
 }
 
-bool UInventoryAndHealth::equipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance> owner)
+bool UInventoryAndHealth::onEquipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance> owner)
 {
-	return Super::equipProjectile(type, owner);
+	return Super::onEquipProjectile(type, owner);
 }
 
-bool UInventoryAndHealth::equipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UInventoryAndHealth::onEquipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
-	return Super::equipDoubleHanded(type, owner);
+	return Super::onEquipDoubleHanded(type, owner);
 }
 
 
-bool UInventoryAndHealth::equipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UInventoryAndHealth::onEquipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
-	return Super::equipLeftHand(type, owner);
+	return Super::onEquipLeftHand(type, owner);
 }
 
-bool UInventoryAndHealth::equipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UInventoryAndHealth::onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
-	return Super::equipRightHand(type, owner);
+	return Super::onEquipRightHand(type, owner);
 }
 
 void UInventoryAndHealth::kill()
@@ -104,6 +104,13 @@ void UInventoryAndHealth::kill()
 		destroyHealthBar();
 	}
 	getPlayerMesh()->SetSimulatePhysics(true);
+}
+
+void UInventoryAndHealth::unequipClothes()
+{
+	Super::unequipClothes();
+	Health.CarriedWeight = 0;
+	Health.Defence = 0;
 }
 
 void UInventoryAndHealth::TickHealthBar()
@@ -138,7 +145,7 @@ bool UInventoryAndHealth::TickHealth(float DeltaTime)
 void UInventoryAndHealth::createHealthBar()
 {
 	check(IsValid(GetWorld()));
-	if (HealthBarComponent == nullptr) {
+	if (HealthBarComponent == nullptr && IsValid(HealthBarClass)) {
 		HealthBarComponent = NewObject<UWidgetComponent>(this, UWidgetComponent::StaticClass());
 		HealthBarComponent->SetWidgetClass(HealthBarClass);
 		

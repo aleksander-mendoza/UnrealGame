@@ -26,5 +26,6 @@ void UInventory::setInventory(UCharacterInventory* inventory, AGamePlayerControl
     check(inventory != nullptr);
     GameController = gameController;
     Inventory = inventory;
+    inventory->InventoryWidget = this;
     ItemListView->SetListItems(inventory->Items);
 }

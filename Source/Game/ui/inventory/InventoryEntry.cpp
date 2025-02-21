@@ -14,9 +14,6 @@ void UInventoryEntry::NativeConstruct()
 
 void UInventoryEntry::NativeOnListItemObjectSet(UObject* ListItemObject)
 {
-	UListViewBase* parent = GetOwningListView();
-	OwningInventory = Cast<UInventory>(parent);
-	check(IsValid(OwningInventory));
 	Item = Cast<UItemInstance>(ListItemObject);
 	
 	if (Item->Quantity > 1) {
@@ -69,14 +66,10 @@ FReply UInventoryEntry::NativeOnMouseButtonDown(const FGeometry& InGeometry, con
 {
 	if (Item != nullptr) {
 		if (InMouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton)) {
-			if (Item->use(OwningInventory->Inventory, true)) {
-				OwningInventory->refresh();
-			}
+			Item->use(true);
 		}
 		else if (InMouseEvent.IsMouseButtonDown(EKeys::RightMouseButton)) {
-			if (Item->use(OwningInventory->Inventory, false)) {
-				OwningInventory->refresh();
-			}
+			Item->use(false);
 		}
 		return FReply::Handled();
 	}
@@ -86,9 +79,7 @@ FReply UInventoryEntry::NativeOnMouseButtonDown(const FGeometry& InGeometry, con
 FReply UInventoryEntry::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	if (InKeyEvent.GetKey()==EKeys::R) {
-		if (Item->drop(OwningInventory->Inventory)) {
-			OwningInventory->removeItem(Item);	
-		}
+		Item->drop();
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();

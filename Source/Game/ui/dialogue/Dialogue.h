@@ -9,11 +9,9 @@
 #include "DialogueOptionObject.h"
 #include "Dialogue.generated.h"
 
-
-namespace DialogueDatabase {
-	class DialogueStage;
-}
+class UDialogueStage;
 class AGameCharacter;
+
 #define DIALOGUE_LINE_DURATION 3
 /**
  * 
@@ -28,6 +26,8 @@ class GAME_API UDialogue : public UUserWidget
 public:
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
+	void setup(AGameCharacter* Npc, AGameCharacter* Player, const UDialogueStage* Stage);
+
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* SpeakerName;
 
@@ -40,9 +40,14 @@ public:
 	UPROPERTY()
 	TArray<UDialogueOptionObject *> EntryPool;
 
-	AGameCharacter* npc; 
-	AGameCharacter* player;
-	const DialogueDatabase::DialogueStage* stage;
+	UPROPERTY()
+	AGameCharacter* Npc; 
+	
+	UPROPERTY()
+	AGameCharacter* Player;
+
+	UPROPERTY()
+	const UDialogueStage* Stage;
 
 	inline void showText(FText text) {
 		SpeakerText->SetText(text);
@@ -56,16 +61,12 @@ public:
 	inline void clearOptions() {
 		ResponseOptions->ClearListItems();
 	}
-	void setup(AGameCharacter* npc, AGameCharacter* player, const DialogueDatabase::DialogueStage* stage);
-	void followUp(const DialogueDatabase::DialogueStage* const nextStage);
+	
+	void followUp(const UDialogueStage* const nextStage);
+	void ensureCapacity(int responseItemCount);
+	void addResponseItem(FText text);
+	void closeDialogue();
+	void chooseOption(int i);
 	float lineLifetime = 0;
-	void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override {
-		Super::NativeTick(MyGeometry, InDeltaTime);
-		if (lineLifetime > 0) {
-			lineLifetime -= InDeltaTime;
-			if (lineLifetime <= 0) {
-				SetVisibility(ESlateVisibility::Collapsed);
-			}
-		}
-	}
+	void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 };

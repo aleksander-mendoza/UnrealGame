@@ -14,7 +14,7 @@ UGameCharacterMovementComponent::UGameCharacterMovementComponent() {
 	GetNavAgentPropertiesRef().bCanCrouch = true;
 	GetNavAgentPropertiesRef().bCanSwim = true;
 
-
+	bWantsInitializeComponent = true;
 	Inventory = CreateDefaultSubobject<UGameCharacterInventory>(TEXT("PlayerInventory"));
 }
 

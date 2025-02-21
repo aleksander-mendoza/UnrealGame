@@ -3,7 +3,7 @@
 
 #include "DialogueOption.h"
 #include "Dialogue.h"
-#include "../../quest/DialogueDatabase.h"
+#include "../../quest/DialogueStage.h"
 
 void UDialogueOption::NativeConstruct()
 {
@@ -13,15 +13,19 @@ void UDialogueOption::NativeConstruct()
 
 void UDialogueOption::NativeOnListItemObjectSet(UObject* ListItemObject)
 {
+	if (!IsValid(Parent)) {
+		UListViewBase* parent = GetOwningListView();
+		Parent = Cast<UDialogue>(parent);
+		check(IsValid(Parent));
+	}
 	Option = Cast<UDialogueOptionObject>(ListItemObject);
 	check(Option != nullptr);
-	TextOption->SetText(Option->parent->stage->getOption(Option->i, Option->parent));
+	TextOption->SetText(Option->text);
 }
 
 void UDialogueOption::OnOptionClick()
 {
 	if (Option) {
-		const DialogueDatabase::DialogueStage * const nextStage = Option->parent->stage->chooseOption(Option->i, Option->parent);
-		Option->parent->followUp(nextStage);
+		Parent->chooseOption(Option->i);
 	}
 }

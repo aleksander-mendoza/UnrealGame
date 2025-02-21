@@ -87,46 +87,53 @@ void UMeshedInventory::addClothingItem(const UClothingItem* type, TObjectPtr<UIt
 
 }
 
-bool UMeshedInventory::unequipProjectile()
+bool UMeshedInventory::onUnequipProjectile()
 {
-	return Super::unequipProjectile();
+	return Super::onUnequipProjectile();
 }
 
-bool UMeshedInventory::unequipDoubleHanded()
+bool UMeshedInventory::onUnequipDoubleHanded()
 {
-	if (Super::unequipDoubleHanded()) {
+	if (Super::onUnequipDoubleHanded()) {
 		updateCurrentMoveset();
+		Left.unset();
+		Right.unset();
+		DisableWeaponTrace();
 		return true;
 	}
 	return false;
 }
 
-bool UMeshedInventory::unequipLeftHand()
+bool UMeshedInventory::onUnequipLeftHand()
 {
-	if (Super::unequipLeftHand()) {
+	if (Super::onUnequipLeftHand()) {
 		updateCurrentMoveset();
+		Left.unset();
+		Left.DisableWeaponTrace();
 		return true;
 	}
 	return false;
 }
 
-bool UMeshedInventory::unequipRightHand()
+bool UMeshedInventory::onUnequipRightHand()
 {
-	if (Super::unequipRightHand()) {
+	if (Super::onUnequipRightHand()) {
 		updateCurrentMoveset();
+		Right.unset();
+		Right.DisableWeaponTrace();
 		return true;
 	}
 	return false;
 }
 
-bool UMeshedInventory::equipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance> owner)
+bool UMeshedInventory::onEquipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance> owner)
 {
-	return Super::equipProjectile(type, owner);
+	return Super::onEquipProjectile(type, owner);
 }
 
-bool UMeshedInventory::equipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UMeshedInventory::onEquipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
-	if (Super::equipDoubleHanded(type, owner)) {
+	if (Super::onEquipDoubleHanded(type, owner)) {
 		updateCurrentMoveset();
 		if (type->isLeftTheDominantHand()) {
 			if (Left.setItem(this, getPlayerMesh(), Cast<UItem>(type))) {
@@ -144,9 +151,9 @@ bool UMeshedInventory::equipDoubleHanded(const UDoubleHandedWeaponItem* type, TO
 }
 
 
-bool UMeshedInventory::equipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UMeshedInventory::onEquipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
-	if (Super::equipLeftHand(type, owner)) {
+	if (Super::onEquipLeftHand(type, owner)) {
 		updateCurrentMoveset();
 		if (Left.setItem(this, getPlayerMesh(), Cast<UItem>(type))) {
 			resheathLeft();
@@ -156,9 +163,9 @@ bool UMeshedInventory::equipLeftHand(const UOneHandedWeaponItem* type, TObjectPt
 	return false;
 }
 
-bool UMeshedInventory::equipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
+bool UMeshedInventory::onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance> owner)
 {
-	if (Super::equipRightHand(type, owner)) {
+	if (Super::onEquipRightHand(type, owner)) {
 		updateCurrentMoveset();
 		if (Right.setItem(this, getPlayerMesh(), Cast<UItem>(type))) {
 			resheathRight();
@@ -167,4 +174,28 @@ bool UMeshedInventory::equipRightHand(const UOneHandedWeaponItem* type, TObjectP
 	}
 	return false;
 }
+
+void UMeshedInventory::unequipProjectile()
+{
+	Super::unequipProjectile();
+}
+
+void UMeshedInventory::unequipHands()
+{
+	Super::unequipHands();
+	CurrentMoveset = BareHandedMoveset;
+	DisableWeaponTrace();
+	Left.unset();
+	Right.unset();
+}
+
+void UMeshedInventory::unequipClothes()
+{
+	Super::unequipClothes();
+	for (int i = 0; i < ClothesMeshes.Num(); i++) {
+		ClothesMeshes[i]->UnregisterComponent();
+		ClothesMeshes.RemoveAtSwap(i);
+	}
+}
+
 

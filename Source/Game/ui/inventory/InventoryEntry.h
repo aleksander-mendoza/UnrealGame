@@ -17,7 +17,6 @@ class GAME_API UInventoryEntry : public UUserWidget, public IUserObjectListEntry
 {
 	GENERATED_BODY()
 
-	class UInventory * OwningInventory;
 	class UItemInstance* Item;
 protected:
 	virtual void NativeConstruct() override;

@@ -18,9 +18,8 @@ void  UActorInventory::addItem(TObjectPtr<UItemInstance> item)
 	check(item->Owner == nullptr);
 	item->Owner = this;
 	Items.Add(item);
-	if (InventoryWidget != nullptr) {
-		InventoryWidget->addItem(item);
-	}
+	addInventoryEntryWidget(item);
+	
 }
 
 TObjectPtr<UItemInstance> UActorInventory::removeItem(TObjectPtr<UItemInstance> item, int quantity)
@@ -31,10 +30,11 @@ TObjectPtr<UItemInstance> UActorInventory::removeItem(TObjectPtr<UItemInstance> 
 	if (popped == item) {
 		popped->Owner = nullptr;
 		bool b = Items.RemoveSingleSwap(popped) != 0;
-		if (InventoryWidget != nullptr) {
-			InventoryWidget->removeItem(item);
-		}
 		check(b);
+		removeInventoryEntryWidget(item);
+	}
+	else {
+		refreshInventoryEntryWidget(item);
 	}
 	return popped;
 }
@@ -57,4 +57,26 @@ void UActorInventory::resetInventory()
 {
 	clearInventory();
 	Loot->sample(this, 1);
+}
+
+void UActorInventory::refreshInventoryEntryWidget(TObjectPtr<UItemInstance> item) {
+	check(item->Owner == this);
+	if (InventoryWidget != nullptr) {
+		InventoryWidget->updateItem(item);
+	}
+}
+
+void UActorInventory::removeInventoryEntryWidget(TObjectPtr<UItemInstance> item)
+{
+	check(item->Owner == this);
+	if (InventoryWidget != nullptr) {
+		InventoryWidget->removeItem(item);
+	}
+}
+void UActorInventory::addInventoryEntryWidget(TObjectPtr<UItemInstance> item)
+{
+	check(item->Owner == this);
+	if (InventoryWidget != nullptr) {
+		InventoryWidget->addItem(item);
+	}
 }

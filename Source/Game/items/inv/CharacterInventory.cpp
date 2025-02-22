@@ -31,6 +31,7 @@ void UCharacterInventory::removeClothingItem(const UClothingItem* type, TObjectP
 		occupiedClothingSlots &= ~type->ClothingSlots;
 		if(type->isDevious()) occupiedDeviousClothingSlots &= ~type->ClothingSlots;
 		check(isAllValid());
+		refreshInventoryEntryWidget(item);
 	}
 }
 
@@ -43,6 +44,7 @@ void UCharacterInventory::addClothingItem(const UClothingItem* type, TObjectPtr<
 	occupiedClothingSlots |= type->ClothingSlots;
 	if (type->isDevious()) occupiedDeviousClothingSlots &= ~type->ClothingSlots;
 	check(isAllValid());
+	refreshInventoryEntryWidget(item);
 	
 }
 
@@ -84,6 +86,7 @@ bool UCharacterInventory::onUnequipProjectile()
 	check(SelectedProjectile !=nullptr);
 	check(SelectedProjectile->EquippedAt == EQUIPPED_AT_PROJECTILE);
 	SelectedProjectile->EquippedAt = EQUIPPED_AT_NONE;
+	refreshInventoryEntryWidget(SelectedProjectile);
 	SelectedProjectile = nullptr;
 	return true;
 }
@@ -93,6 +96,7 @@ bool UCharacterInventory::onUnequipDoubleHanded()
 	check(LeftHand == RightHand);
 	check(LeftHand->EquippedAt == EQUIPPED_AT_DOUBLEHANDED);
 	LeftHand->EquippedAt = EQUIPPED_AT_NONE;
+	refreshInventoryEntryWidget(LeftHand);
 	RightHand = nullptr;
 	LeftHand = nullptr;
 	check(isAllValid());
@@ -103,6 +107,7 @@ bool UCharacterInventory::onUnequipLeftHand()
 {
 	check(LeftHand != RightHand);
 	LeftHand->EquippedAt = EQUIPPED_AT_NONE;
+	refreshInventoryEntryWidget(LeftHand);
 	LeftHand = nullptr;
 	check(isAllValid());
 	return true;
@@ -111,6 +116,7 @@ bool UCharacterInventory::onUnequipRightHand()
 {
 	check(LeftHand != RightHand);
 	RightHand->EquippedAt = EQUIPPED_AT_NONE;
+	refreshInventoryEntryWidget(RightHand);
 	RightHand = nullptr;
 	check(isAllValid());
 	return true;
@@ -123,6 +129,7 @@ bool UCharacterInventory::onEquipProjectile(const UProjectileItem* type, TObject
 	check(SelectedProjectile == nullptr);
 	SelectedProjectile = owner;
 	SelectedProjectile->EquippedAt = EQUIPPED_AT_PROJECTILE;
+	refreshInventoryEntryWidget(SelectedProjectile);
 	check(isAllValid());
 	return true;
 }
@@ -136,6 +143,7 @@ bool UCharacterInventory::onEquipDoubleHanded(const UDoubleHandedWeaponItem* typ
 	LeftHand = owner;
 	RightHand = owner;
 	owner->EquippedAt = EQUIPPED_AT_DOUBLEHANDED;
+	refreshInventoryEntryWidget(owner);
 	check(isAllValid());
 	return true;
 }
@@ -149,6 +157,7 @@ bool UCharacterInventory::onEquipLeftHand(const UOneHandedWeaponItem* type, TObj
 	LeftHand = owner;
 	LeftHand->EquippedAt = EQUIPPED_AT_LEFT_HAND;
 	check(isAllValid());
+	refreshInventoryEntryWidget(owner);
 	return true;
 }
 
@@ -161,6 +170,7 @@ bool UCharacterInventory::onEquipRightHand(const UOneHandedWeaponItem* type, TOb
 	RightHand = owner;
 	RightHand->EquippedAt = EQUIPPED_AT_RIGHT_HAND;
 	check(isAllValid());
+	refreshInventoryEntryWidget(owner);
 	return true;
 }
 

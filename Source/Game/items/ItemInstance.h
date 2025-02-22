@@ -45,6 +45,7 @@ public:
 	UPROPERTY()
 	UActorInventory* Owner = nullptr;
 
+	void refreshInventoryEntryWidget();
 	inline bool IsEquipped() const {
 		return EquippedAt != EQUIPPED_AT_NONE;
 	}

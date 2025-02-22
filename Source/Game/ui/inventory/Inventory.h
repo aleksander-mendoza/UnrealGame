@@ -31,9 +31,12 @@ public:
 	void addItem(UItemInstance* item) {
 		ItemListView->AddItem(item);
 	}
+	void updateItem(UItemInstance* item);
 	void refresh() {
 		ItemListView->RegenerateAllEntries();
 	}
 	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
 	UListView* ItemListView;
+
+	
 };

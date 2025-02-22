@@ -15,22 +15,7 @@ void UInventoryEntry::NativeConstruct()
 void UInventoryEntry::NativeOnListItemObjectSet(UObject* ListItemObject)
 {
 	Item = Cast<UItemInstance>(ListItemObject);
-	
-	if (Item->Quantity > 1) {
-		FString n = Item->ItemType->Name.ToString();
-		n.AppendChar('(');
-		n += FString::FromInt(Item->Quantity);
-		n.AppendChar(')');
-		NameLabel->SetText(FText::FromString(n));
-	}
-	else {
-		NameLabel->SetText(Item->ItemType->Name);
-	}
-	setStatus();
-	WeightLabel->SetText(FText::AsNumber(Item->ItemType->Weight));
-	ValueLabel->SetText(FText::AsNumber(Item->ItemType->Value));
-	WarmthLabel->SetText(FText::AsNumber(Item->ItemType->getWarmth()));
-	DamageLabel->SetText(FText::AsNumber(Item->ItemType->getDamage()));
+	refresh();
 	
 }
 void UInventoryEntry::setStatus() {
@@ -57,13 +42,32 @@ void UInventoryEntry::setStatus() {
 	}
 	StatusLabel->SetText(FText::FromString(c));
 }
+void UInventoryEntry::refresh()
+{
+	if (Item->Quantity > 1) {
+		FString n = Item->ItemType->Name.ToString();
+		n.AppendChar('(');
+		n += FString::FromInt(Item->Quantity);
+		n.AppendChar(')');
+		NameLabel->SetText(FText::FromString(n));
+	}
+	else {
+		NameLabel->SetText(Item->ItemType->Name);
+	}
+	setStatus();
+	WeightLabel->SetText(FText::AsNumber(Item->ItemType->Weight));
+	ValueLabel->SetText(FText::AsNumber(Item->ItemType->Value));
+	WarmthLabel->SetText(FText::AsNumber(Item->ItemType->getWarmth()));
+	DamageLabel->SetText(FText::AsNumber(Item->ItemType->getDamage()));
+}
 void UInventoryEntry::NativeOnItemSelectionChanged(bool bIsSelected)
 {
-	//OnMouseButtonDown
+	RowBorder->SetBrushColor(FLinearColor(1, 1, 1, bIsSelected ? 0.4 : 0));
 }
 
 FReply UInventoryEntry::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+	
 	if (Item != nullptr) {
 		if (InMouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton)) {
 			Item->use(true);
@@ -76,11 +80,21 @@ FReply UInventoryEntry::NativeOnMouseButtonDown(const FGeometry& InGeometry, con
 	return FReply::Unhandled();
 }
 
+void UInventoryEntry::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (IsValid(Item)) {
+		UListView* lv = Cast<UListView>(GetOwningListView());
+		lv->SetSelectedItem(Item);
+	}
+}
+
+void UInventoryEntry::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+
+}
+
 FReply UInventoryEntry::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (InKeyEvent.GetKey()==EKeys::R) {
-		Item->drop();
-		return FReply::Handled();
-	}
+	
 	return FReply::Unhandled();
 }

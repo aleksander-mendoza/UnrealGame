@@ -18,7 +18,7 @@ class GAME_API UActorInventory : public UActorComponent
 public:	
 	
 	UPROPERTY()
-	class UInventory* InventoryWidget;
+	class UInventory* InventoryWidget=nullptr;
 
 	// Sets default values for this component's properties
 	UActorInventory() {
@@ -29,7 +29,7 @@ public:
 	virtual void InitializeComponent() override;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<ULoot> Loot;
+	TObjectPtr<ULoot> Loot = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray< TObjectPtr<UItemInstance>> Items;
@@ -48,5 +48,7 @@ public:
 	virtual void clearInventory();
 
 	virtual void resetInventory();
-
+	void refreshInventoryEntryWidget(TObjectPtr<UItemInstance> item);
+	void removeInventoryEntryWidget(TObjectPtr<UItemInstance> item);
+	void addInventoryEntryWidget(TObjectPtr<UItemInstance> item);
 };

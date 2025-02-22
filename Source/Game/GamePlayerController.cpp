@@ -196,7 +196,7 @@ void AGamePlayerController::TriggerInventory(const FInputActionValue& Value)
 			else {
 				FInputModeUIOnly Mode;
 				Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
-				Mode.SetWidgetToFocus(hud->showInventory(GameCharacter, this)->TakeWidget());
+				Mode.SetWidgetToFocus(hud->showInventory(GameCharacter, this)->ItemListView->TakeWidget());
 				SetInputMode(Mode);
 				
 			}

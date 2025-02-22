@@ -48,10 +48,10 @@ void UInventoryAndHealth::addClothingItem(const UClothingItem* type, TObjectPtr<
 	Health.Defence -= type->Armor;
 }
 
-bool UInventoryAndHealth::onEquipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
+bool UInventoryAndHealth::equipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
 {
 	if (Health.IsFemale != type->IsFemale) return false;
-	return Super::onEquipClothes(type, owner);
+	return Super::equipClothes(type, owner);
 }
 
 bool UInventoryAndHealth::onUnequipProjectile()

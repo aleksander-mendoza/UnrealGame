@@ -11,6 +11,7 @@ AItemActorSkeletal::AItemActorSkeletal()
 	Mesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("ItemMesh"));
 	Mesh->SetMobility(EComponentMobility::Movable);
 	Mesh->SetSimulatePhysics(true);
+	Mesh->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
 	//Mesh->RegisterComponent();
 	SetRootComponent(Mesh);
 

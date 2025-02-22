@@ -80,15 +80,16 @@ public:
 		}
 		return true;
 	}
-	
+
+	virtual TObjectPtr<UItemInstance>  dropItem(TObjectPtr<UItemInstance> item, int quantity) override;
 
 	virtual void removeClothingItem(const class UClothingItem* type, TObjectPtr < UItemInstance > item);
 	
 	virtual void addClothingItem(const class UClothingItem* type, TObjectPtr < UItemInstance> item);
 
-	virtual bool onEquipClothes(const class UClothingItem* type, TObjectPtr < UItemInstance > owner);
+	virtual bool equipClothes(const class UClothingItem* type, TObjectPtr < UItemInstance > owner);
 
-	virtual bool onUnequipClothes(const class UClothingItem* type, TObjectPtr < UItemInstance> owner);
+	virtual bool unequipClothes(const class UClothingItem* type, TObjectPtr < UItemInstance> owner);
 
 	virtual bool onUnequipProjectile();
 

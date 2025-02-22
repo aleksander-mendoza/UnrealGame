@@ -8,11 +8,11 @@
 
 bool UClothingItem::equip(UCharacterInventory* user,  TObjectPtr<UItemInstance>  owner, bool leftHand) const
 {
-	return user->onEquipClothes(this, owner);
+	return user->equipClothes(this, owner);
 }
 
 
 bool UClothingItem::unequip(UCharacterInventory* user,  TObjectPtr<UItemInstance>  owner) const
 {
-	return user->onUnequipClothes(this, owner);
+	return user->unequipClothes(this, owner);
 }

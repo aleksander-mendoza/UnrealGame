@@ -37,7 +37,13 @@ void UBowAnims::endAttack(UGameCharacterInventory* user, bool leftHand) const
 
 void UBowAnims::cancelAttack(UGameCharacterInventory* user) const
 {
-	user->BowShot = false;
-	user->EnableAttacking();
-	user->ArmedPoseType = EArmedPoseType::BOW;
+	
+	if (user->ArmedPoseType == EArmedPoseType::BOW_AIMED) {
+		user->BowShot = false;
+		user->EnableAttacking();
+		user->ArmedPoseType = EArmedPoseType::BOW;
+	}
+	else {
+		user->becomeUnarmed();
+	}
 }

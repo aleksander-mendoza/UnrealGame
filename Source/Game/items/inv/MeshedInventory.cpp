@@ -63,6 +63,8 @@ void UMeshedInventory::removeClothingItem(const UClothingItem* type, TObjectPtr<
 	check(item->ItemType == type);
 	check(PlayerMesh != nullptr);
 	const int idx = item->EquippedAt;
+	check(idx >= 0);
+	check(Clothes[idx] == item);
 	ClothesMeshes[idx]->UnregisterComponent();
 	ClothesMeshes.RemoveAtSwap(idx);
 	Super::removeClothingItem(type, item);

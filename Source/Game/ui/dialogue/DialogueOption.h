@@ -23,7 +23,6 @@ protected:
 	virtual void NativeOnListItemObjectSet(UObject* ListItemObject) override;
 
 
-	class UDialogue* Parent;
 
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* TextOption;

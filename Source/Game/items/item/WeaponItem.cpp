@@ -22,8 +22,8 @@ bool UOneHandedWeaponItem::unequip(UCharacterInventory* user,  TObjectPtr<UItemI
 		return user->unequipLeftHand();
 	}
 	else {
-		check(owner->EquippedAt == EQUIPPED_AT_RIGHT_HAND);
-		check(user->RightHand == owner);
+		check(owner->EquippedAt == EQUIPPED_AT_RIGHT_HAND || owner->EquippedAt == EQUIPPED_AT_NONE);
+		check(user->RightHand == owner || owner->EquippedAt == EQUIPPED_AT_NONE);
 		return user->unequipRightHand();
 	}
 }
@@ -57,10 +57,10 @@ bool UDoubleHandedWeaponItem::equip(UCharacterInventory* user,  TObjectPtr<UItem
 bool UDoubleHandedWeaponItem::unequip(UCharacterInventory* user,  TObjectPtr<UItemInstance>  owner) const
 {
 	check(owner->ItemType == this);
-	check(owner->EquippedAt == EQUIPPED_AT_DOUBLEHANDED);
-	check(user->LeftHand == owner);
-	check(user->RightHand == owner);
-	return user->onUnequipDoubleHanded();
+	if (owner->EquippedAt == EQUIPPED_AT_DOUBLEHANDED) {
+		return user->onUnequipDoubleHanded();
+	}
+	return true;
 }
 
 float UDoubleHandedWeaponItem::getTotalDamage(UInventoryAndHealth* user) const

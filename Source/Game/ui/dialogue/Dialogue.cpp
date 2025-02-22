@@ -44,6 +44,7 @@ void UDialogue::ensureCapacity(int responseItemCount)
 	for (int j = EntryPool.Num(); j < responseItemCount; j++) {
 		UDialogueOptionObject* item = NewObject<UDialogueOptionObject>(this);
 		item->i = j;
+		item->Parent = this;
 		EntryPool.Add(item);
 	}
 }

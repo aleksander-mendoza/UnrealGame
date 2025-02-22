@@ -13,11 +13,6 @@ void UDialogueOption::NativeConstruct()
 
 void UDialogueOption::NativeOnListItemObjectSet(UObject* ListItemObject)
 {
-	if (!IsValid(Parent)) {
-		UListViewBase* parent = GetOwningListView();
-		Parent = Cast<UDialogue>(parent);
-		check(IsValid(Parent));
-	}
 	Option = Cast<UDialogueOptionObject>(ListItemObject);
 	check(Option != nullptr);
 	TextOption->SetText(Option->text);
@@ -26,6 +21,6 @@ void UDialogueOption::NativeOnListItemObjectSet(UObject* ListItemObject)
 void UDialogueOption::OnOptionClick()
 {
 	if (Option) {
-		Parent->chooseOption(Option->i);
+		Option->Parent->chooseOption(Option->i);
 	}
 }

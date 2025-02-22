@@ -82,7 +82,7 @@ public:
 
 	virtual void addClothingItem(const class UClothingItem* type, TObjectPtr < UItemInstance> item) override;
 
-	virtual bool onEquipClothes(const class UClothingItem* type, TObjectPtr < UItemInstance > owner);
+	virtual bool equipClothes(const class UClothingItem* type, TObjectPtr < UItemInstance > owner);
 
 	virtual bool onUnequipProjectile() override;
 

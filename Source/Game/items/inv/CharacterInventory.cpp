@@ -7,6 +7,12 @@
 #include "../ItemInstance.h"
 
 
+TObjectPtr<UItemInstance> UCharacterInventory::dropItem(TObjectPtr<UItemInstance> item, int quantity)
+{
+	item->unequip(this);
+	return Super::dropItem(item, quantity);
+}
+
 void UCharacterInventory::removeClothingItem(const UClothingItem* type, TObjectPtr<UItemInstance> item)
 {
 	check(item->ItemType == type);
@@ -40,30 +46,36 @@ void UCharacterInventory::addClothingItem(const UClothingItem* type, TObjectPtr<
 	
 }
 
-bool UCharacterInventory::onEquipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
+bool UCharacterInventory::equipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
 {
-	check(owner->ItemType == type);
-	check(Items.Contains(owner));
-	if ((occupiedDeviousClothingSlots & type->ClothingSlots) != 0) return false;
-	if ((occupiedClothingSlots & type->ClothingSlots) != 0) {
-		for (int clothesIdx = Clothes.Num(); clothesIdx >= 0; clothesIdx--) {
-			TObjectPtr<UItemInstance>  equippedItemObj = Clothes[clothesIdx];
-			const UClothingItem* equippedType = equippedItemObj->ItemType->asClothingItem();
-			check(equippedType != nullptr);
-			if ((equippedType->ClothingSlots & type->ClothingSlots) != 0) {
-				check(!equippedType->isDevious());
-				removeClothingItem(equippedType, equippedItemObj);
+	if (owner->EquippedAt == EQUIPPED_AT_NONE) {
+		check(owner->ItemType == type);
+		check(owner->Owner == this);
+		check(Items.Contains(owner));
+		if ((occupiedDeviousClothingSlots & type->ClothingSlots) != 0) return false;
+		if ((occupiedClothingSlots & type->ClothingSlots) != 0) {
+			for (int clothesIdx = Clothes.Num(); clothesIdx >= 0; clothesIdx--) {
+				TObjectPtr<UItemInstance>  equippedItemObj = Clothes[clothesIdx];
+				const UClothingItem* equippedType = equippedItemObj->ItemType->asClothingItem();
+				check(equippedType != nullptr);
+				if ((equippedType->ClothingSlots & type->ClothingSlots) != 0) {
+					check(!equippedType->isDevious());
+					removeClothingItem(equippedType, equippedItemObj);
+				}
 			}
 		}
+		addClothingItem(type, owner);
 	}
-	addClothingItem(type, owner);
 	return true;
 }
 
-bool UCharacterInventory::onUnequipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
+bool UCharacterInventory::unequipClothes(const UClothingItem* type, TObjectPtr<UItemInstance> owner)
 {
-	if (type->isDevious())return false;
-	removeClothingItem(type, owner);
+	if (owner->EquippedAt >= 0) {
+		check(owner->Owner == this);
+		if (type->isDevious())return false;
+		removeClothingItem(type, owner);
+	}
 	return true;
 }
 
@@ -79,6 +91,7 @@ bool UCharacterInventory::onUnequipProjectile()
 bool UCharacterInventory::onUnequipDoubleHanded()
 {
 	check(LeftHand == RightHand);
+	check(LeftHand->EquippedAt == EQUIPPED_AT_DOUBLEHANDED);
 	LeftHand->EquippedAt = EQUIPPED_AT_NONE;
 	RightHand = nullptr;
 	LeftHand = nullptr;

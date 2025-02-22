@@ -43,8 +43,7 @@ bool UProjectileItem::equip(UCharacterInventory* user,  TObjectPtr<UItemInstance
 bool UProjectileItem::unequip(UCharacterInventory* user,  TObjectPtr<UItemInstance>  owner) const
 {
 	check(owner->ItemType == this);
-	check(owner->EquippedAt == EQUIPPED_AT_PROJECTILE);
-	check(user->SelectedProjectile == owner);
+	check(owner->EquippedAt == EQUIPPED_AT_NONE || (user->SelectedProjectile == owner && owner->EquippedAt == EQUIPPED_AT_PROJECTILE));
 	user->unequipProjectile();
 	return true;
 }

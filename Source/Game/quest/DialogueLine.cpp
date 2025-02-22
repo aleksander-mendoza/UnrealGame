@@ -12,7 +12,8 @@ void UDialogueLine::setup(AGameCharacter* npc, AGameCharacter* player, UDialogue
 	for (int i = 0; i < Responses.Num(); i++) {
 		stage->addResponseItem(Responses[i].Text);
 	}
-	stage->lineLifetime = DIALOGUE_LINE_DURATION;
+	stage->showText(Text);
+	stage->lineLifetime = 0;
 }
 
 

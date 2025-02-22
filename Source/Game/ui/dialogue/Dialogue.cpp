@@ -62,6 +62,7 @@ void UDialogue::addResponseItem(FText text)
 void UDialogue::closeDialogue()
 {
 	Player->GameController->CloseDialogue();
+	lineLifetime = DIALOGUE_LINE_DURATION;
 }
 
 void UDialogue::chooseOption(int i)

@@ -175,23 +175,18 @@ bool UMeshedInventory::onEquipRightHand(const UOneHandedWeaponItem* type, TObjec
 	return false;
 }
 
-void UMeshedInventory::unequipProjectile()
+void UMeshedInventory::stripHands()
 {
-	Super::unequipProjectile();
-}
-
-void UMeshedInventory::unequipHands()
-{
-	Super::unequipHands();
+	Super::stripHands();
 	CurrentMoveset = BareHandedMoveset;
 	DisableWeaponTrace();
 	Left.unset();
 	Right.unset();
 }
 
-void UMeshedInventory::unequipClothes()
+void UMeshedInventory::stripClothes()
 {
-	Super::unequipClothes();
+	Super::stripClothes();
 	for (int i = 0; i < ClothesMeshes.Num(); i++) {
 		ClothesMeshes[i]->UnregisterComponent();
 		ClothesMeshes.RemoveAtSwap(i);

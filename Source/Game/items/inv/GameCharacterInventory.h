@@ -136,7 +136,7 @@ public:
 
 	virtual bool onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
 	
-	virtual void unequipHands() override;
+	virtual void stripHands() override;
 
 	////////////////////////////////////////
 	/////////////// TICKS   ////////////////

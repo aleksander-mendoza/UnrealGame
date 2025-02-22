@@ -184,9 +184,9 @@ bool UGameCharacterInventory::onEquipRightHand(const UOneHandedWeaponItem* type,
 	return false;
 }
 
-void UGameCharacterInventory::unequipHands()
+void UGameCharacterInventory::stripHands()
 {
-	Super::unequipHands();
+	Super::stripHands();
 	if (IsPlayingAttackAnim()) {
 		stopAnim(ATTACK_STOP_BLENDOUT);
 		EnableAttacking(ATTACK_STOP_BLENDOUT);

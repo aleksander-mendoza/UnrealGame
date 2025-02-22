@@ -106,9 +106,9 @@ void UInventoryAndHealth::kill()
 	getPlayerMesh()->SetSimulatePhysics(true);
 }
 
-void UInventoryAndHealth::unequipClothes()
+void UInventoryAndHealth::stripClothes()
 {
-	Super::unequipClothes();
+	Super::stripClothes();
 	Health.CarriedWeight = 0;
 	Health.Defence = 0;
 }
@@ -152,8 +152,8 @@ void UInventoryAndHealth::createHealthBar()
 		//HealthBarComponent->SetRelativeLocation(FVector(0, 0, 0));
 		FVector origin;
 		FVector extent;
-		GetOwner()->GetActorBounds(false, origin, extent, false);
-		FVector2D size(extent.X + extent.Y, extent.Z);
+		GetOwner()->GetActorBounds(true, origin, extent, false);
+		FVector2D size(extent.X + extent.Y, 30+extent.Z*2);
 
 		HealthBarComponent->SetDrawSize(size);
 		check(IsValid(HealthBarComponent->GetWorld()));

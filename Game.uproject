@@ -11,7 +11,8 @@
 			"AdditionalDependencies": [
 				"Engine",
 				"AnimGraphRuntime",
-				"UMG"
+				"UMG",
+				"AIModule"
 			]
 		}
 	],
@@ -37,6 +38,10 @@
 		},
 		{
 			"Name": "PCGWaterInterop",
+			"Enabled": true
+		},
+		{
+			"Name": "Mutable",
 			"Enabled": true
 		}
 	]

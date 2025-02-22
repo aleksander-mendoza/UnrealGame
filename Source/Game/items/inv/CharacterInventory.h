@@ -94,16 +94,6 @@ public:
 
 	virtual bool onUnequipDoubleHanded();
 
-	virtual bool onUnequipSingleHanded(bool lefthand) {
-		return lefthand ? onUnequipLeftHand() : onUnequipRightHand();
-	}
-
-	virtual bool onUnequipBothHands() {
-		bool a = onUnequipLeftHand();
-		bool b = onUnequipRightHand();
-		return a && b;
-	}
-
 	virtual bool onUnequipLeftHand();
 
 	virtual bool onUnequipRightHand();
@@ -112,23 +102,80 @@ public:
 
 	virtual bool onEquipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner);
 
-	virtual bool onEquipSingleHanded(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner, bool leftHand);
-
 	virtual bool onEquipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner);
 
 	virtual bool onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner);
 
-	virtual void unequipProjectile();
+	virtual void stripClothes();
 
-	virtual void unequipHands();
+	virtual void stripHands();
 
-	virtual void unequipClothes();
-
-	virtual void unequipAll() {
-		unequipHands();
-		unequipClothes();
+	virtual void stripAll() {
+		stripHands();
+		stripClothes();
 		unequipProjectile();
 	}
 
 	virtual void clearInventory() override;
+
+	inline void equipProjectile(const class UProjectileItem* type, TObjectPtr<UItemInstance>  owner) {
+		unequipProjectile();
+		onEquipProjectile(type, owner);
+	}
+	inline void unequipProjectile() {
+		if (SelectedProjectile != nullptr) {
+			onUnequipProjectile();
+		}
+	}
+
+	inline bool unequipBothHands() {
+		if (LeftHand != nullptr) {
+			if (LeftHand == RightHand) {
+				return onUnequipDoubleHanded();
+			} else {
+				if (!onUnequipLeftHand()) {
+					return false;
+				}
+			}
+		} 
+		if (RightHand != nullptr) {
+			return onUnequipRightHand();
+		}
+		return true;
+	}
+	inline bool unequipRightHand() {
+		if (RightHand != nullptr) {
+			if (RightHand == LeftHand) {
+				return onUnequipDoubleHanded();
+			}
+			else {
+				return onUnequipRightHand();
+			}
+		}
+		return true;
+	}
+	inline bool unequipLeftHand() {
+		if (LeftHand != nullptr) {
+			if (LeftHand == RightHand) {
+				return onUnequipDoubleHanded();
+			}
+			else {
+				return onUnequipLeftHand();
+			}
+		}
+		return true;
+	}
+	inline bool equipSingleHanded(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner, bool leftHand) {
+		return leftHand ? equipLeftHand(type, owner) : equipRightHand(type, owner);
+	}
+	inline bool equipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) {
+		return unequipLeftHand() && onEquipLeftHand(type, owner);
+	}
+	inline bool equipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) {
+		return unequipRightHand() && onEquipRightHand(type, owner);
+	}
+	inline bool equipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) {
+		return unequipBothHands() && onEquipDoubleHanded(type, owner);
+	}
+
 };

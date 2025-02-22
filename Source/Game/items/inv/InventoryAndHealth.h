@@ -102,7 +102,7 @@ public:
 
 	virtual void kill();
 
-	virtual void unequipClothes() override; 
+	virtual void stripClothes() override; 
 	
 
 	////////////////////////////////////////

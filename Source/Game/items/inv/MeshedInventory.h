@@ -183,12 +183,10 @@ public:
 	virtual bool onEquipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
 
 	virtual bool onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
-	
-	virtual void unequipProjectile() override;
 
-	virtual void unequipHands() override;
+	virtual void stripHands() override;
 
-	virtual void unequipClothes() override;
+	virtual void stripClothes() override;
 
 	virtual void NotifyAttackAnimationFinished() {
 		DisableWeaponTrace();

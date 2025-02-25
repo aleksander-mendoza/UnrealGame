@@ -6,6 +6,9 @@
 #include "Blueprint/UserWidget.h"
 #include "../../items/ItemInstance.h"
 #include "Components/ListView.h"
+#include "Components/TextBlock.h"
+#include "Components/Button.h"
+#include "Components/HorizontalBox.h"
 #include "Inventory.generated.h"
 
 class AGamePlayerController;
@@ -38,5 +41,20 @@ public:
 	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
 	UListView* ItemListView;
 
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UHorizontalBox* Header;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton* NpcButton;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton* PlayerButton;
+
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UTextBlock* NpcName;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UTextBlock* PlayerName;
 	
 };

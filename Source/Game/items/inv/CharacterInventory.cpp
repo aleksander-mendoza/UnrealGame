@@ -55,6 +55,7 @@ bool UCharacterInventory::equipClothes(const UClothingItem* type, TObjectPtr<UIt
 		check(owner->Owner == this);
 		check(Items.Contains(owner));
 		if ((occupiedDeviousClothingSlots & type->ClothingSlots) != 0) return false;
+		if (type->isSkeletalMeshNull())return false;
 		if ((occupiedClothingSlots & type->ClothingSlots) != 0) {
 			for (int clothesIdx = Clothes.Num(); clothesIdx >= 0; clothesIdx--) {
 				TObjectPtr<UItemInstance>  equippedItemObj = Clothes[clothesIdx];

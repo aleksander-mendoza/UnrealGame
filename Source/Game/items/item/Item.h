@@ -117,6 +117,9 @@ public:
 	inline USkeletalMesh* getSkeletalMesh() const {
 		return WearableMesh.LoadSynchronous();
 	}
+	inline bool isSkeletalMeshNull() const {
+		return WearableMesh.IsNull();
+	}
 	inline UStaticMesh* getMesh() const {
 		return Mesh.LoadSynchronous();
 	}

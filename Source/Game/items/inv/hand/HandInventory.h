@@ -44,7 +44,7 @@ struct GAME_API FHandInventory
 	}
 
 	inline FVector getHandLocation(const USkeletalMeshComponent* const playerMesh) const {
-		return BareHandSocket->GetSocketLocation(playerMesh);
+		return IsValid(BareHandSocket)? BareHandSocket->GetSocketLocation(playerMesh): FVector();
 	}
 	inline FTransform getBladeTransform(bool start) const {
 		return getBladeSocket(start).GetSocketTransform(HandMesh);

@@ -11,7 +11,12 @@ void ULootAll::sample(UActorInventory* inv, int count)
 		UWorld* world = inv->GetWorld();
 		for (int i = 0; i < Items.Num(); i++) {
 			FLootItem& item = Items[i];
-			item.Item->sample(inv, item.getQuantity()* count);
+			if (IsValid(item.Item)) {
+				int qty = item.getQuantity();
+				if (qty > 0) {
+					item.Item->sample(inv, qty * count);
+				}
+			}
 		}
 	}
 }

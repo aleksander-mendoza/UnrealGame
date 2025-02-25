@@ -44,8 +44,8 @@ void UMeshedInventory::InitializeComponent()
 	check(BareHandedMoveset != nullptr);
 	Left.BareHandSocket = getPlayerMesh()->GetSocketByName(BareHandedMoveset->LeftUnsheathSocket);
 	Right.BareHandSocket = getPlayerMesh()->GetSocketByName(BareHandedMoveset->RightUnsheathSocket);
-	check(Left.BareHandSocket != nullptr);
-	check(Right.BareHandSocket != nullptr);
+	//check(Left.BareHandSocket != nullptr);
+	//check(Right.BareHandSocket != nullptr);
 }
 
 

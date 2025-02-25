@@ -1,0 +1,73 @@
+{
+	"FileVersion": 3,
+	"Version": 2022,
+	"VersionName": "5.5.0.467",
+	"FriendlyName": "DazToUnreal",
+	"Description": "",
+	"Category": "Other",
+	"CreatedBy": "David Vodhanel",
+	"CreatedByURL": "",
+	"DocsURL": "https://davidvodhanel.com/",
+	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/content/070a312bc04c48bcb1a4d193aaddf73e",
+	"SupportURL": "https://github.com/daz3d/DazToUnreal/issues",
+	"CanContainContent": true,
+	"Installed": true,
+	"Modules": [
+		{
+			"Name": "DazToUnreal",
+			"Type": "Editor",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "EditorScriptingUtilities",
+			"Enabled": true
+		},
+		{
+			"Name": "LiveLink",
+			"Enabled": true
+		},
+		{
+			"Name": "IKRig",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "AlembicImporter",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "MLDeformerFramework",
+			"Enabled": true
+		},
+		{
+			"Name": "NNI",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "NeuralMorphModel",
+			"Enabled": true
+		},
+		{
+			"Name": "VertexDeltaModel",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "ControlRig",
+			"Enabled": true,
+			"Optional": true
+		},
+		{
+			"Name": "LiveLinkControlRig",
+			"Enabled": true,
+			"Optional": true
+		}
+	]
+}

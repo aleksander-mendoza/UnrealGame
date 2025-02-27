@@ -5,11 +5,14 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/ListView.h"
-#include "../../GameCharacter.h"
+#include "Components/Button.h"
 #include "ColorPicker.h"
+#include "../../character/designer/BodyPart.h"
 #include "RaceMenu.generated.h"
 
+class UGameCharacterInventory;
 class URaceMenuEntryObject;
+class URaceMenuControlEntry;
 /**
  * 
  */
@@ -24,37 +27,79 @@ class GAME_API URaceMenu : public UUserWidget
 protected:
 	virtual void NativeConstruct() override;
 
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true", RowType = "Hairdo"))
-	UDataTable* Hairdos;
+	EBodyPart currentBodypart = EBodyPart::BODY;
+	UGameCharacterInventory* Player;
 
 	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
 	UListView* ControlListView;
 
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton * AssCategoryButton;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton* BreastCategoryButton;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton* PussyCategoryButton;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton* FemaleLegsCategoryButton;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton* FemaleArmsCategoryButton;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton* FemaleBodyCategoryButton;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton* FemaleFaceCategoryButton;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton* MaleGenderButton;
+
+	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
+	UButton* FemaleGenderButton;
 
 	UPROPERTY(VisibleAnywhere, meta = (BindWidget))
 	UColorPicker* ColorPicker;
 
 	URaceMenuEntryObject* ColorPickerSubscriber;
+	UPROPERTY()
+	TArray<URaceMenuEntryObject*> AllEntries;
 
 	UFUNCTION()
 	void OnColorChanged(FLinearColor rgb);
+	UFUNCTION()
+	void OnAssCategory(){ refilterEntries(EBodyPart::ASS ); }
+	UFUNCTION()
+	void OnBreastCategory() { refilterEntries(EBodyPart::BREASTS  ); }
+	UFUNCTION()
+	void OnPussyCategory() { refilterEntries(EBodyPart::GENITALS  ); }
+	UFUNCTION()
+	void OnFemaleLegsCategory() { refilterEntries(EBodyPart::LEGS  ); }
+	UFUNCTION()
+	void OnFemaleArmsCategory() { refilterEntries(EBodyPart::ARMS  ); }
+	UFUNCTION()
+	void OnFemaleBodyCategory() { refilterEntries(EBodyPart::BODY  ); }
+	UFUNCTION()
+	void OnFemaleFaceCategory() { refilterEntries(EBodyPart::HEAD  ); }
+	UFUNCTION()
+	void OnMaleGender() { refilterEntries(currentBodypart, false); }
+	UFUNCTION()
+	void OnFemaleGender() { refilterEntries(currentBodypart, true); }
 
 
 public:
-	void setSliderValues(AGameCharacter* character);
+	void setupAllEntries(UGameCharacterInventory* character);
+	void refilterEntries(EBodyPart bodyPart, bool isFemale);
+	void refilterEntries(EBodyPart bodyPart);
+	void refreshEntries();
 	inline void openColorPicker(URaceMenuEntryObject* entry) {
-		if (ColorPickerSubscriber == entry || entry ==nullptr) {
-			ColorPicker->SetVisibility(ESlateVisibility::Collapsed);
-			ColorPickerSubscriber = nullptr;
-		}
-		else {
-			ColorPicker->SetVisibility(ESlateVisibility::Visible);
-			ColorPickerSubscriber = entry;
-		}
+		ColorPickerSubscriber = ColorPickerSubscriber == entry ? nullptr : entry;
+		ColorPicker->SetVisibility(ColorPickerSubscriber == nullptr ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 	}
 private:
-	void AddMorphTargetEntry(AGameCharacter* player, FName morphTarget, FString name, float minValue = 0, float maxValue = 1, float defaultValue = 0);
+	
 
 	
 };

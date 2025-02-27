@@ -10,11 +10,17 @@
  * 
  */
 USTRUCT(BlueprintType)
-struct GAME_API FHairdo : public FTableRowBase
+struct GAME_API FHairdo 
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FText Name;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	bool SimulatePhysics;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TSoftObjectPtr<USkeletalMesh> Mesh;
 
 	inline USkeletalMesh* getSkeletalMesh() const{

@@ -55,7 +55,7 @@ public:
 	inline USkeletalMeshComponent* getPlayerMesh() {
 		return PlayerMesh;
 	}
-	void setPlayerMesh(USkeletalMeshComponent* playerMesh) {
+	virtual void setPlayerMesh(USkeletalMeshComponent* playerMesh) {
 		PlayerMesh = playerMesh;
 		CurrentMoveset = BareHandedMoveset;
 	}

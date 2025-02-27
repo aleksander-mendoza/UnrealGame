@@ -3,9 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "../../character/designer/BodyPart.h"
 #include "RaceMenuEntryObject.generated.h"
 
-class AGameCharacter;
+class UGameCharacterInventory;
 class URaceMenu;
 class URaceMenuControlEntry;
 UCLASS()
@@ -18,14 +19,20 @@ public:
 	UPROPERTY()
 	FText Name;
 	
-	AGameCharacter* Character;
+	UGameCharacterInventory* Character;
 	URaceMenu* menu;
+	EBodyPart bodyPart= EBodyPart::BODY;
+	URaceMenuControlEntry* Entry;
+	bool IsForFemales=true;
+	bool IsForMales=true;
 
 	virtual float SetScalarValue(float val) { return val; };
 	virtual void SetColorValue(FLinearColor rgb) {};
-	virtual void Setup(URaceMenuControlEntry* entry) {};
+	virtual void Setup(URaceMenuControlEntry* entry) {
+		Entry = entry;
+	};
 	virtual void ResetToDefault() {};
-	void Init(FText name, AGameCharacter* player, URaceMenu* racemenu) {
+	void Init(FText name, UGameCharacterInventory* player, URaceMenu* racemenu) {
 		Name = name;
 		Character = player;
 		menu = racemenu;
@@ -46,7 +53,7 @@ public:
 	virtual void ResetToDefault() override {
 		SetScalarValue(DefaultValue);
 	}
-	inline void InitScalar(FText name, AGameCharacter* player, URaceMenu* racemenu, float value, float minValue = 0, float maxValue = 1, float defaultValue = 0, float stepSize=0.001) {
+	inline void InitScalar(FText name, UGameCharacterInventory* player, URaceMenu* racemenu, float value, float minValue = 0, float maxValue = 1, float defaultValue = 0, float stepSize=0.001) {
 		Init(name, player, racemenu);
 		MaxValue = maxValue;
 		MinValue = minValue;
@@ -67,7 +74,7 @@ public:
 	
 
 	virtual float SetScalarValue(float val) override;
-	void InitMorphTarget(FText name, AGameCharacter* player, URaceMenu* racemenu, FName morphTarget, float minValue = 0, float maxValue = 1, float defaultValue = 0);
+	void InitMorphTarget(FText name, UGameCharacterInventory* player, URaceMenu* racemenu, FName morphTarget, float minValue = 0, float maxValue = 1, float defaultValue = 0);
 };
 
 
@@ -78,12 +85,9 @@ class GAME_API URaceMenuEntryObjectHairdoPicker : public URaceMenuEntryObjectSca
 
 public:
 
-	UDataTable * Hairdos;
-	TArray<FName> HairdoNames;
-
-
+	virtual void Setup(URaceMenuControlEntry* entry) override;
 	virtual float SetScalarValue(float val) override;
-	void InitHairdoPicker(AGameCharacter* player, URaceMenu* racemenu);
+	void InitHairdoPicker(UGameCharacterInventory* player, URaceMenu* racemenu);
 };
 
 
@@ -97,7 +101,7 @@ public:
 	FLinearColor DefaultValue;
 
 
-	void InitColorPicker(FText name, AGameCharacter* player, URaceMenu* racemenu, FLinearColor defaultValue) {
+	void InitColorPicker(FText name, UGameCharacterInventory* player, URaceMenu* racemenu, FLinearColor defaultValue) {
 		Init(name, player, racemenu);
 		DefaultValue = defaultValue;
 	}
@@ -115,6 +119,6 @@ class GAME_API URaceMenuEntryObjectHairColorPicker : public URaceMenuEntryObject
 
 public:
 
-	void InitHairColorPicker(AGameCharacter* player, URaceMenu* racemenu);
+	void InitHairColorPicker(UGameCharacterInventory* player, URaceMenu* racemenu);
 	virtual void SetColorValue(FLinearColor rgb) override;
 };

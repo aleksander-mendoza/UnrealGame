@@ -22,8 +22,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UAnimMontage> BowShootArrow;
 
-	virtual bool startAttack(UGameCharacterInventory* user, bool leftHand) const override;
-	virtual void endAttack(UGameCharacterInventory* user, bool leftHand) const override;
-	virtual void cancelAttack(UGameCharacterInventory* user) const override;
+	virtual bool startAttack(UCombatInventory* user, bool leftHand) const override;
+	virtual void endAttack(UCombatInventory* user, bool leftHand) const override;
+	virtual void cancelAttack(UCombatInventory* user) const override;
 	
 };

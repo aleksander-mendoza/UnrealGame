@@ -267,7 +267,7 @@ void AGamePlayerController::TriggerRaceMenu(const FInputActionValue& Value)
 				FInputModeGameAndUI Mode;
 				Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
 				Mode.SetHideCursorDuringCapture(false);
-				Mode.SetWidgetToFocus(hud->showRaceMenu(GameCharacter)->TakeWidget());
+				Mode.SetWidgetToFocus(hud->showRaceMenu(GameCharacter->GameMovement->Inventory)->TakeWidget());
 				SetInputMode(Mode);
 
 			} 

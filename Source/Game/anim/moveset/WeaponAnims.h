@@ -7,7 +7,7 @@
 #include "../ArmedPoseType.h"
 #include "WeaponAnims.generated.h"
 
-class UGameCharacterInventory;
+class UCombatInventory;
 /**
  * 
  */
@@ -87,9 +87,9 @@ public:
 		return uint8(ArmedPose) < uint8(other->ArmedPose) ? other : this;
 	}
 
-	virtual bool startAttack(UGameCharacterInventory* user, bool leftHand) const;
-	virtual void endAttack(UGameCharacterInventory* user, bool leftHand) const;
-	virtual void cancelAttack(UGameCharacterInventory* user) const;
+	virtual bool startAttack(UCombatInventory* user, bool leftHand) const;
+	virtual void endAttack(UCombatInventory* user, bool leftHand) const;
+	virtual void cancelAttack(UCombatInventory* user) const;
 
 	
 };

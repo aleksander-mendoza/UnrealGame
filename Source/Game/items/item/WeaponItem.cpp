@@ -67,12 +67,12 @@ float UDoubleHandedWeaponItem::getTotalDamage(UInventoryAndHealth* user) const
 	return Damage * user->Health.DoubleHandedWeaponDamageMultiplier;
 }
 
-bool UWeaponItem::startAttack(UGameCharacterInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const
+bool UWeaponItem::startAttack(UCombatInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const
 {
 	return Moveset->startAttack(user, leftHand);
 }
 
-void UWeaponItem::endAttack(UGameCharacterInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const
+void UWeaponItem::endAttack(UCombatInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const
 {
 	Moveset->endAttack(user, leftHand);
 }

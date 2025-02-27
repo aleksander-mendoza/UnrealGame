@@ -4,7 +4,7 @@
 #include "BowAnims.h"
 #include "../../GameCharacter.h"
 
-bool UBowAnims::startAttack(UGameCharacterInventory* user, bool leftHand) const
+bool UBowAnims::startAttack(UCombatInventory* user, bool leftHand) const
 {
 	if (leftHand) {
 		user->BowShot = false;
@@ -19,7 +19,7 @@ bool UBowAnims::startAttack(UGameCharacterInventory* user, bool leftHand) const
 	return false;
 }
 
-void UBowAnims::endAttack(UGameCharacterInventory* user, bool leftHand) const
+void UBowAnims::endAttack(UCombatInventory* user, bool leftHand) const
 {
 	if (user->ArmedPoseType == EArmedPoseType::BOW_AIMED) {
 		user->setArmedStatus(EArmedPoseType::BOW);
@@ -35,7 +35,7 @@ void UBowAnims::endAttack(UGameCharacterInventory* user, bool leftHand) const
 	user->wantsToAttack = false;
 }
 
-void UBowAnims::cancelAttack(UGameCharacterInventory* user) const
+void UBowAnims::cancelAttack(UCombatInventory* user) const
 {
 	
 	if (user->ArmedPoseType == EArmedPoseType::BOW_AIMED) {

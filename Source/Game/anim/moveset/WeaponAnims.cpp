@@ -5,7 +5,7 @@
 #include "../../items/inv/GameCharacterInventory.h"
 
 
-bool UWeaponAnims::startAttack(UGameCharacterInventory* user, bool leftHand) const
+bool UWeaponAnims::startAttack(UCombatInventory* user, bool leftHand) const
 {
 	const FWeaponAnim* anim = GetAnim();
 	check(!user->IsPlayingAttackAnim());
@@ -18,12 +18,12 @@ bool UWeaponAnims::startAttack(UGameCharacterInventory* user, bool leftHand) con
 }
 
 
-void UWeaponAnims::endAttack(UGameCharacterInventory* user, bool leftHand) const
+void UWeaponAnims::endAttack(UCombatInventory* user, bool leftHand) const
 {
 
 }
 
-void UWeaponAnims::cancelAttack(UGameCharacterInventory* user) const
+void UWeaponAnims::cancelAttack(UCombatInventory* user) const
 {
 	
 	if (user->IsPlayingAttackAnim()) {

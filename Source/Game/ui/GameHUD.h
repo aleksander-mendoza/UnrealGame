@@ -73,9 +73,9 @@ public:
 		DialogueWidget->setup(npc, player, stage);
 		return DialogueWidget;
 	}
-	inline TObjectPtr<URaceMenu> showRaceMenu(AGameCharacter* GameCharacter) {
+	inline TObjectPtr<URaceMenu> showRaceMenu(UGameCharacterInventory* GameCharacter) {
 		RaceMenuInterface = CreateWidget<URaceMenu>(GetWorld(), RaceMenuWidgetClass);
-		RaceMenuInterface->setSliderValues(GameCharacter);
+		RaceMenuInterface->setupAllEntries(GameCharacter);
 		RaceMenuInterface->AddToViewport(9999); // Z-order, this just makes it render on the very top.
 		RaceMenuInterface->SetKeyboardFocus();
 		return RaceMenuInterface;

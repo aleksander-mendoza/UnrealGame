@@ -77,12 +77,6 @@ AGameCharacter::AGameCharacter(const FObjectInitializer& ObjectInitializer) : Su
 	GameMovement->Inventory->setPlayerMesh(playerMesh);
 	
 
-
-	HairMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HairSkeletalMesh"));
-	HairMeshComponent->SetupAttachment(playerMesh, "hairSocket");
-	HairMeshComponent->SetSimulatePhysics(true);
-
-	SetGender(GameMovement->Inventory->IsFemale());
 }
 
 

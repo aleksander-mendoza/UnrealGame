@@ -3,147 +3,81 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
-#include "WorldEntityInventory.h"
+#include "CombatInventory.h"
+#include "../../character/designer/Race.h"
 #include "GameCharacterInventory.generated.h"
 
-#define ATTACK_DISABLED INFINITY
-#define ATTACK_STOP_BLENDOUT 0.2
-//DECLARE_DELEGATE_OneParam(FStringDelegate, FString);
-
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class GAME_API UGameCharacterInventory  : public UWorldEntityInventory
+class GAME_API UGameCharacterInventory  : public UCombatInventory
 {
 	GENERATED_BODY()
 
 	
 
 public:	
-	
-	EArmedPoseType ArmedPoseType = EArmedPoseType::UNARMED;
-	bool BowShot = false;
-	bool isAttackLeftHanded = false;
-	bool wantsToAttack = false;
-	bool wantsToAttackLeftHanded = false;
-	float attackCooldown = 0;
-	const FWeaponAnim* CurrentAttackAnim;
+
+	/** The male skeletal mesh associated with this Character (optional sub-object). */
+	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<URace> Race;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
+	FLinearColor HairColor = FLinearColor(0., 0., 1.);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
+	int HairdoIndex = -1;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
+	FName HairSocket;
+
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> HairMeshComponent;
+
+	UPROPERTY()
+	UMaterialInstanceDynamic* DynamicHairMaterial = nullptr;
 
 	////////////////////////////////////////
 	/////////////// GETTERS ////////////////
 	////////////////////////////////////////
-	inline bool WantsToAttack() {
-		return wantsToAttack;
+	
+	inline const FGender& GetGender() const{
+		return Race->getGender(IsFemale());
 	}
-	inline bool WantsToAttack(bool leftHand) {
-		return wantsToAttack && wantsToAttackLeftHanded == leftHand;
-	}
-	inline bool WantsToAttackLeft() {
-		return WantsToAttack(true);
-	}
-	inline bool WantsToAttackRight() {
-		return WantsToAttack(false);
-	}
-	inline EArmedPoseType getArmedStatus() {
-		return ArmedPoseType;
-	}
-	inline void setArmedStatus(EArmedPoseType pose) {
-		ArmedPoseType = pose;
-	}
-	inline bool IsPlayingAttackAnim() const {
-		return CurrentAttackAnim != nullptr;
-	}
-	inline bool AttackAnimRequiresMirroring() {
-		if (CurrentAttackAnim != nullptr) {
-			return CurrentAttackAnim->IsLeftHanded == isAttackLeftHanded;
+	inline void SetGender(const  bool isFemale) {
+		if (isFemale != IsFemale()) {
+			USkeletalMeshComponent* mesh = getPlayerMesh();
+			mesh->SetSkeletalMesh(Race->getBodyMesh(isFemale));
+			mesh->SetAnimInstanceClass(Race->getAnimClass(isFemale));
+			Health.IsFemale = isFemale;
 		}
-		return false;
 	}
-	inline void DisableAttacking() {
-		EnableAttacking(ATTACK_DISABLED);
+	inline bool hasHair() const{
+		return HairdoIndex >= 0;
 	}
-	inline bool IsBowShot() {
-		return BowShot;
+	inline FText getHairdoName() const {
+		if (HairdoIndex < 0)return FText::FromString("Bald");
+		return GetGender().Hairdos[HairdoIndex].Name;
 	}
-	inline bool AimsBow() {
-		return ArmedPoseType == EArmedPoseType::BOW_AIMED;
+	inline int getHairdo() const {
+		return HairdoIndex;
 	}
-	inline bool CanJump() {
-		return !AimsBow() && Health.CanJump();
+	void setHairdo(int index);
+	inline FLinearColor getHairColor() {
+		return HairColor;
 	}
-	inline bool CanRun() {
-		return !AimsBow() && Health.CanRun();
+	inline void setHairColor(FLinearColor rgb) {
+		HairColor = rgb;
+		if (DynamicHairMaterial != nullptr) {
+			DynamicHairMaterial->SetVectorParameterValue("color", rgb);
+		}
 	}
-	inline float GetAttackCooldown() {
-		return Health.GetAttackCooldown(getArmedStatus());
-	}
-	////////////////////////////////////////
-	/////////////// ATTACKS ////////////////
-	////////////////////////////////////////
 
-	void becomeArmed();
-	void becomeUnarmed();
-	void playAnim(const FWeaponAnim * anim);
-	inline void stopAnim(float blendout = ATTACK_STOP_BLENDOUT) {
-		check(IsPlayingAttackAnim());
-		check(CurrentAttackAnim->Anim != nullptr);
-		getAnimInstance()->Montage_Stop(blendout, CurrentAttackAnim->Anim);
-		CurrentAttackAnim = nullptr;
-	}
-	bool startAttack() {
-		return startAttack(wantsToAttackLeftHanded);
-	}
-	bool startAttack(bool leftHand);
-	void endAttack(bool leftHand);
-
-
-	inline void cancelAttack() {
-		wantsToAttack = false;
-		getCurrentMoveset()->cancelAttack(this);
-	}
-	inline void EnableAttacking(float cooldown = 0) {
-		attackCooldown = cooldown;
-	}
-	bool bowReadyToShoot = false;
-	void NotifyBowReadyToShoot() {
-		bowReadyToShoot = true;
-	}
-	virtual void NotifyAttackAnimationFinished() override {
-		Super::NotifyAttackAnimationFinished();
-		EnableAttacking();
-		CurrentAttackAnim = nullptr;
-	}
-	void OnComboPartEnd();
-	
-	
-
-	////////////////////////////////////////
-	/////////////// EVENTS  ////////////////
-	////////////////////////////////////////
-	
-	virtual bool onUnequipProjectile() override;
-
-	virtual bool onUnequipDoubleHanded() override;
-
-	virtual bool onUnequipLeftHand() override;
-
-	virtual bool onUnequipRightHand() override;
-
-	virtual bool onEquipProjectile(const UProjectileItem* type, TObjectPtr<UItemInstance>  owner) override;
-
-	virtual bool onEquipDoubleHanded(const UDoubleHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
-
-	virtual bool onEquipLeftHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
-
-	virtual bool onEquipRightHand(const UOneHandedWeaponItem* type, TObjectPtr<UItemInstance>  owner) override;
-	
-	virtual void stripHands() override;
-
+	virtual void setPlayerMesh(USkeletalMeshComponent* playerMesh) override;
 	////////////////////////////////////////
 	/////////////// TICKS   ////////////////
 	////////////////////////////////////////
-	
-	bool TickCooldown(float DeltaTime);
 
-	void TickEverything(float DeltaTime);
+	inline void TickEverything(float DeltaTime) {
+		TickCombat(DeltaTime);
+	}
 
 };

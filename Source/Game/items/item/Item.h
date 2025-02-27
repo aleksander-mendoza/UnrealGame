@@ -11,6 +11,7 @@ class UGameCharacterInventory;
 class UItemInstance;
 class UInventoryAndHealth;
 class UCharacterInventory;
+class UCombatInventory;
 class UActorInventory;
 
 /**
@@ -66,9 +67,9 @@ public:
 		return use(affected, owner, true);
 	}
 
-	virtual bool startAttack(UGameCharacterInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const { return false; }
-	virtual void endAttack(UGameCharacterInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const { }
-	virtual void cancelAttack(UGameCharacterInventory* user, TObjectPtr<UItemInstance> owner) const { }
+	virtual bool startAttack(UCombatInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const { return false; }
+	virtual void endAttack(UCombatInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const { }
+	virtual void cancelAttack(UCombatInventory* user, TObjectPtr<UItemInstance> owner) const { }
 	
 	
 	UFUNCTION()

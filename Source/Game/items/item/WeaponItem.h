@@ -34,8 +34,8 @@ public:
 	virtual float getTotalDamage(UInventoryAndHealth* user) const override {
 		return getDamage();
 	}
-	virtual bool startAttack(UGameCharacterInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const override;	
-	virtual void endAttack(UGameCharacterInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const override;
+	virtual bool startAttack(UCombatInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const override;
+	virtual void endAttack(UCombatInventory* user, TObjectPtr<UItemInstance> owner, bool leftHand) const override;
 	virtual bool isLeftTheDominantHand() const {
 		return Moveset->IsLeftTheDominantHand;
 	}

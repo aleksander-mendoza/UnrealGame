@@ -18,7 +18,7 @@
 #include "items/Container.h" 
 #include "character/Hittable.h" 
 #include "character/Interactable.h"
-#include "character/Hairdo.h"
+
 #include "ui/NpcHealthBar.h"
 
 #include "character/GameCharacterMovementComponent.h"
@@ -62,31 +62,15 @@ class AGameCharacter : public ACharacter, public IHittable, public IInteractable
 	TObjectPtr<UPhysicsHandleComponent> PhysicsHandle;
 	double physicshandleDistance=-1;
 
-	/** The female skeletal mesh associated with this Character (optional sub-object). */
-	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<USkeletalMesh> FemaleMesh;
-
-	/** The male skeletal mesh associated with this Character (optional sub-object). */
-	UPROPERTY(Category = Mesh, EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<USkeletalMesh> MaleMesh;
 
 
 
-	/* The AnimBlueprint class to use. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
-	class TSubclassOf<UCharacterAnimInstance> FemaleAnimClass;
-
-	/* The AnimBlueprint class to use. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
-	class TSubclassOf<UCharacterAnimInstance> MaleAnimClass;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
 	FText CharacterName;
 
 	
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true"))
-	FLinearColor HairColor = FLinearColor(0., 0., 1.);
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -111,8 +95,6 @@ class AGameCharacter : public ACharacter, public IHittable, public IInteractable
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Mesh, meta = (AllowPrivateAccess = "true", RowType = "Hairdo"))
 	FDataTableRowHandle Hairdo;
 
-	UPROPERTY()
-	TObjectPtr<USkeletalMeshComponent> HairMeshComponent;
 
 
 
@@ -312,40 +294,7 @@ public:
 
 
 	
-	inline void SetGender(const  bool isFemale) {
-		if (isFemale != GameMovement->Inventory->IsFemale()) {
-			USkeletalMeshComponent * mesh = GetMesh();
-			mesh->SetSkeletalMesh(isFemale ? FemaleMesh : MaleMesh);
-			mesh->SetAnimInstanceClass(isFemale ? FemaleAnimClass : MaleAnimClass);
-			GameMovement->Inventory->Health.IsFemale = isFemale;
-			animInstane = nullptr;
-				
-		}
-	}
-	UMaterialInstanceDynamic* DynamicHairMaterial=nullptr;
-	inline void setHairdo(FDataTableRowHandle hairdo) {
-		Hairdo = hairdo;
-		USkeletalMesh* mesh=nullptr;
-		if (!Hairdo.IsNull()) {
-			mesh = Hairdo.GetRow<FHairdo>("")->getSkeletalMesh();
-			if (DynamicHairMaterial == nullptr) {
-				FSkeletalMaterial& mat = mesh->GetMaterials()[0];
-				DynamicHairMaterial = UMaterialInstanceDynamic::Create(mat.MaterialInterface, this);
-				DynamicHairMaterial->SetVectorParameterValue("color", HairColor);
-			}
-			HairMeshComponent->SetMaterial(0, DynamicHairMaterial);
-		}
-		HairMeshComponent->SetSkeletalMesh(mesh);
-	}
-	inline FLinearColor getHairColor() {
-		return HairColor;
-	}
-	void setHairColor(FLinearColor rgb) {
-		HairColor = rgb;
-		if (DynamicHairMaterial != nullptr) {
-			DynamicHairMaterial->SetVectorParameterValue("color", rgb);
-		}
-	}
+	
 	
 	
 

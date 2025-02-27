@@ -14,6 +14,7 @@
 
 class UInventoryEntry;
 class UActorInventory;
+class UCombatInventory;
 /**
  *
  */
@@ -70,13 +71,13 @@ public:
 	inline const UWeaponAnims * getMoveset() const {
 		return ItemType->getMoveset();
 	}
-	inline bool startAttack(UGameCharacterInventory* user, bool leftHand) {
+	inline bool startAttack(UCombatInventory* user, bool leftHand) {
 		return ItemType->startAttack(user, this, leftHand);
 	}
-	inline void endAttack(UGameCharacterInventory* user, bool leftHand) {
+	inline void endAttack(UCombatInventory* user, bool leftHand) {
 		return ItemType->endAttack(user, this, leftHand);
 	}
-	inline void cancelAttack(UGameCharacterInventory* user) {
+	inline void cancelAttack(UCombatInventory* user) {
 		return ItemType->cancelAttack(user, this);
 	}
 	inline bool use(UCharacterInventory* user, bool leftHand) {

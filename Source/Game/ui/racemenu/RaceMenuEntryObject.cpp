@@ -66,7 +66,7 @@ void URaceMenuEntryObjectHairdoPicker::Setup(URaceMenuControlEntry* entry)
 
 float URaceMenuEntryObjectHairdoPicker::SetScalarValue(float val)
 {
-	int ival = int(val+0.5);
+	int ival = FMath::RoundToInt(val+0.5);
 	Value = ival;
 	Character->setHairdo(ival);
 	FFormatNamedArguments Args;

@@ -1,0 +1,19 @@
+{
+    "application": "save_root_paths",
+    "version": 0.1,
+    "content": [
+        "C:/Users/Aleksander/Documents/DAZ 3D/Studio/My Library",
+        "C:/Users/Public/Documents/My DAZ 3D Library"
+    ],
+    "builtin_mdl": [
+        "C:/Program Files/DAZ 3D/DAZStudio4/shaders/iray",
+        "C:/Users/Aleksander/AppData/Roaming/DAZ 3D/Studio4/shaders/iray",
+        "C:/Users/Aleksander/AppData/Roaming/DAZ 3D/Studio4/temp/shaders/iray"
+    ],
+    "import_dirs": [
+    ],
+    "mdl_dirs": [
+    ],
+    "builtin_content" : "C:/ProgramData/DAZ 3D/Studio4/DAZ Built-in Content",
+    "cloud_content" : "C:/Users/Aleksander/Documents/DAZ 3D/Studio/My Daz Connect Library"
+}

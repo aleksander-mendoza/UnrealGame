@@ -20,12 +20,12 @@ void UGameCharacterInventory::setHairdo(int index)
 		HairMeshComponent = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass());
 		HairMeshComponent->RegisterComponent();
 		HairMeshComponent->AttachToComponent(playerMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, HairSocket);
-		HairMeshComponent->SetSkeletalMesh(mesh);
+		
 		HairMeshComponent->SetAnimInstanceClass(playerMesh->AnimClass);
 		HairMeshComponent->SetLeaderPoseComponent(playerMesh, true);
 		
 	}
-	
+	HairMeshComponent->SetSkeletalMesh(mesh);
 	HairMeshComponent->SetSimulatePhysics(gender.Hairdos[HairdoIndex].SimulatePhysics);
 
 	if (DynamicHairMaterial == nullptr) {

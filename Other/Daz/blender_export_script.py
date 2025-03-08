@@ -1,5 +1,7 @@
 import os
 import sys
+
+import cv2
 import numpy as np
 import bpy
 import bmesh
@@ -103,14 +105,23 @@ class DazOptimizer:
             body_tile = Image.open(img_file_paths['Body'][map_type])
             arms_tile = Image.open(img_file_paths['Arms'][map_type])
             legs_tile = Image.open(img_file_paths['Legs'][map_type])
-            nails_tile = Image.open(img_file_paths['Nails'][map_type]) if map_type in img_file_paths['Nails'] else None
+
             head_tile = np.array(head_tile)
             body_tile = np.array(body_tile)
             arms_tile = np.array(arms_tile)
             legs_tile = np.array(legs_tile)
-            nails_tile = None if nails_tile is None else np.array(nails_tile)
             s = legs_tile.shape[0]
             s2 = s * 2
+            if map_type != "NM":
+                nails_tile = Image.open(img_file_paths['Nails'][map_type])
+                nails_tile = np.array(nails_tile)
+                nails_tile_size = s2//8
+                if map_type == "R":
+                    nails_tile = np.average(nails_tile, axis=2)
+                nails_tile = cv2.resize(nails_tile, (nails_tile_size, nails_tile_size))
+
+            else:
+                nails_tile = None
 
             def shift_img(img: np.ndarray, y0, y1, x0, x1, mask: np.ndarray, translation: [float, float], hflip=False):
                 shape = [s2, s2, legs_tile.shape[2]] if len(legs_tile.shape) > 2 else [s2, s2]
@@ -136,12 +147,14 @@ class DazOptimizer:
             packed += shift_img(head_tile, s, s2, 0, s, head_region_mask == LIP_COLOR, LIP_TRANS)
             # packed += shift_img(head, s, s2, s, s2, head_region_mask == HEAD_COLOR, [0.008526, 0.019377])
             packed[s:, :s] = head_tile
+            if nails_tile is not None:
+                packed[s2-nails_tile_size:s2, s:s+nails_tile_size] = nails_tile
 
             # packed[:s, :s] = legs_tile
             # packed[s:, s:] = body_tile
             # packed[:s, s:] = arms_tile
             packed = Image.fromarray(packed)
-            packed.save(os.path.join(self.workdir, self.name + '_' + map_type + '.' + extension))
+            packed.save(os.path.join(self.workdir, self.name + '_' + map_type + '.png'))
             # plt.imshow(packed)
             # plt.show()
 
@@ -260,7 +273,6 @@ class DazOptimizer:
         bpy.ops.uv.select_split()
 
         base_layer_np = self.get_base_uv_layer_np()
-        pixel_class = get_pixel_class()
         selection = self.get_base_uv_layer_selection_np()
         base_layer_np[selection] = base_layer_np[selection] / 4 + LIP_TRANS
         self.update_base_uv_layer(base_layer_np)

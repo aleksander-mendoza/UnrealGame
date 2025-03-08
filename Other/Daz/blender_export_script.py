@@ -2,14 +2,17 @@ import os
 import sys
 import numpy as np
 import bpy
+import bmesh
 
 BOT_ARM_TRANS = [-0.072266 - 0.006897, 0.085937 + 0.009853]
 TOP_ARM_TRANS = [0.043945, 0.006836]
 RIGHT_LEG_TRANS = -0.014389
 BODY_TRANS = [0.0, 0.170266]
+LIP_TRANS = [1/4+1/16, -1/32]
 LEFT_LEG_COLOR = (64 * 256 + 24) * 256 + 126
 RIGHT_LEG_COLOR = (42 * 256 + 126) * 256 + 24
 BOT_ARM_COLOR = (62 * 256 + 21) * 256 + 211
+LIP_COLOR = (21 * 256 + 109) * 256 + 211
 TOP_ARM_COLOR = (255 * 256 + 0) * 256 + 0
 BODY_COLOR = (21 * 256 + 211) * 256 + 91
 HEAD_COLOR = (204 * 256 + 162) * 256 + 20
@@ -94,16 +97,18 @@ class DazOptimizer:
         print(img_file_paths)
         # from matplotlib import pyplot as plt
         for map_type in ["R", "NM", "SSS", "D"]:
-            head_file:str = img_file_paths['Head'][map_type]
+            head_file: str = img_file_paths['Head'][map_type]
             _, extension = head_file.rsplit('.', maxsplit=1)
             head_tile = Image.open(head_file)
             body_tile = Image.open(img_file_paths['Body'][map_type])
             arms_tile = Image.open(img_file_paths['Arms'][map_type])
             legs_tile = Image.open(img_file_paths['Legs'][map_type])
+            nails_tile = Image.open(img_file_paths['Nails'][map_type]) if map_type in img_file_paths['Nails'] else None
             head_tile = np.array(head_tile)
             body_tile = np.array(body_tile)
             arms_tile = np.array(arms_tile)
             legs_tile = np.array(legs_tile)
+            nails_tile = None if nails_tile is None else np.array(nails_tile)
             s = legs_tile.shape[0]
             s2 = s * 2
 
@@ -128,18 +133,19 @@ class DazOptimizer:
             packed += shift_img(legs_tile, 0, s, 0, s, legs_region_mask == LEFT_LEG_COLOR, [0, 0])
             packed += shift_img(legs_tile, 0, s, 0, s, legs_region_mask == RIGHT_LEG_COLOR, [RIGHT_LEG_TRANS, 0], True)
             packed += shift_img(body_tile, s, s2, s, s2, body_region_mask == BODY_COLOR, BODY_TRANS)
+            packed += shift_img(head_tile, s, s2, 0, s, head_region_mask == LIP_COLOR, LIP_TRANS)
             # packed += shift_img(head, s, s2, s, s2, head_region_mask == HEAD_COLOR, [0.008526, 0.019377])
             packed[s:, :s] = head_tile
+
             # packed[:s, :s] = legs_tile
             # packed[s:, s:] = body_tile
             # packed[:s, s:] = arms_tile
             packed = Image.fromarray(packed)
-            packed.save(os.path.join(self.workdir, self.name+'_'+map_type+'.'+extension))
+            packed.save(os.path.join(self.workdir, self.name + '_' + map_type + '.' + extension))
             # plt.imshow(packed)
             # plt.show()
 
     def get_body_mesh(self):
-        import bpy
         return bpy.data.objects['Tara 9 Mesh']
 
     def merge_geografts(self):
@@ -163,16 +169,30 @@ class DazOptimizer:
         bpy.context.view_layer.objects.active = BODY_RIG
         bpy.ops.object.join()
 
+    def get_base_uv_layer(self):
+        return self.get_body_mesh().data.uv_layers['Base Multi UDIM']
+
+    def get_base_uv_layer_np(self):
+        return np.array([v.uv for v in self.get_base_uv_layer().data])
+
+    def get_base_uv_layer_selection_np(self):
+        return np.array([v.select for v in self.get_base_uv_layer().data], dtype=bool)
+
+    def update_base_uv_layer(self, base_layer_np: np.ndarray):
+        for v, new_uv in zip(self.get_base_uv_layer().data, base_layer_np):
+            v.uv = new_uv
+
     def pack_uvs(self):
 
+        # ========= Concat UVs =========
         BODY_M = self.get_body_mesh()
         # pack UVs
         bpy.ops.object.select_all(action='DESELECT')
         BODY_M.select_set(True)
         bpy.context.view_layer.objects.active = BODY_M
         bpy.ops.object.mode_set(mode='OBJECT')
-        base_layer = BODY_M.data.uv_layers['Base Multi UDIM']
-        base_layer_np = np.array([v.uv for v in base_layer.data])
+        base_layer_np = self.get_base_uv_layer_np()
+        is_nails = 4 < base_layer_np[:, 0]
         base_layer_np *= 0.5
         out_of_bounds = base_layer_np[:, 0] > 1
         base_layer_np[out_of_bounds] += [-1, 0.5]
@@ -184,19 +204,66 @@ class DazOptimizer:
         base_layer_np[is_gp] = gp_layer_np[is_gp]
         uv_mask = self.get_uv_mask()
         uv_mask_size = uv_mask.shape[0]
-        pixel_coords = np.copy(base_layer_np)
-        pixel_coords[:, 1] = 1 - pixel_coords[:, 1]
-        pixel_coords = (pixel_coords * uv_mask_size).clip(0, uv_mask_size - 1)
-        pixel_coords = np.int32(pixel_coords)
-        pixel_class = uv_mask[pixel_coords[:, 1], pixel_coords[:, 0]]
-        shifted = np.copy(base_layer_np)
-        shifted[pixel_class == BOT_ARM_COLOR] += BOT_ARM_TRANS
-        shifted[pixel_class == TOP_ARM_COLOR] += TOP_ARM_TRANS
-        shifted[pixel_class == RIGHT_LEG_COLOR, 1] = 1.5 - shifted[pixel_class == RIGHT_LEG_COLOR, 1]
-        shifted[pixel_class == RIGHT_LEG_COLOR, 0] += RIGHT_LEG_TRANS
-        shifted[pixel_class == BODY_COLOR] += BODY_TRANS
-        for v, new_uv in zip(base_layer.data, shifted):
-            v.uv = new_uv
+
+        def get_pixel_class():
+            pixel_coords = np.copy(base_layer_np)
+            pixel_coords[:, 1] = 1 - pixel_coords[:, 1]
+            pixel_coords = (pixel_coords * uv_mask_size).clip(0, uv_mask_size - 1)
+            pixel_coords = np.int32(pixel_coords)
+            pix_cls = uv_mask[pixel_coords[:, 1], pixel_coords[:, 0]]
+            return pix_cls
+
+        pixel_class = get_pixel_class()
+
+        base_layer_np[pixel_class == BOT_ARM_COLOR] += BOT_ARM_TRANS
+        base_layer_np[pixel_class == TOP_ARM_COLOR] += TOP_ARM_TRANS
+        base_layer_np[pixel_class == RIGHT_LEG_COLOR, 1] = 1.5 - base_layer_np[pixel_class == RIGHT_LEG_COLOR, 1]
+        base_layer_np[pixel_class == RIGHT_LEG_COLOR, 0] += RIGHT_LEG_TRANS
+        base_layer_np[pixel_class == BODY_COLOR] += BODY_TRANS
+        base_layer_np[is_nails] = base_layer_np[is_nails] / 4 + [0.25, -0.5 / 4]
+        self.update_base_uv_layer(base_layer_np)
+
+        # ========= Separate lip UVs =========
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.context.scene.tool_settings.use_uv_select_sync = False
+        bpy.ops.uv.select_all(action='DESELECT')
+        bpy.ops.mesh.select_all(action='DESELECT')
+
+        me = bpy.context.object.data
+        bm = bmesh.from_edit_mesh(me)
+        uv_layer = bm.loops.layers.uv.verify()
+
+        # for v in bm.verts:
+        #    v.select_set(False)
+
+        for face in bm.faces:
+            full_loop = True
+            for loop in face.loops:
+                loop_uv = loop[uv_layer]
+                uv = np.array(loop_uv.uv)
+                uv[1] = 1 - uv[1]
+                pixel_coord = (uv * uv_mask_size).clip(0, uv_mask_size - 1)
+                pixel_coord = np.int32(pixel_coord)
+                pixel_cls = uv_mask[pixel_coord[1], pixel_coord[0]]
+                matched = pixel_cls == LIP_COLOR
+                # loop_uv.select = matched
+                full_loop = full_loop and matched
+                # if matched:
+                #    loop.vert.select_set(True)
+            face.select_set(full_loop)
+
+        # bm.select_mode = {'VERT', 'EDGE', 'FACE'}
+        bm.select_flush_mode()
+        # bpy.context.tool_settings.mesh_select_mode = (False, False, True)
+        bpy.ops.uv.select_all(action='SELECT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.uv.select_split()
+
+        base_layer_np = self.get_base_uv_layer_np()
+        pixel_class = get_pixel_class()
+        selection = self.get_base_uv_layer_selection_np()
+        base_layer_np[selection] = base_layer_np[selection] / 4 + LIP_TRANS
+        self.update_base_uv_layer(base_layer_np)
         # += [0.043945, 0.006836] # top arm
         # += [-0.072266 , 0.085937] # obttom arm
         # += [0.008526, 0.019377] # torso
@@ -204,14 +271,12 @@ class DazOptimizer:
         # -= 0.5 # nails
 
     def remove_default_cube(self):
-        import bpy
         for x in list(bpy.data.objects):
             bpy.data.objects.remove(x)
         for x in list(bpy.data.collections):
             bpy.data.collections.remove(x)
 
         # save file
-
 
     # *= 0.25# nails
     # -= 0.5 # nails
@@ -231,14 +296,21 @@ def save_textures(duf_filepath):
 
 
 def install_libraries():
+    pil_missing = False
+    opencv_missing = False
     try:
         import PIL
     except ModuleNotFoundError:
+        pil_missing = True
+    try:
+        import cv2
+    except ModuleNotFoundError:
+        opencv_missing = True
+    if pil_missing or opencv_missing:
         py_exe = sys.executable
         res_path = os.path.realpath(os.path.join(py_exe, "../../lib/site-packages"))
         print("Run the following command as an admin: ")
-        print('&"' + py_exe + '" -m pip install pillow "--target=' + res_path + '"')
-        exit()
+        print('&"' + py_exe + '" -m pip install pillow opencv-python "--target=' + res_path + '"')
 
 
 def run_outside_blender():
@@ -256,7 +328,6 @@ def run_outside_blender():
     subprocess.run(["blender", "-P", file_path, "--", duf_path])
 
     # Image("")
-
 
 
 bl_info = {
@@ -440,7 +511,7 @@ class DazAddBreastBones_operator(bpy.types.Operator):
         return context.mode == "OBJECT"
 
     def execute(self, context):
-        DazOptimizer().pack_uvs()
+        DazOptimizer().separate_lips()
 
         return {'FINISHED'}
 
@@ -491,7 +562,6 @@ class DazFitClothes_operator(bpy.types.Operator):
         DazOptimizer().pack_uvs()
 
         return {'FINISHED'}
-
 
 
 class DazOptimizeHair_operator(bpy.types.Operator):

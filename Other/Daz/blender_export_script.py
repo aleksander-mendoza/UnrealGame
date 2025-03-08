@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import bpy
 import bmesh
+import json
 
 BOT_ARM_TRANS = [-0.072266 - 0.006897, 0.085937 + 0.009853]
 TOP_ARM_TRANS = [0.043945, 0.006836]
@@ -127,7 +128,7 @@ class DazOptimizer:
         import re
 
         name_pattern = re.compile(
-            "([A-Za-z0-9_-]+)_([Hh]ead|[Ee]yelashes|[Ll]egs|[Nn]ails|[Bb]ody|[Aa]rms|[Mm]outh)[A-Z]?_(D|NM|R|SSS|C|nm)_[0-9]+\.jpg")
+            r"([A-Za-z0-9_-]+)_([Hh]ead|[Ee]yelashes|[Ll]egs|[Nn]ails|[Bb]ody|[Aa]rms|[Mm]outh|[Ee]yes_sclera[_0-9]*|[Ee]yes_iris[_0-9]*)[A-Za-z]?(_(D|NM|R|SSS|C|nm)(_[0-9]+)?)?\.(jpg|png)")
 
         img_file_paths = {}
         gp_map_types = {
@@ -149,7 +150,12 @@ class DazOptimizer:
                     if match:
                         object_name = match.group(1)
                         body_part = match.group(2).lower()
-                        map_type = match.group(3)
+                        map_type = match.group(4)
+                        if map_type is None or map_type == '':
+                            map_type = 'D'
+                        else:
+                            map_type = map_type.rstrip('_')
+                        body_part = body_part.rstrip('_0123456789')
                 if body_part is not None and map_type is not None:
                     file_path = os.path.join(root, file_name)
                     if body_part not in img_file_paths:
@@ -162,9 +168,10 @@ class DazOptimizer:
         body_region_mask = uv_region_mask[MASK_TILE_SIZE:, MASK_TILE_SIZE:]
         legs_region_mask = uv_region_mask[:MASK_TILE_SIZE, :MASK_TILE_SIZE]
         head_region_mask = uv_region_mask[MASK_TILE_SIZE:, :MASK_TILE_SIZE]
-        print(img_file_paths)
+
+        print(json.dumps(img_file_paths, indent=4))
         # from matplotlib import pyplot as plt
-        for map_type in ["R", "NM", "SSS", "D"]:
+        for map_type in ["D", "R", "NM", "SSS"]:
             print("map_type=", map_type)
             head_file: str = img_file_paths['head'][map_type]
             _, extension = head_file.rsplit('.', maxsplit=1)
@@ -177,8 +184,30 @@ class DazOptimizer:
             body_tile = np.array(body_tile)
             arms_tile = np.array(arms_tile)
             legs_tile = np.array(legs_tile)
+
             s = legs_tile.shape[0]
             s2 = s * 2
+            if ('eyes_iris' in img_file_paths and 'eyes_sclera' in img_file_paths
+                    and map_type in img_file_paths['eyes_iris'] and map_type in img_file_paths['eyes_sclera']):
+                iris = Image.open(img_file_paths['eyes_iris'][map_type])
+                sclera = Image.open(img_file_paths['eyes_sclera'][map_type])
+                iris = np.array(iris)
+                iris_rgb = iris[:,:,:3]
+                iris_a = iris[:, :, 3]
+                if iris_a.dtype.kind != 'f':
+                    iris_a = iris_a/255
+                sclera = np.array(sclera)
+                sclera_h, sclera_w = sclera.shape[:2]
+                sclera_h = sclera_h // 2
+                sclera = sclera[:sclera_h]
+                iris_h, iris_w = s // 8, s // 4
+                eyes = iris_rgb.T * iris_a.T + sclera.T * (1-iris_a.T)
+                eyes = eyes.T
+                eyes = cv2.resize(eyes, [iris_w, iris_h])
+
+            else:
+                eyes = None
+
             if map_type != "NM":
                 nails_tile = Image.open(img_file_paths['nails'][map_type])
                 nails_tile = np.array(nails_tile)
@@ -229,6 +258,9 @@ class DazOptimizer:
                 packed[s2-nails_tile_size:s2, s:s+nails_tile_size] = nails_tile
             if gp_tile is not None:
                 packed[s2 - gp_tile_size:s2, s2-gp_tile_size:s2] += gp_tile
+            if eyes is not None:
+                packed[s2 - s//4-s//8:s2-s//4, s+s//4:s+s//2] = eyes
+
             # packed[:s, :s] = legs_tile
             # packed[s:, s:] = body_tile
             # packed[:s, s:] = arms_tile
@@ -354,7 +386,9 @@ class DazOptimizer:
         bpy.context.view_layer.objects.active = BODY_M
         bpy.ops.object.mode_set(mode='OBJECT')
         base_layer_np = self.get_base_uv_layer_np()
-        is_nails = 4 < base_layer_np[:, 0]
+        is_nails = np.logical_and(4 < base_layer_np[:, 0], base_layer_np[:, 0] < 5)
+        is_eyes = np.logical_and(5 < base_layer_np[:, 0], base_layer_np[:, 0] < 6)
+        is_mouth = np.logical_and(6 < base_layer_np[:, 0], base_layer_np[:, 0] < 7)
         base_layer_np *= 0.5
         out_of_bounds = base_layer_np[:, 0] > 1
         base_layer_np[out_of_bounds] += [-1, 0.5]
@@ -383,6 +417,7 @@ class DazOptimizer:
         base_layer_np[pixel_class == RIGHT_LEG_COLOR, 0] += RIGHT_LEG_TRANS
         base_layer_np[pixel_class == BODY_COLOR] += BODY_TRANS
         base_layer_np[is_nails] = base_layer_np[is_nails] / 4 + [0.25, -0.5 / 4]
+        base_layer_np[is_eyes] = base_layer_np[is_eyes] / 4 + [-6/16 + 0.5 + 1/8, - 0.5 / 8]
         base_layer_np[is_gp] = gp_layer_np[is_gp] + GP_TRANS
         self.update_base_uv_layer(base_layer_np)
 
@@ -427,9 +462,6 @@ class DazOptimizer:
         base_layer_np = self.get_base_uv_layer_np()
         # pixel_class = get_pixel_class()
         selection = self.get_base_uv_layer_selection_np()
-        print("selection=", selection.shape)
-        print("base_layer_np=", base_layer_np.shape)
-        print("LIP_TRANS=", LIP_TRANS)
         base_layer_np[selection] = base_layer_np[selection] + LIP_TRANS
         self.update_base_uv_layer(base_layer_np)
         # += [0.043945, 0.006836] # top arm

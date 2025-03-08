@@ -18,6 +18,7 @@ LIP_COLOR = (21 * 256 + 109) * 256 + 211
 TOP_ARM_COLOR = (255 * 256 + 0) * 256 + 0
 BODY_COLOR = (21 * 256 + 211) * 256 + 91
 HEAD_COLOR = (204 * 256 + 162) * 256 + 20
+GP_TRANS = [1/2+1/8, 0]
 
 
 class DazOptimizer:
@@ -49,46 +50,111 @@ class DazOptimizer:
         uv_region_mask = (uv_region_mask[:, :, 0] * 256 + uv_region_mask[:, :, 1]) * 256 + uv_region_mask[:, :, 2]
         return uv_region_mask
 
+    def get_body_mesh(self):
+        return bpy.data.objects['Tara 9 Mesh']
+
+    def get_eyes_mesh(self):
+        return bpy.data.objects['Genesis 9 Eyes Mesh']
+
+    def get_base_uv_layer(self):
+        return self.get_body_mesh().data.uv_layers['Base Multi UDIM']
+
+    def get_base_uv_layer_np(self):
+        return np.array([v.uv for v in self.get_base_uv_layer().data])
+
+    def get_base_uv_layer_selection_np(self):
+        return np.array([v.select for v in self.get_base_uv_layer().data], dtype=bool)
+
+    def update_base_uv_layer(self, base_layer_np: np.ndarray):
+        for v, new_uv in zip(self.get_base_uv_layer().data, base_layer_np):
+            v.uv = new_uv
+
+    def optimize_eyes(self):
+        EYES_M = self.get_eyes_mesh()
+        bpy.ops.object.select_all(action='DESELECT')
+        EYES_M.select_set(True)
+        bpy.context.view_layer.objects.active = EYES_M
+
+        #uv_layer = EYES_M.data.uv_layers.active
+        #uvs = np.array([v.uv for v in uv_layer.data], dtype=bool)
+        #uvs[:, y] < 0.5
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.context.scene.tool_settings.use_uv_select_sync = False
+        bpy.ops.uv.select_all(action='DESELECT')
+        bpy.ops.mesh.select_all(action='DESELECT')
+
+        me = bpy.context.object.data
+        bm = bmesh.from_edit_mesh(me)
+        uv_layer = bm.loops.layers.uv.verify()
+
+        for v in bm.verts:
+            v.select = False
+
+        for face in bm.faces:
+            for loop in face.loops:
+                loop_uv = loop[uv_layer]
+                uv = np.array(loop_uv.uv)
+                dist = np.linalg.norm(uv % 0.5 - 0.25)
+                if uv[1] < 0.5 or dist > 0.24 or dist < 0.038:
+                    loop.vert.select = True
+        for v in bm.verts:
+            if v.select:
+                bm.verts.remove(v)
+
+        def select_loop(center):
+            for face in bm.faces:
+                for loop in face.loops:
+                    loop_uv = loop[uv_layer]
+                    uv = np.array(loop_uv.uv)
+                    dist = np.linalg.norm(uv - center)
+                    loop.vert.select_set(dist < 0.044)
+
+        bmesh.update_edit_mesh(me)
+
+        select_loop([0.25, 0.75])
+        bpy.ops.mesh.edge_face_add()
+        select_loop([0.75, 0.75])
+        bpy.ops.mesh.edge_face_add()
+
+        bmesh.update_edit_mesh(me)
+
+        #
+
+
+
     def concat_textures(self):
         from PIL import Image
         import re
 
         name_pattern = re.compile(
-            "([A-Za-z0-9_-]+)_(Head|Eyelashes|Legs|Nails|Body|Arms|Mouth)[A-Z]?_(D|NM|R|SSS|C)_[0-9]+\.jpg")
+            "([A-Za-z0-9_-]+)_([Hh]ead|[Ee]yelashes|[Ll]egs|[Nn]ails|[Bb]ody|[Aa]rms|[Mm]outh)[A-Z]?_(D|NM|R|SSS|C|nm)_[0-9]+\.jpg")
 
         img_file_paths = {}
-        gdir = self.genesis_dir()
-        for subdir in os.listdir(gdir):
-            subdir = os.path.join(gdir, subdir)
-            if os.path.isdir(subdir):
-                for file_name in os.listdir(subdir):
-                    match = name_pattern.fullmatch(file_name)
-                    if match:
-                        file_path = os.path.join(subdir, file_name)
-                        object_name = match.group(1)
-                        body_part = match.group(2)
-                        map_type = match.group(3)
-
-                        if body_part not in img_file_paths:
-                            img_file_paths[body_part] = {}
-                        img_file_paths[body_part][map_type] = file_path
-
-        gp_dir = self.gold_palace_dir()
-        if os.path.exists(gp_dir):
-            gp_map_types = {
-                "Roughness": "R",
-                "NormalMap": "NM",
-                "Speculairty": "SSS",
-                "Color": "D",
-            }
-            img_file_paths["G9GP"] = {}
-            for file_name in gp_dir:
+        gp_map_types = {
+            "Roughness": "R",
+            "NormalMap": "NM",
+            "Speculairty": "SSS",
+            "Color": "D",
+        }
+        for root, dirs, files in os.walk(self.textures_dir()):
+            for file_name in files:
+                body_part = None
+                map_type = None
                 if file_name.startswith("G9GP_") and file_name.endswith(".jpg"):
                     map_type = file_name[len("G9GP_"):-len(".jpg")]
-                    if map_type in gp_map_types:
-                        map_type = gp_map_types[map_type]
-                        file_path = os.path.join(gp_dir, file_name)
-                        img_file_paths["G9GP"][map_type] = file_path
+                    map_type = gp_map_types.get(map_type)
+                    body_part = "G9GP"
+                else:
+                    match = name_pattern.fullmatch(file_name)
+                    if match:
+                        object_name = match.group(1)
+                        body_part = match.group(2).lower()
+                        map_type = match.group(3)
+                if body_part is not None and map_type is not None:
+                    file_path = os.path.join(root, file_name)
+                    if body_part not in img_file_paths:
+                        img_file_paths[body_part] = {}
+                    img_file_paths[body_part][map_type] = file_path
 
         uv_region_mask = self.get_uv_mask()
         MASK_TILE_SIZE = uv_region_mask.shape[0] // 2
@@ -99,12 +165,13 @@ class DazOptimizer:
         print(img_file_paths)
         # from matplotlib import pyplot as plt
         for map_type in ["R", "NM", "SSS", "D"]:
-            head_file: str = img_file_paths['Head'][map_type]
+            print("map_type=", map_type)
+            head_file: str = img_file_paths['head'][map_type]
             _, extension = head_file.rsplit('.', maxsplit=1)
             head_tile = Image.open(head_file)
-            body_tile = Image.open(img_file_paths['Body'][map_type])
-            arms_tile = Image.open(img_file_paths['Arms'][map_type])
-            legs_tile = Image.open(img_file_paths['Legs'][map_type])
+            body_tile = Image.open(img_file_paths['body'][map_type])
+            arms_tile = Image.open(img_file_paths['arms'][map_type])
+            legs_tile = Image.open(img_file_paths['legs'][map_type])
 
             head_tile = np.array(head_tile)
             body_tile = np.array(body_tile)
@@ -113,15 +180,26 @@ class DazOptimizer:
             s = legs_tile.shape[0]
             s2 = s * 2
             if map_type != "NM":
-                nails_tile = Image.open(img_file_paths['Nails'][map_type])
+                nails_tile = Image.open(img_file_paths['nails'][map_type])
                 nails_tile = np.array(nails_tile)
                 nails_tile_size = s2//8
                 if map_type == "R":
                     nails_tile = np.average(nails_tile, axis=2)
+                    nails_tile = nails_tile.astype(legs_tile.dtype)
                 nails_tile = cv2.resize(nails_tile, (nails_tile_size, nails_tile_size))
 
             else:
                 nails_tile = None
+            if "G9GP" in img_file_paths and map_type in img_file_paths["G9GP"]:
+                gp_tile = Image.open(img_file_paths['G9GP'][map_type])
+                gp_tile = np.array(gp_tile)
+                gp_tile_size = s2 * 14 // 64
+                if map_type == "R":
+                    gp_tile = np.average(gp_tile, axis=2)
+                    gp_tile = gp_tile.astype(legs_tile.dtype)
+                gp_tile = cv2.resize(gp_tile, (gp_tile_size, gp_tile_size))
+            else:
+                gp_tile = None
 
             def shift_img(img: np.ndarray, y0, y1, x0, x1, mask: np.ndarray, translation: [float, float], hflip=False):
                 shape = [s2, s2, legs_tile.shape[2]] if len(legs_tile.shape) > 2 else [s2, s2]
@@ -149,7 +227,8 @@ class DazOptimizer:
             packed[s:, :s] = head_tile
             if nails_tile is not None:
                 packed[s2-nails_tile_size:s2, s:s+nails_tile_size] = nails_tile
-
+            if gp_tile is not None:
+                packed[s2 - gp_tile_size:s2, s2-gp_tile_size:s2] += gp_tile
             # packed[:s, :s] = legs_tile
             # packed[s:, s:] = body_tile
             # packed[:s, s:] = arms_tile
@@ -158,8 +237,6 @@ class DazOptimizer:
             # plt.imshow(packed)
             # plt.show()
 
-    def get_body_mesh(self):
-        return bpy.data.objects['Tara 9 Mesh']
 
     def merge_geografts(self):
 
@@ -182,18 +259,6 @@ class DazOptimizer:
         bpy.context.view_layer.objects.active = BODY_RIG
         bpy.ops.object.join()
 
-    def get_base_uv_layer(self):
-        return self.get_body_mesh().data.uv_layers['Base Multi UDIM']
-
-    def get_base_uv_layer_np(self):
-        return np.array([v.uv for v in self.get_base_uv_layer().data])
-
-    def get_base_uv_layer_selection_np(self):
-        return np.array([v.select for v in self.get_base_uv_layer().data], dtype=bool)
-
-    def update_base_uv_layer(self, base_layer_np: np.ndarray):
-        for v, new_uv in zip(self.get_base_uv_layer().data, base_layer_np):
-            v.uv = new_uv
 
     def pack_uvs(self):
 
@@ -211,10 +276,10 @@ class DazOptimizer:
         base_layer_np[out_of_bounds] += [-1, 0.5]
         gp_layer = BODY_M.data.uv_layers['Golden Palace']
         gp_layer_np = np.array([v.uv for v in gp_layer.data])
-        gp_layer_np *= 0.5
         is_gp = np.all(gp_layer_np > 0, axis=1)
-        gp_layer_np[:, 0] += 1
-        base_layer_np[is_gp] = gp_layer_np[is_gp]
+        gp_layer_np /= 8
+
+
         uv_mask = self.get_uv_mask()
         uv_mask_size = uv_mask.shape[0]
 
@@ -234,6 +299,7 @@ class DazOptimizer:
         base_layer_np[pixel_class == RIGHT_LEG_COLOR, 0] += RIGHT_LEG_TRANS
         base_layer_np[pixel_class == BODY_COLOR] += BODY_TRANS
         base_layer_np[is_nails] = base_layer_np[is_nails] / 4 + [0.25, -0.5 / 4]
+        base_layer_np[is_gp] = gp_layer_np[is_gp] + GP_TRANS
         self.update_base_uv_layer(base_layer_np)
 
         # ========= Separate lip UVs =========
@@ -272,9 +338,15 @@ class DazOptimizer:
         bpy.ops.mesh.select_all(action='SELECT')
         bpy.ops.uv.select_split()
 
+        bpy.ops.object.mode_set(mode='OBJECT')
+        #  def separate_lips(self):
         base_layer_np = self.get_base_uv_layer_np()
+        # pixel_class = get_pixel_class()
         selection = self.get_base_uv_layer_selection_np()
-        base_layer_np[selection] = base_layer_np[selection] / 4 + LIP_TRANS
+        print("selection=", selection.shape)
+        print("base_layer_np=", base_layer_np.shape)
+        print("LIP_TRANS=", LIP_TRANS)
+        base_layer_np[selection] = base_layer_np[selection] + LIP_TRANS
         self.update_base_uv_layer(base_layer_np)
         # += [0.043945, 0.006836] # top arm
         # += [-0.072266 , 0.085937] # obttom arm
@@ -282,13 +354,6 @@ class DazOptimizer:
         # *= 0.25# nails
         # -= 0.5 # nails
 
-    def remove_default_cube(self):
-        for x in list(bpy.data.objects):
-            bpy.data.objects.remove(x)
-        for x in list(bpy.data.collections):
-            bpy.data.collections.remove(x)
-
-        # save file
 
     # *= 0.25# nails
     # -= 0.5 # nails
@@ -369,6 +434,23 @@ class EasyImportPanel(bpy.types.Panel):
     # needs a draw method
     def draw(self, context):
         pass
+
+
+class DazDelCube_operator(bpy.types.Operator):
+    """ Delete default cube """
+    bl_idname = "dazoptim.delcube"
+    bl_label = "Delete default cube"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def execute(self, context):
+        for x in list(bpy.data.objects):
+            bpy.data.objects.remove(x)
+        for x in list(bpy.data.collections):
+            bpy.data.collections.remove(x)
 
 
 class DazLoad_operator(bpy.types.Operator):
@@ -476,6 +558,22 @@ class DazConcatTextures_operator(bpy.types.Operator):
 
     def execute(self, context):
         DazOptimizer().concat_textures()
+
+        return {'FINISHED'}
+
+
+class DazOptimizeEyes_operator(bpy.types.Operator):
+    """ Optimize eyes """
+    bl_idname = "dazoptim.optim_eyes"
+    bl_label = "Optimize eyes"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().optimize_eyes()
 
         return {'FINISHED'}
 
@@ -633,37 +731,33 @@ class DazOptimize_sidebar(bpy.types.Panel):
 
     def draw(self, context):
         col = self.layout.column(align=True)
-        prop = col.operator(DazLoad_operator.bl_idname, text="1. Load Daz")
-        prop = col.operator(DazSave_operator.bl_idname, text="2. Save textures")
-        prop = col.operator(DazConcatTextures_operator.bl_idname, text="3. Merge textures")
-        prop = col.operator(DazMergeMeshes_operator.bl_idname, text="4. Merge Meshes")
-        prop = col.operator(DazOptimizeUVs_operator.bl_idname, text="5. Optimize UVs")
-        prop = col.operator(DazAddBreastBones_operator.bl_idname, text="6. Add breast bones")
-        prop = col.operator(DazAddGluteBones_operator.bl_idname, text="7. Add glute bones")
-        prop = col.operator(DazAddThighBones_operator.bl_idname, text="8. Add thigh bones")
-        prop = col.operator(DazFitClothes_operator.bl_idname, text="9. Fit Clothes")
-        prop = col.operator(DazOptimizeHair_operator.bl_idname, text="10. Optimize hair")
-        prop = col.operator(DazConvertToUe5Skeleton_operator.bl_idname, text="11. Convert to UE5 Skeleton")
-        prop = col.operator(DazSendToUnreal.bl_idname, text="12. Send to unreal")
+        i = 0
+        for op_class, op_text in operators:
+            prop = col.operator(op_class.bl_idname, text=str(i)+". "+op_text)
+            i += 1
 
+
+operators = [
+    (DazDelCube_operator, "Delete default cube"),
+    (DazLoad_operator, "Load Daz"),
+    (DazSave_operator, "Save textures"),
+    (DazOptimizeEyes_operator,  "Optimize eyes"),
+    (DazMergeMeshes_operator,  "Merge Meshes"),
+    (DazConcatTextures_operator, "Merge textures"),
+    (DazOptimizeUVs_operator, "Optimize UVs"),
+    (DazAddBreastBones_operator, "Add breast bones"),
+    (DazAddGluteBones_operator, "Add glute bones"),
+    (DazAddThighBones_operator, "Add thigh bones"),
+    (DazFitClothes_operator, "Fit Clothes"),
+    (DazOptimizeHair_operator, "Optimize hair"),
+    (DazConvertToUe5Skeleton_operator, "Convert to UE5 Skeleton"),
+    (DazSendToUnreal, "Send to unreal"),
+]
 
 classes = [
     DazOptimize_sidebar,
-    DazLoad_operator,
-    DazSave_operator,
-    DazConcatTextures_operator,
-    DazOptimizeUVs_operator,
-    DazMergeMeshes_operator,
-    DazAddBreastBones_operator,
-    DazAddGluteBones_operator,
-    DazAddThighBones_operator,
-    DazFitClothes_operator,
-    DazOptimizeHair_operator,
-    DazConvertToUe5Skeleton_operator,
-    DazSendToUnreal,
     EasyImportPanel,
-
-]
+] + [op for (op, _) in operators]
 
 
 def register():

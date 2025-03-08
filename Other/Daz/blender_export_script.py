@@ -237,8 +237,7 @@ class DazOptimizer:
             # plt.imshow(packed)
             # plt.show()
 
-
-    def merge_geografts(self):
+    def merge_golden_palace(self):
 
         GOLD_PAL_M = bpy.data.objects['GoldenPalace_G9 Mesh']
         BODY_M = self.get_body_mesh()
@@ -258,6 +257,91 @@ class DazOptimizer:
         BODY_RIG.select_set(True)
         bpy.context.view_layer.objects.active = BODY_RIG
         bpy.ops.object.join()
+
+    def merge_two_rigs(self, original, addon):
+        bpy.ops.object.select_all(action='DESELECT')
+        addon.select_set(True)
+        bpy.context.view_layer.objects.active = original
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        deform_bones = {bone.name for bone in addon.data.bones if bone.use_deform}
+        parents = {bone.name: bone.parent.name for bone in addon.data.bones if bone.parent is not None}
+
+        bpy.ops.object.mode_set(mode='EDIT')
+        duplicates = [bone for bone in addon.data.edit_bones if bone.name in original.data.bones]
+        for dup in duplicates:
+            addon.data.edit_bones.remove(dup)
+
+        addon.select_set(True)
+        original.select_set(True)
+        bpy.context.view_layer.objects.active = original
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.join()
+        for bone in original.data.bones:
+            if bone.name in deform_bones:
+                bone.use_deform = True
+        bpy.ops.object.mode_set(mode='EDIT')
+        for bone in original.data.edit_bones:
+            parent = parents.get(bone.name)
+            if parent is not None:
+                bone.parent = original.data.edit_bones[parent]
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+    def merge_eyes(self):
+
+        EYES_M = bpy.data.objects['Genesis 9 Eyes Mesh']
+        BODY_M = self.get_body_mesh()
+        EYES_RIG = bpy.data.objects['Genesis 9 Eyes']
+        BODY_RIG = bpy.data.objects['Tara 9']
+
+        uv_map_name = EYES_M.data.uv_layers.active.name
+
+        # merge meshes
+        bpy.ops.object.select_all(action='DESELECT')
+        EYES_M.select_set(True)
+        BODY_M.select_set(True)
+        bpy.context.view_layer.objects.active = BODY_M
+        bpy.ops.object.join()
+
+        # merge UV maps
+        eyes_layer = BODY_M.data.uv_layers[uv_map_name]
+        eyes_layer_np = np.array([v.uv for v in eyes_layer.data])
+        is_eye = np.all(eyes_layer_np > 0, axis=1)
+        base_layer_np = self.get_base_uv_layer_np()
+        base_layer_np[is_eye] = eyes_layer_np[is_eye] + [5,0]
+        self.update_base_uv_layer(base_layer_np)
+        BODY_M.data.uv_layers.remove(eyes_layer)
+
+        # merge bones
+        self.merge_two_rigs(BODY_RIG, EYES_RIG)
+
+    def merge_mouth(self):
+
+        MOUTH_M = bpy.data.objects['Genesis 9 Mouth Mesh']
+        BODY_M = self.get_body_mesh()
+        MOUTH_RIG = bpy.data.objects['Genesis 9 Mouth']
+        BODY_RIG = bpy.data.objects['Tara 9']
+
+        uv_map_name = MOUTH_M.data.uv_layers.active.name
+
+        # merge meshes
+        bpy.ops.object.select_all(action='DESELECT')
+        MOUTH_M.select_set(True)
+        BODY_M.select_set(True)
+        bpy.context.view_layer.objects.active = BODY_M
+        bpy.ops.object.join()
+
+        # merge UV maps
+        mouth_layer = BODY_M.data.uv_layers[uv_map_name]
+        mouth_layer_np = np.array([v.uv for v in mouth_layer.data])
+        is_mouth = np.all(mouth_layer_np > 0, axis=1)
+        base_layer_np = self.get_base_uv_layer_np()
+        base_layer_np[is_mouth] = mouth_layer_np[is_mouth] + [6,0]
+        self.update_base_uv_layer(base_layer_np)
+        BODY_M.data.uv_layers.remove(mouth_layer)
+
+        # merge bones
+        self.merge_two_rigs(BODY_RIG, MOUTH_RIG)
 
 
     def pack_uvs(self):
@@ -358,10 +442,6 @@ class DazOptimizer:
     # *= 0.25# nails
     # -= 0.5 # nails
 
-    def finalize(self):
-        self.merge_geografts()
-        self.pack_uvs()
-
 
 def save_textures(duf_filepath):
     duf_filepath = os.path.abspath(duf_filepath)
@@ -451,6 +531,7 @@ class DazDelCube_operator(bpy.types.Operator):
             bpy.data.objects.remove(x)
         for x in list(bpy.data.collections):
             bpy.data.collections.remove(x)
+        return {'FINISHED'}
 
 
 class DazLoad_operator(bpy.types.Operator):
@@ -578,7 +659,7 @@ class DazOptimizeEyes_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class DazMergeMeshes_operator(bpy.types.Operator):
+class DazMergeGoldenPalace_operator(bpy.types.Operator):
     """ Merge Meshes """
     bl_idname = "dazoptim.merge_meshes"
     bl_label = "Merge meshes"
@@ -589,7 +670,39 @@ class DazMergeMeshes_operator(bpy.types.Operator):
         return context.mode == "OBJECT"
 
     def execute(self, context):
-        DazOptimizer().merge_geografts()
+        DazOptimizer().merge_golden_palace()
+
+        return {'FINISHED'}
+
+
+class DazMergeEyes_operator(bpy.types.Operator):
+    """ Merge Eyes """
+    bl_idname = "dazoptim.merge_eyes"
+    bl_label = "Merge eyes"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().merge_eyes()
+
+        return {'FINISHED'}
+
+
+class DazMergeMouth_operator(bpy.types.Operator):
+    """ Merge Mouth """
+    bl_idname = "dazoptim.merge_mouth"
+    bl_label = "Merge mouth"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().merge_mouth()
 
         return {'FINISHED'}
 
@@ -742,7 +855,9 @@ operators = [
     (DazLoad_operator, "Load Daz"),
     (DazSave_operator, "Save textures"),
     (DazOptimizeEyes_operator,  "Optimize eyes"),
-    (DazMergeMeshes_operator,  "Merge Meshes"),
+    (DazMergeGoldenPalace_operator,  "Merge Golden Palace"),
+    (DazMergeEyes_operator,  "Merge eyes"),
+    (DazMergeMouth_operator, "Merge mouth"),
     (DazConcatTextures_operator, "Merge textures"),
     (DazOptimizeUVs_operator, "Optimize UVs"),
     (DazAddBreastBones_operator, "Add breast bones"),

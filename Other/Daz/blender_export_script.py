@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 
 import cv2
@@ -20,7 +21,108 @@ TOP_ARM_COLOR = (255 * 256 + 0) * 256 + 0
 BODY_COLOR = (21 * 256 + 211) * 256 + 91
 HEAD_COLOR = (204 * 256 + 162) * 256 + 20
 
-
+UE5_BONE_HIERARCHY = {'pelvis': '', 'spine_01': 'pelvis', 'spine_02': 'spine_01', 'spine_03': 'spine_02',
+                      'spine_04': 'spine_03', 'spine_05': 'spine_04', 'neck_01': 'spine_05', 'neck_02': 'neck_01',
+                      'head': 'neck_02', 'clavicle_l': 'spine_05', 'upperarm_l': 'clavicle_l',
+                      'lowerarm_l': 'upperarm_l', 'lowerarm_twist_02_l': 'lowerarm_l',
+                      'lowerarm_twist_01_l': 'lowerarm_l', 'lowerarm_correctiveRoot_l': 'lowerarm_l',
+                      'lowerarm_in_l': 'lowerarm_correctiveRoot_l', 'lowerarm_out_l': 'lowerarm_correctiveRoot_l',
+                      'lowerarm_fwd_l': 'lowerarm_correctiveRoot_l', 'lowerarm_bck_l': 'lowerarm_correctiveRoot_l',
+                      'hand_l': 'lowerarm_l', 'wrist_inner_l': 'hand_l', 'wrist_outer_l': 'hand_l',
+                      'index_metacarpal_l': 'hand_l', 'index_01_l': 'index_metacarpal_l', 'index_02_l': 'index_01_l',
+                      'index_03_l': 'index_02_l', 'middle_metacarpal_l': 'hand_l', 'middle_01_l': 'middle_metacarpal_l',
+                      'middle_02_l': 'middle_01_l', 'middle_03_l': 'middle_02_l', 'thumb_01_l': 'hand_l',
+                      'thumb_02_l': 'thumb_01_l', 'thumb_03_l': 'thumb_02_l', 'pinky_metacarpal_l': 'hand_l',
+                      'pinky_01_l': 'pinky_metacarpal_l', 'pinky_02_l': 'pinky_01_l', 'pinky_03_l': 'pinky_02_l',
+                      'ring_metacarpal_l': 'hand_l', 'ring_01_l': 'ring_metacarpal_l', 'ring_02_l': 'ring_01_l',
+                      'ring_03_l': 'ring_02_l', 'weapon_l': 'hand_l', 'upperarm_twist_01_l': 'upperarm_l',
+                      'upperarm_twistCor_01_l': 'upperarm_twist_01_l', 'upperarm_twist_02_l': 'upperarm_l',
+                      'upperarm_tricep_l': 'upperarm_twist_02_l', 'upperarm_bicep_l': 'upperarm_twist_02_l',
+                      'upperarm_twistCor_02_l': 'upperarm_twist_02_l', 'upperarm_correctiveRoot_l': 'upperarm_l',
+                      'upperarm_bck_l': 'upperarm_correctiveRoot_l', 'upperarm_fwd_l': 'upperarm_correctiveRoot_l',
+                      'upperarm_in_l': 'upperarm_correctiveRoot_l', 'upperarm_out_l': 'upperarm_correctiveRoot_l',
+                      'clavicle_out_l': 'clavicle_l', 'clavicle_scap_l': 'clavicle_l', 'clavicle_r': 'spine_05',
+                      'upperarm_r': 'clavicle_r', 'lowerarm_r': 'upperarm_r', 'lowerarm_twist_02_r': 'lowerarm_r',
+                      'lowerarm_twist_01_r': 'lowerarm_r', 'lowerarm_correctiveRoot_r': 'lowerarm_r',
+                      'lowerarm_out_r': 'lowerarm_correctiveRoot_r', 'lowerarm_in_r': 'lowerarm_correctiveRoot_r',
+                      'lowerarm_fwd_r': 'lowerarm_correctiveRoot_r', 'lowerarm_bck_r': 'lowerarm_correctiveRoot_r',
+                      'hand_r': 'lowerarm_r', 'wrist_inner_r': 'hand_r', 'wrist_outer_r': 'hand_r',
+                      'pinky_metacarpal_r': 'hand_r', 'pinky_01_r': 'pinky_metacarpal_r', 'pinky_02_r': 'pinky_01_r',
+                      'pinky_03_r': 'pinky_02_r', 'ring_metacarpal_r': 'hand_r', 'ring_01_r': 'ring_metacarpal_r',
+                      'ring_02_r': 'ring_01_r', 'ring_03_r': 'ring_02_r', 'middle_metacarpal_r': 'hand_r',
+                      'middle_01_r': 'middle_metacarpal_r', 'middle_02_r': 'middle_01_r', 'middle_03_r': 'middle_02_r',
+                      'index_metacarpal_r': 'hand_r', 'index_01_r': 'index_metacarpal_r', 'index_02_r': 'index_01_r',
+                      'index_03_r': 'index_02_r', 'thumb_01_r': 'hand_r', 'thumb_02_r': 'thumb_01_r',
+                      'thumb_03_r': 'thumb_02_r', 'weapon_r': 'hand_r', 'upperarm_twist_01_r': 'upperarm_r',
+                      'upperarm_twistCor_01_r': 'upperarm_twist_01_r', 'upperarm_twist_02_r': 'upperarm_r',
+                      'upperarm_tricep_r': 'upperarm_twist_02_r', 'upperarm_bicep_r': 'upperarm_twist_02_r',
+                      'upperarm_twistCor_02_r': 'upperarm_twist_02_r', 'upperarm_correctiveRoot_r': 'upperarm_r',
+                      'upperarm_bck_r': 'upperarm_correctiveRoot_r', 'upperarm_in_r': 'upperarm_correctiveRoot_r',
+                      'upperarm_fwd_r': 'upperarm_correctiveRoot_r', 'upperarm_out_r': 'upperarm_correctiveRoot_r',
+                      'clavicle_out_r': 'clavicle_r', 'clavicle_scap_r': 'clavicle_r', 'clavicle_pec_r': 'spine_05',
+                      'spine_04_latissimus_l': 'spine_05', 'spine_04_latissimus_r': 'spine_05',
+                      'clavicle_pec_l': 'spine_05', 'thigh_r': 'pelvis', 'calf_r': 'thigh_r', 'foot_r': 'calf_r',
+                      'ball_r': 'foot_r', 'ankle_fwd_r': 'foot_r', 'ankle_bck_r': 'foot_r', 'calf_twist_02_r': 'calf_r',
+                      'calf_twistCor_02_r': 'calf_twist_02_r', 'calf_twist_01_r': 'calf_r',
+                      'calf_correctiveRoot_r': 'calf_r', 'calf_kneeBack_r': 'calf_correctiveRoot_r',
+                      'calf_knee_r': 'calf_correctiveRoot_r', 'thigh_twist_01_r': 'thigh_r',
+                      'thigh_twistCor_01_r': 'thigh_twist_01_r', 'thigh_twist_02_r': 'thigh_r',
+                      'thigh_twistCor_02_r': 'thigh_twist_02_r', 'thigh_correctiveRoot_r': 'thigh_r',
+                      'thigh_fwd_r': 'thigh_correctiveRoot_r', 'thigh_bck_r': 'thigh_correctiveRoot_r',
+                      'thigh_out_r': 'thigh_correctiveRoot_r', 'thigh_in_r': 'thigh_correctiveRoot_r',
+                      'thigh_bck_lwr_r': 'thigh_correctiveRoot_r', 'thigh_fwd_lwr_r': 'thigh_correctiveRoot_r',
+                      'thigh_l': 'pelvis', 'calf_l': 'thigh_l', 'foot_l': 'calf_l', 'ball_l': 'foot_l',
+                      'ankle_bck_l': 'foot_l', 'ankle_fwd_l': 'foot_l', 'calf_twist_02_l': 'calf_l',
+                      'calf_twistCor_02_l': 'calf_twist_02_l', 'calf_twist_01_l': 'calf_l',
+                      'calf_correctiveRoot_l': 'calf_l', 'calf_kneeBack_l': 'calf_correctiveRoot_l',
+                      'calf_knee_l': 'calf_correctiveRoot_l', 'thigh_twist_01_l': 'thigh_l',
+                      'thigh_twistCor_01_l': 'thigh_twist_01_l', 'thigh_twist_02_l': 'thigh_l',
+                      'thigh_twistCor_02_l': 'thigh_twist_02_l', 'thigh_correctiveRoot_l': 'thigh_l',
+                      'thigh_bck_l': 'thigh_correctiveRoot_l', 'thigh_fwd_l': 'thigh_correctiveRoot_l',
+                      'thigh_out_l': 'thigh_correctiveRoot_l', 'thigh_bck_lwr_l': 'thigh_correctiveRoot_l',
+                      'thigh_in_l': 'thigh_correctiveRoot_l', 'thigh_fwd_lwr_l': 'thigh_correctiveRoot_l',
+                      'interaction': '', 'center_of_mass': '', 'IK_PT_Foot_L': '', 'IK_PT_Foot_R': '',
+                      'IK_PT_Hand_L': '', 'IK_PT_Hand_R': '', 'ControllersPanel': '', 'LFootIKFK': 'ControllersPanel',
+                      'RFootIKFK': 'ControllersPanel', 'LHandIKFK': 'ControllersPanel', 'RHandIKFK': 'ControllersPanel',
+                      'BalanceAutoManual': 'ControllersPanel', 'Base': '', 'FootRoot': 'Base', 'IK_Foot_L': 'FootRoot',
+                      'IK_Foot_Rotation_L': 'IK_Foot_L', 'Foot_Offset_L': 'IK_Foot_Rotation_L',
+                      'IK_Foot_Solver_L': 'IK_Foot_Rotation_L', 'IK_LegLength_Target_L': 'IK_Foot_Solver_L',
+                      'IK_Foot_R': 'FootRoot', 'IK_Foot_Rotation_R': 'IK_Foot_R', 'Foot_Offset_R': 'IK_Foot_Rotation_R',
+                      'IK_Foot_Solver_R': 'IK_Foot_Rotation_R', 'IK_LegLength_Target_R': 'IK_Foot_Solver_R',
+                      'HandRoot': 'Base', 'IK_Hand_L': 'HandRoot', 'IK_Hand_Solver_L': 'IK_Hand_L',
+                      'IK_ArmLength_Target_L': 'IK_Hand_Solver_L', 'IK_Hand_R': 'HandRoot',
+                      'IK_Hand_Solver_R': 'IK_Hand_R', 'IK_ArmLength_Target_R': 'IK_Hand_Solver_R',
+                      'TorsoRotation': 'Base', 'PelvisControl': 'TorsoRotation', 'Pelvis': 'PelvisControl',
+                      'Spine_01': 'Pelvis', 'Spine_02': 'Spine_01', 'Spine_03': 'Spine_02', 'Spine_04': 'Spine_03',
+                      'Spine_05': 'Spine_04', 'Neck_01': 'Spine_05', 'Neck_02': 'Neck_01', 'Head': 'Neck_02',
+                      'Clavicle_L': 'Spine_05', 'UpperArm_L': 'Clavicle_L', 'LowerArm_L': 'UpperArm_L',
+                      'Hand_L': 'LowerArm_L', 'Ring_L': 'Hand_L', 'Index_Metacarpal_L': 'Hand_L',
+                      'Index_01_L': 'Index_Metacarpal_L', 'Index_02_L': 'Index_01_L', 'Index_03_L': 'Index_02_L',
+                      'Middle_Metacarpal_L': 'Hand_L', 'Middle_01_L': 'Middle_Metacarpal_L',
+                      'Middle_02_L': 'Middle_01_L', 'Middle_03_L': 'Middle_02_L', 'Thumb_Metacarpal_L': 'Hand_L',
+                      'Thumb_01_L': 'Thumb_Metacarpal_L', 'Thumb_02_L': 'Thumb_01_L', 'Ring_Metacarpal_L': 'Hand_L',
+                      'Ring_01_L': 'Ring_Metacarpal_L', 'Ring_02_L': 'Ring_01_L', 'Ring_03_L': 'Ring_02_L',
+                      'Pinky_Metacarpal_L': 'Hand_L', 'Pinky_01_L': 'Pinky_Metacarpal_L', 'Pinky_02_L': 'Pinky_01_L',
+                      'Pinky_03_L': 'Pinky_02_L', 'Fingers_L': 'Hand_L', 'Thumb_L': 'Hand_L', 'Index_L': 'Hand_L',
+                      'Middle_L': 'Hand_L', 'Pinky_L': 'Hand_L', 'Weapon_Socket_L': 'Hand_L', 'Clavicle_R': 'Spine_05',
+                      'UpperArm_R': 'Clavicle_R', 'LowerArm_R': 'UpperArm_R', 'Hand_R': 'LowerArm_R',
+                      'Index_Metacarpal_R': 'Hand_R', 'Index_01_R': 'Index_Metacarpal_R', 'Index_02_R': 'Index_01_R',
+                      'Index_03_R': 'Index_02_R', 'Middle_Metacarpal_R': 'Hand_R', 'Middle_01_R': 'Middle_Metacarpal_R',
+                      'Middle_02_R': 'Middle_01_R', 'Middle_03_R': 'Middle_02_R', 'Thumb_Metacarpal_R': 'Hand_R',
+                      'Thumb_01_R': 'Thumb_Metacarpal_R', 'Thumb_02_R': 'Thumb_01_R', 'Ring_Metacarpal_R': 'Hand_R',
+                      'Ring_01_R': 'Ring_Metacarpal_R', 'Ring_02_R': 'Ring_01_R', 'Ring_03_R': 'Ring_02_R',
+                      'Pinky_Metacarpal_R': 'Hand_R', 'Pinky_01_R': 'Pinky_Metacarpal_R', 'Pinky_02_R': 'Pinky_01_R',
+                      'Pinky_03_R': 'Pinky_02_R', 'Ring_R': 'Hand_R', 'Pinky_R': 'Hand_R', 'Thumb_R': 'Hand_R',
+                      'Index_R': 'Hand_R', 'Fingers_R': 'Hand_R', 'Middle_R': 'Hand_R', 'Weapon_Socket_R': 'Hand_R',
+                      'IK_ArmLenght_L': 'Spine_05', 'Shoulder_Target_L': 'IK_ArmLenght_L', 'IK_ArmLength_R': 'Spine_05',
+                      'Shoulder_Target_R': 'IK_ArmLength_R', 'IK_LegLenght_L': 'Spine_05', 'IK_LegLenght_R': 'Spine_05',
+                      'Tigh_L': 'Pelvis', 'Calf_L': 'Tigh_L', 'Foot_L': 'Calf_L', 'Ball_L': 'Foot_L',
+                      'Tigh_R': 'Pelvis', 'Calf_R': 'Tigh_R', 'Foot_R': 'Calf_R', 'Ball_R': 'Foot_R',
+                      'PelvisHeightOffset': 'PelvisControl', 'TorsoControl': 'PelvisControl',
+                      'ChestControl': 'TorsoControl', 'HeadControl': 'ChestControl', 'ChestRotation': 'TorsoRotation',
+                      'AimTarget': '', 'ik_foot_root': '', 'ik_foot_l': 'ik_foot_root', 'ik_foot_r': 'ik_foot_root',
+                      'ik_hand_root': '', 'ik_hand_gun': 'ik_hand_root', 'ik_hand_l': 'ik_hand_gun',
+                      'ik_hand_r': 'ik_hand_gun'}
 
 def select_bone(bone):
     bone.select = True
@@ -83,11 +185,11 @@ class DazOptimizer:
     def get_eyes_mesh(self):
         return bpy.data.objects['Genesis 9 Eyes Mesh']
 
-    def get_base_uv_layer(self):
-        return self.get_body_mesh().data.uv_layers['Base Multi UDIM']
+    def get_base_uv_layer(self, layer_name='Base Multi UDIM'):
+        return self.get_body_mesh().data.uv_layers[layer_name]
 
-    def get_base_uv_layer_np(self):
-        return np.array([v.uv for v in self.get_base_uv_layer().data])
+    def get_base_uv_layer_np(self, layer_name='Base Multi UDIM'):
+        return np.array([v.uv for v in self.get_base_uv_layer(layer_name=layer_name).data])
 
     def get_base_uv_layer_selection_np(self):
         return np.array([v.select for v in self.get_base_uv_layer().data], dtype=bool)
@@ -554,9 +656,81 @@ class DazOptimizer:
             for i, subpec_group in enumerate(l_pec_groups):
                 subpec_weights = pec_weights - (i+1)/(cuts+1)
 
+    def save_textures(self):
+        BODY_M = self.get_body_mesh()
+        bpy.ops.object.select_all(action='DESELECT')
+        BODY_M.select_set(True)
+        bpy.context.view_layer.objects.active = BODY_M
+        tex_dir = self.textures_dir()
+        if os.path.exists(tex_dir):
+            shutil.rmtree(tex_dir)
+        bpy.ops.daz.save_local_textures()
+
+    def bake_golden_palace(self):
+        BODY_M = self.get_body_mesh()
+        baked_gp_img = bpy.data.images['GP_Baked'] if 'GP_Baked' in bpy.data.images else bpy.data.images.new('GP_Baked', 1024 * 4, 1024 * 4)
+        new_gp_uv_map = 'unified_gp_uv'
+        if new_gp_uv_map not in BODY_M.data.uv_layers:
+            gp_labia_majora = BODY_M.data.uv_layers['Golden Palace 2']
+            gp_labia_minora = BODY_M.data.uv_layers['Golden Palace']
+            gp_labia_majora.active = True
+            new_uv_layer = BODY_M.data.uv_layers.new(name=new_gp_uv_map)
+            new_uv_layer_np = np.array([v.uv for v in new_uv_layer.data])
+            gp_labia_majora_np = np.array([v.uv for v in gp_labia_majora.data])
+            gp_labia_minora_np = np.array([v.uv for v in gp_labia_minora.data])
+            is_labia_majora = np.logical_and(0.285 < gp_labia_majora_np[:, 0], gp_labia_majora_np[:, 0] < 0.72)
+            vagina_symmetry_line = 1.26598
+            vagina_extent = 1.47191
+            vagina_half_width = vagina_extent - vagina_symmetry_line
+            p1A = np.array([1.31444-vagina_symmetry_line, 0.912306])
+            p2A = np.array([1.4164-vagina_symmetry_line, 0.545495])
+            vag_distance = np.absolute(gp_labia_minora_np[:, 0] - vagina_symmetry_line)
+            slopeA = (p2A[1]-p1A[1])/(p2A[0]-p1A[0])
+            # p1[2] = p1[0] * slope + offset
+            # p1[2] - p1[0] * slope = offset
+            offsetA = p1A[1] - p1A[0] * slopeA
+            offsetA += 0.05  # just for a good measure to avoid errors due to floating point precision
+            p1B = np.array([1.43189-vagina_symmetry_line, 0.317139])
+            p2B = np.array([1.40303-vagina_symmetry_line, 0.217741])
+            slopeB = (p2B[1] - p1B[1]) / (p2B[0] - p1B[0])
+            offsetB = p1B[1] - p1B[0] * slopeB
+            offsetB -= 0.1  # just for a good measure to avoid errors due to floating point precision
+            is_labia_minora = np.logical_and(vag_distance * slopeB + offsetB < gp_labia_minora_np[:, 1], gp_labia_minora_np[:, 1] < vag_distance * slopeA + offsetA)
+            is_labia_majora = np.logical_and(is_labia_majora, np.logical_not(is_labia_minora))
+            is_anus = np.logical_and(np.all(gp_labia_majora_np > 0, axis=1), np.all(gp_labia_minora_np > 0, axis=1))
+            is_anus = np.logical_and(is_anus, np.logical_not(np.logical_or(is_labia_majora, is_labia_minora)))
+            p1 = (0.514551, 0.546842)  # point on circle boundary
+            p2 = (0.499947, 0.550254)  # center
+            p3 = (0.500005, 0.588271)  # oval top point
+            vag_oval_longer_radius = np.linalg.norm(np.subtract(p3, p2))
+            vag_radius = np.linalg.norm(np.subtract(p1, p2))
+            vag_distance = gp_labia_majora_np - p2
+            vag_distance[:, 1] *= vag_radius / vag_oval_longer_radius
+            is_vagina = np.linalg.norm(vag_distance, axis=1) < vag_radius
+            is_vagina = np.logical_and(is_vagina, np.logical_not(is_labia_minora))
+            is_insides = np.logical_or(is_vagina, is_anus)
+            new_uv_layer_np[:, :] = 0
+            vagina_margin = 0.08
+            new_uv_layer_np[is_labia_minora] = gp_labia_minora_np[is_labia_minora] - [1+vagina_margin, 0]
+            new_uv_layer_np[is_labia_majora] = gp_labia_majora_np[is_labia_majora] + [1-0.72, 0]
+            new_uv_layer_np[is_insides] = (gp_labia_minora_np[is_insides]-[1,0])*(1/8)+[vagina_half_width*2-vagina_margin,0]
+            for v, new_uv in zip(new_uv_layer.data, new_uv_layer_np):
+                v.uv = new_uv
 
 
 
+        for mat in BODY_M.data.materials:
+            if mat.name.startswith('GP_'):
+                n = mat.node_tree.nodes
+                l = mat.node_tree.links
+                target_texture = n.new('ShaderNodeTexImage')
+                target_texture.image = baked_gp_img
+                uv_map = n.new('ShaderNodeUVMap')
+                uv_map.location = (-300, 200)
+                uv_map.uv_map = new_gp_uv_map
+                target_texture.location = (0, 200)
+                l.new(target_texture.inputs['Vector'], uv_map.outputs['UV'])
+                n.active = target_texture
 
 
 
@@ -570,12 +744,7 @@ def save_textures(duf_filepath):
     name = os.path.basename(duf_filepath)[:-len(".duf")]
     blend_filepath = os.path.join(workdir, name + ".blend")
     bpy.ops.wm.save_as_mainfile(filepath=blend_filepath)
-    rig = find_body_rig()
-    body = bpy.data.objects[rig.name + ' Mesh']
-    bpy.ops.object.select_all(action='DESELECT')
-    body.select_set(True)
-    bpy.context.view_layer.objects.active = body
-    bpy.ops.daz.save_local_textures()
+    DazOptimizer(workdir=workdir, name=name).save_textures()
 
 
 def install_libraries():
@@ -963,6 +1132,22 @@ class DazConvertToUe5Skeleton_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class DazBakeGoldenPalace(bpy.types.Operator):
+    """ Bake Golden Palace """
+    bl_idname = "dazoptim.bake_gp"
+    bl_label = "Bake Golden Palace"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().bake_golden_palace()
+
+        return {'FINISHED'}
+
+
 class DazSendToUnreal(bpy.types.Operator):
     """ Send to unreal """
     bl_idname = "dazoptim.send_to_ue5"
@@ -1000,6 +1185,7 @@ operators = [
     (DazSave_operator, "Save textures"),
     (DazOptimizeEyes_operator,  "Optimize eyes"),
     (DazMergeGrografts_operator, "Merge Geografts"),
+    (DazBakeGoldenPalace, "Bake golden palace"),
     (DazMergeEyes_operator,  "Merge eyes"),
     (DazMergeMouth_operator, "Merge mouth"),
     (DazConcatTextures_operator, "Merge textures"),

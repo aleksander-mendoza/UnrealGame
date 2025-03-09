@@ -22,6 +22,12 @@ HEAD_COLOR = (204 * 256 + 162) * 256 + 20
 GP_TRANS = [1/2+1/8, 0]
 
 
+def select_bone(bone):
+    bone.select = True
+    bone.select_head = True
+    bone.select_tail = True
+
+
 class DazOptimizer:
 
     def __init__(self, workdir=None, name=None):
@@ -53,6 +59,9 @@ class DazOptimizer:
 
     def get_body_mesh(self):
         return bpy.data.objects['Tara 9 Mesh']
+
+    def get_body_rig(self):
+        return bpy.data.objects['Tara 9']
 
     def get_eyes_mesh(self):
         return bpy.data.objects['Genesis 9 Eyes Mesh']
@@ -119,6 +128,7 @@ class DazOptimizer:
 
         bmesh.update_edit_mesh(me)
 
+        bpy.ops.object.mode_set(mode='OBJECT')
         #
 
 
@@ -274,7 +284,7 @@ class DazOptimizer:
         GOLD_PAL_M = bpy.data.objects['GoldenPalace_G9 Mesh']
         BODY_M = self.get_body_mesh()
         GOLD_PAL_RIG = bpy.data.objects['GoldenPalace_G9']
-        BODY_RIG = bpy.data.objects['Tara 9']
+        BODY_RIG = self.get_body_rig()
 
         # merge meshes
         bpy.ops.object.select_all(action='DESELECT')
@@ -284,11 +294,7 @@ class DazOptimizer:
         bpy.ops.daz.merge_geografts()
 
         # merge bones
-        bpy.ops.object.select_all(action='DESELECT')
-        GOLD_PAL_RIG.select_set(True)
-        BODY_RIG.select_set(True)
-        bpy.context.view_layer.objects.active = BODY_RIG
-        bpy.ops.object.join()
+        self.merge_two_rigs(BODY_RIG, GOLD_PAL_RIG)
 
     def merge_two_rigs(self, original, addon):
         bpy.ops.object.select_all(action='DESELECT')
@@ -324,7 +330,7 @@ class DazOptimizer:
         EYES_M = bpy.data.objects['Genesis 9 Eyes Mesh']
         BODY_M = self.get_body_mesh()
         EYES_RIG = bpy.data.objects['Genesis 9 Eyes']
-        BODY_RIG = bpy.data.objects['Tara 9']
+        BODY_RIG = self.get_body_rig()
 
         uv_map_name = EYES_M.data.uv_layers.active.name
 
@@ -352,7 +358,7 @@ class DazOptimizer:
         MOUTH_M = bpy.data.objects['Genesis 9 Mouth Mesh']
         BODY_M = self.get_body_mesh()
         MOUTH_RIG = bpy.data.objects['Genesis 9 Mouth']
-        BODY_RIG = bpy.data.objects['Tara 9']
+        BODY_RIG = self.get_body_rig()
 
         uv_map_name = MOUTH_M.data.uv_layers.active.name
 
@@ -374,7 +380,6 @@ class DazOptimizer:
 
         # merge bones
         self.merge_two_rigs(BODY_RIG, MOUTH_RIG)
-
 
     def pack_uvs(self):
 
@@ -421,8 +426,17 @@ class DazOptimizer:
         base_layer_np[is_gp] = gp_layer_np[is_gp] + GP_TRANS
         self.update_base_uv_layer(base_layer_np)
 
-        # ========= Separate lip UVs =========
+    def separate_lip_uvs(self):
+        BODY_M = self.get_body_mesh()
+        # pack UVs
+        bpy.ops.object.select_all(action='DESELECT')
+        BODY_M.select_set(True)
+        bpy.context.view_layer.objects.active = BODY_M
         bpy.ops.object.mode_set(mode='EDIT')
+
+        uv_mask = self.get_uv_mask()
+        uv_mask_size = uv_mask.shape[0]
+
         bpy.context.scene.tool_settings.use_uv_select_sync = False
         bpy.ops.uv.select_all(action='DESELECT')
         bpy.ops.mesh.select_all(action='DESELECT')
@@ -469,6 +483,55 @@ class DazOptimizer:
         # += [0.008526, 0.019377] # torso
         # *= 0.25# nails
         # -= 0.5 # nails
+
+    def subdivide_breast_bones(self):
+
+        BODY_RIG = self.get_body_rig()
+        bpy.ops.object.select_all(action='DESELECT')
+        BODY_RIG.select_set(True)
+        bpy.context.view_layer.objects.active = BODY_RIG
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.armature.select_all(action='DESELECT')
+        cuts = 2
+        for bone_name in ['r_pectoral', 'l_pectoral']:
+            bone = BODY_RIG.data.edit_bones[bone_name]
+            select_bone(bone)
+        bpy.ops.armature.subdivide(number_cuts=cuts)
+        l_pec_groups = []
+        r_pec_groups = []
+        pectorals = [('r_pectoral', r_pec_groups), ('l_pectoral', l_pec_groups)]
+        for bone_name, vertex_groups in pectorals:
+            for i in range(0, cuts):
+                subbone_name = bone_name+"."+str(i+1).zfill(3)
+                subbone = BODY_RIG.data.edit_bones[subbone_name]
+                subbone_name = subbone.name = bone_name+str(i+1)
+                group = bpy.context.object.vertex_groups.new(name=subbone_name)
+                vertex_groups.append(group.index)
+        BODY_M = self.get_body_mesh()
+        bpy.ops.object.select_all(action='DESELECT')
+        BODY_M.select_set(True)
+        bpy.context.view_layer.objects.active = BODY_M
+        bpy.ops.object.mode_set(mode='EDIT')
+
+        def contains_group(vertex, group_index):
+            for g in vertex.groups:
+                if g.group == group_index:
+                    return g.weight
+            return 0
+
+        l_pec_idx = BODY_M.vertex_groups['l_pectoral'].index
+        r_pec_idx = BODY_M.vertex_groups['r_pectoral'].index
+        l_pec_weights = np.array([contains_group(v, l_pec_idx) for v in BODY_M.data.vertices])
+        r_pec_weights = np.array([contains_group(v, r_pec_idx) for v in BODY_M.data.vertices])
+        for pec_weights, pec_groups in [(l_pec_weights, l_pec_groups), (r_pec_weights, r_pec_groups)]:
+            max_weight = np.max(pec_weights)
+            for i, subpec_group in enumerate(l_pec_groups):
+                subpec_weights = pec_weights - (i+1)/(cuts+1)
+
+
+
+
+
 
 
     # *= 0.25# nails
@@ -755,6 +818,22 @@ class DazOptimizeUVs_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class DazSeparateLipUVs_operator(bpy.types.Operator):
+    """ Separate Lip UVs """
+    bl_idname = "dazoptim.sep_lip_uvs"
+    bl_label = "Separate Lip UVs"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().separate_lip_uvs()
+
+        return {'FINISHED'}
+
+
 class DazAddBreastBones_operator(bpy.types.Operator):
     """ Add breast bones """
     bl_idname = "dazoptim.breast_bones"
@@ -766,7 +845,7 @@ class DazAddBreastBones_operator(bpy.types.Operator):
         return context.mode == "OBJECT"
 
     def execute(self, context):
-        DazOptimizer().separate_lips()
+        DazOptimizer().subdivide_breast_bones()
 
         return {'FINISHED'}
 
@@ -892,7 +971,8 @@ operators = [
     (DazMergeMouth_operator, "Merge mouth"),
     (DazConcatTextures_operator, "Merge textures"),
     (DazOptimizeUVs_operator, "Optimize UVs"),
-    (DazAddBreastBones_operator, "Add breast bones"),
+    (DazSeparateLipUVs_operator, "Separate Lip UVs"),
+    (DazAddBreastBones_operator, "Subdivide breast bones"),
     (DazAddGluteBones_operator, "Add glute bones"),
     (DazAddThighBones_operator, "Add thigh bones"),
     (DazFitClothes_operator, "Fit Clothes"),

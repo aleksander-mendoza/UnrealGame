@@ -666,8 +666,7 @@ class DazOptimizer:
             shutil.rmtree(tex_dir)
         bpy.ops.daz.save_local_textures()
 
-    def bake_golden_palace(self):
-        BODY_M = self.get_body_mesh()
+    def unify_golden_palace_uvs(self, BODY_M):
         baked_gp_img = bpy.data.images['GP_Baked'] if 'GP_Baked' in bpy.data.images else bpy.data.images.new('GP_Baked', 1024 * 4, 1024 * 4)
         new_gp_uv_map = 'unified_gp_uv'
         if new_gp_uv_map not in BODY_M.data.uv_layers:
@@ -716,8 +715,15 @@ class DazOptimizer:
             new_uv_layer_np[is_insides] = (gp_labia_minora_np[is_insides]-[1,0])*(1/8)+[vagina_half_width*2-vagina_margin,0]
             for v, new_uv in zip(new_uv_layer.data, new_uv_layer_np):
                 v.uv = new_uv
+        return baked_gp_img
 
-
+    def bake_golden_palace(self):
+        BODY_M = self.get_body_mesh()
+        baked_gp_img = self.unify_golden_palace_uvs(BODY_M)
+        bpy.context.scene.render.engine = 'CYCLES'
+        bpy.context.scene.cycles.bake_type = 'DIFFUSE'
+        bpy.context.scene.render.bake.use_pass_direct = False
+        bpy.context.scene.render.bake.use_pass_indirect = False
 
         for mat in BODY_M.data.materials:
             if mat.name.startswith('GP_'):

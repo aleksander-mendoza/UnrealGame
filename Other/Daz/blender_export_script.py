@@ -19,13 +19,20 @@ LIP_COLOR = (21 * 256 + 109) * 256 + 211
 TOP_ARM_COLOR = (255 * 256 + 0) * 256 + 0
 BODY_COLOR = (21 * 256 + 211) * 256 + 91
 HEAD_COLOR = (204 * 256 + 162) * 256 + 20
-GP_TRANS = [1/2+1/8, 0]
+
 
 
 def select_bone(bone):
     bone.select = True
     bone.select_head = True
     bone.select_tail = True
+
+
+def find_body_rig():
+    o = bpy.data.objects[0]
+    while o.parent is not None:
+        o = o.parent
+    return o
 
 
 class DazOptimizer:
@@ -38,6 +45,8 @@ class DazOptimizer:
             name = name[:name.rindex('.')]
         self.name = name
         self.workdir = workdir
+        self.body_mesh = None
+        self.body_rig = None
 
     def gold_palace_dir(self):
         return os.path.join(self.workdir, "textures/original/meipex/m_goldenpalace/g9")
@@ -57,11 +66,19 @@ class DazOptimizer:
         uv_region_mask = (uv_region_mask[:, :, 0] * 256 + uv_region_mask[:, :, 1]) * 256 + uv_region_mask[:, :, 2]
         return uv_region_mask
 
+    def find_body(self):
+        self.body_rig = find_body_rig()
+        self.body_mesh = bpy.data.objects[self.body_rig.name+' Mesh']
+
     def get_body_mesh(self):
-        return bpy.data.objects['Tara 9 Mesh']
+        if self.body_mesh is None:
+            self.find_body()
+        return self.body_mesh
 
     def get_body_rig(self):
-        return bpy.data.objects['Tara 9']
+        if self.body_rig is None:
+            self.find_body()
+        return self.body_rig
 
     def get_eyes_mesh(self):
         return bpy.data.objects['Genesis 9 Eyes Mesh']
@@ -130,8 +147,6 @@ class DazOptimizer:
 
         bpy.ops.object.mode_set(mode='OBJECT')
         #
-
-
 
     def concat_textures(self):
         from PIL import Image
@@ -279,22 +294,32 @@ class DazOptimizer:
             # plt.imshow(packed)
             # plt.show()
 
-    def merge_golden_palace(self):
 
-        GOLD_PAL_M = bpy.data.objects['GoldenPalace_G9 Mesh']
+    def merge_geografts(self):
         BODY_M = self.get_body_mesh()
-        GOLD_PAL_RIG = bpy.data.objects['GoldenPalace_G9']
         BODY_RIG = self.get_body_rig()
 
         # merge meshes
         bpy.ops.object.select_all(action='DESELECT')
-        GOLD_PAL_M.select_set(True)
+        GOLD_PAL_RIG = None
+        if 'GoldenPalace_G9' in bpy.data.objects:
+            GOLD_PAL_M = bpy.data.objects['GoldenPalace_G9 Mesh']
+            GOLD_PAL_RIG = bpy.data.objects['GoldenPalace_G9']
+            GOLD_PAL_M.select_set(True)
+        BREASTACULAR_RIG = None
+        if 'BreastacularG9' in bpy.data.objects:
+            BREASTACULAR_M = bpy.data.objects['BreastacularG9 Mesh']
+            BREASTACULAR_RIG = bpy.data.objects['BreastacularG9']
+            BREASTACULAR_M.select_set(True)
         BODY_M.select_set(True)
         bpy.context.view_layer.objects.active = BODY_M
         bpy.ops.daz.merge_geografts()
 
         # merge bones
-        self.merge_two_rigs(BODY_RIG, GOLD_PAL_RIG)
+        if GOLD_PAL_RIG is not None:
+            self.merge_two_rigs(BODY_RIG, GOLD_PAL_RIG)
+        if BREASTACULAR_RIG is not None:
+            self.merge_two_rigs(BODY_RIG, BREASTACULAR_RIG)
 
     def merge_two_rigs(self, original, addon):
         bpy.ops.object.select_all(action='DESELECT')
@@ -400,7 +425,7 @@ class DazOptimizer:
         gp_layer = BODY_M.data.uv_layers['Golden Palace']
         gp_layer_np = np.array([v.uv for v in gp_layer.data])
         is_gp = np.all(gp_layer_np > 0, axis=1)
-        gp_layer_np /= 8
+
 
 
         uv_mask = self.get_uv_mask()
@@ -423,7 +448,8 @@ class DazOptimizer:
         base_layer_np[pixel_class == BODY_COLOR] += BODY_TRANS
         base_layer_np[is_nails] = base_layer_np[is_nails] / 4 + [0.25, -0.5 / 4]
         base_layer_np[is_eyes] = base_layer_np[is_eyes] / 4 + [-6/16 + 0.5 + 1/8, - 0.5 / 8]
-        base_layer_np[is_gp] = gp_layer_np[is_gp] + GP_TRANS
+        base_layer_np[is_gp] = gp_layer_np[is_gp] * 14 / 64 + [(64-14) / 64, 0]
+        base_layer_np[is_mouth] = base_layer_np[is_mouth] / 4 + [1/8, -0.5 / 4]
         self.update_base_uv_layer(base_layer_np)
 
     def separate_lip_uvs(self):
@@ -544,6 +570,11 @@ def save_textures(duf_filepath):
     name = os.path.basename(duf_filepath)[:-len(".duf")]
     blend_filepath = os.path.join(workdir, name + ".blend")
     bpy.ops.wm.save_as_mainfile(filepath=blend_filepath)
+    rig = find_body_rig()
+    body = bpy.data.objects[rig.name + ' Mesh']
+    bpy.ops.object.select_all(action='DESELECT')
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
     bpy.ops.daz.save_local_textures()
 
 
@@ -600,10 +631,10 @@ class EasyImportPanel(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         op = context.active_operator
-        print("aaa=", op.bl_idname)
         if op and op.bl_idname == "DAZ_OT_easy_import_daz":
             cls.directory = op.directory
             cls.filepath = op.filepath
+            context.scene['duf_filepath'] = op.filepath
         return False
 
     # needs a draw method
@@ -715,10 +746,12 @@ class DazSave_operator(bpy.types.Operator):
         return context.mode == "OBJECT"
 
     def execute(self, context):
-        if bpy.types.dazoptim_easy_import_panel.filepath is None:
+        if bpy.types.dazoptim_easy_import_panel.filepath is None and 'duf_filepath' not in bpy.context.scene:
             self.report({"WARNING"}, "Load a DAZ character first!")
             return {'CANCELLED'}
-        save_textures(bpy.types.dazoptim_easy_import_panel.filepath)
+        if bpy.types.dazoptim_easy_import_panel.filepath is not None and 'duf_filepath' not in bpy.context.scene:
+            bpy.context.scene['duf_filepath'] = bpy.types.dazoptim_easy_import_panel.filepath
+        save_textures(bpy.context.scene['duf_filepath'])
         return {'FINISHED'}
 
 
@@ -754,10 +787,10 @@ class DazOptimizeEyes_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class DazMergeGoldenPalace_operator(bpy.types.Operator):
-    """ Merge Meshes """
-    bl_idname = "dazoptim.merge_meshes"
-    bl_label = "Merge meshes"
+class DazMergeGrografts_operator(bpy.types.Operator):
+    """ Merge geografts """
+    bl_idname = "dazoptim.merge_geografts"
+    bl_label = "Merge geografts"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -765,7 +798,7 @@ class DazMergeGoldenPalace_operator(bpy.types.Operator):
         return context.mode == "OBJECT"
 
     def execute(self, context):
-        DazOptimizer().merge_golden_palace()
+        DazOptimizer().merge_geografts()
 
         return {'FINISHED'}
 
@@ -966,7 +999,7 @@ operators = [
     (DazLoad_operator, "Load Daz"),
     (DazSave_operator, "Save textures"),
     (DazOptimizeEyes_operator,  "Optimize eyes"),
-    (DazMergeGoldenPalace_operator,  "Merge Golden Palace"),
+    (DazMergeGrografts_operator, "Merge Geografts"),
     (DazMergeEyes_operator,  "Merge eyes"),
     (DazMergeMouth_operator, "Merge mouth"),
     (DazConcatTextures_operator, "Merge textures"),

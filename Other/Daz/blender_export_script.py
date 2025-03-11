@@ -2,17 +2,37 @@ import os
 import shutil
 import sys
 
-import cv2
 import numpy as np
 import bpy
 import bmesh
 import json
 
+
+def install_libraries():
+    pil_missing = False
+    opencv_missing = False
+    try:
+        import PIL
+    except ModuleNotFoundError:
+        pil_missing = True
+    try:
+        import cv2
+    except ModuleNotFoundError:
+        opencv_missing = True
+    if pil_missing or opencv_missing:
+        py_exe = sys.executable
+        res_path = os.path.realpath(os.path.join(py_exe, "../../lib/site-packages"))
+        print("Run the following command as an admin: ")
+        print('&"' + py_exe + '" -m pip install pillow opencv-python "--target=' + res_path + '"')
+
+
+install_libraries()
+
 BOT_ARM_TRANS = [-0.072266 - 0.006897, 0.085937 + 0.009853]
 TOP_ARM_TRANS = [0.043945, 0.006836]
 RIGHT_LEG_TRANS = -0.014389
 BODY_TRANS = [0.0, 0.170266]
-LIP_TRANS = [1/4+1/16, -1/32]
+LIP_TRANS = [1 / 4 + 1 / 16, -1 / 32]
 LEFT_LEG_COLOR = (64 * 256 + 24) * 256 + 126
 RIGHT_LEG_COLOR = (42 * 256 + 126) * 256 + 24
 BOT_ARM_COLOR = (62 * 256 + 21) * 256 + 211
@@ -20,7 +40,7 @@ LIP_COLOR = (21 * 256 + 109) * 256 + 211
 TOP_ARM_COLOR = (255 * 256 + 0) * 256 + 0
 BODY_COLOR = (21 * 256 + 211) * 256 + 91
 HEAD_COLOR = (204 * 256 + 162) * 256 + 20
-
+NEW_GP_UV_MAP = 'unified_gp_uv'
 UE5_BONE_HIERARCHY = {'pelvis': '', 'spine_01': 'pelvis', 'spine_02': 'spine_01', 'spine_03': 'spine_02',
                       'spine_04': 'spine_03', 'spine_05': 'spine_04', 'neck_01': 'spine_05', 'neck_02': 'neck_01',
                       'head': 'neck_02', 'clavicle_l': 'spine_05', 'upperarm_l': 'clavicle_l',
@@ -124,6 +144,7 @@ UE5_BONE_HIERARCHY = {'pelvis': '', 'spine_01': 'pelvis', 'spine_02': 'spine_01'
                       'ik_hand_root': '', 'ik_hand_gun': 'ik_hand_root', 'ik_hand_l': 'ik_hand_gun',
                       'ik_hand_r': 'ik_hand_gun'}
 
+
 def select_bone(bone):
     bone.select = True
     bone.select_head = True
@@ -170,7 +191,7 @@ class DazOptimizer:
 
     def find_body(self):
         self.body_rig = find_body_rig()
-        self.body_mesh = bpy.data.objects[self.body_rig.name+' Mesh']
+        self.body_mesh = bpy.data.objects[self.body_rig.name + ' Mesh']
 
     def get_body_mesh(self):
         if self.body_mesh is None:
@@ -204,9 +225,9 @@ class DazOptimizer:
         EYES_M.select_set(True)
         bpy.context.view_layer.objects.active = EYES_M
 
-        #uv_layer = EYES_M.data.uv_layers.active
-        #uvs = np.array([v.uv for v in uv_layer.data], dtype=bool)
-        #uvs[:, y] < 0.5
+        # uv_layer = EYES_M.data.uv_layers.active
+        # uvs = np.array([v.uv for v in uv_layer.data], dtype=bool)
+        # uvs[:, y] < 0.5
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.context.scene.tool_settings.use_uv_select_sync = False
         bpy.ops.uv.select_all(action='DESELECT')
@@ -253,6 +274,7 @@ class DazOptimizer:
     def concat_textures(self):
         from PIL import Image
         import re
+        import cv2
 
         name_pattern = re.compile(
             r"([A-Za-z0-9_-]+)_([Hh]ead|[Ee]yelashes|[Ll]egs|[Nn]ails|[Bb]ody|[Aa]rms|[Mm]outh|[Ee]yes_sclera[_0-9]*|[Ee]yes_iris[_0-9]*)[A-Za-z]?(_(D|NM|R|SSS|C|nm)(_[0-9]+)?)?\.(jpg|png)")
@@ -319,16 +341,16 @@ class DazOptimizer:
                 iris = Image.open(img_file_paths['eyes_iris'][map_type])
                 sclera = Image.open(img_file_paths['eyes_sclera'][map_type])
                 iris = np.array(iris)
-                iris_rgb = iris[:,:,:3]
+                iris_rgb = iris[:, :, :3]
                 iris_a = iris[:, :, 3]
                 if iris_a.dtype.kind != 'f':
-                    iris_a = iris_a/255
+                    iris_a = iris_a / 255
                 sclera = np.array(sclera)
                 sclera_h, sclera_w = sclera.shape[:2]
                 sclera_h = sclera_h // 2
                 sclera = sclera[:sclera_h]
                 iris_h, iris_w = s // 8, s // 4
-                eyes = iris_rgb.T * iris_a.T + sclera.T * (1-iris_a.T)
+                eyes = iris_rgb.T * iris_a.T + sclera.T * (1 - iris_a.T)
                 eyes = eyes.T
                 eyes = cv2.resize(eyes, [iris_w, iris_h])
 
@@ -338,7 +360,7 @@ class DazOptimizer:
             if map_type != "NM":
                 nails_tile = Image.open(img_file_paths['nails'][map_type])
                 nails_tile = np.array(nails_tile)
-                nails_tile_size = s2//8
+                nails_tile_size = s2 // 8
                 if map_type == "R":
                     nails_tile = np.average(nails_tile, axis=2)
                     nails_tile = nails_tile.astype(legs_tile.dtype)
@@ -382,11 +404,11 @@ class DazOptimizer:
             # packed += shift_img(head, s, s2, s, s2, head_region_mask == HEAD_COLOR, [0.008526, 0.019377])
             packed[s:, :s] = head_tile
             if nails_tile is not None:
-                packed[s2-nails_tile_size:s2, s:s+nails_tile_size] = nails_tile
+                packed[s2 - nails_tile_size:s2, s:s + nails_tile_size] = nails_tile
             if gp_tile is not None:
-                packed[s2 - gp_tile_size:s2, s2-gp_tile_size:s2] += gp_tile
+                packed[s2 - gp_tile_size:s2, s2 - gp_tile_size:s2] += gp_tile
             if eyes is not None:
-                packed[s2 - s//4-s//8:s2-s//4, s+s//4:s+s//2] = eyes
+                packed[s2 - s // 4 - s // 8:s2 - s // 4, s + s // 4:s + s // 2] = eyes
 
             # packed[:s, :s] = legs_tile
             # packed[s:, s:] = body_tile
@@ -395,7 +417,6 @@ class DazOptimizer:
             packed.save(os.path.join(self.workdir, self.name + '_' + map_type + '.png'))
             # plt.imshow(packed)
             # plt.show()
-
 
     def merge_geografts(self):
         BODY_M = self.get_body_mesh()
@@ -473,7 +494,7 @@ class DazOptimizer:
         eyes_layer_np = np.array([v.uv for v in eyes_layer.data])
         is_eye = np.all(eyes_layer_np > 0, axis=1)
         base_layer_np = self.get_base_uv_layer_np()
-        base_layer_np[is_eye] = eyes_layer_np[is_eye] + [5,0]
+        base_layer_np[is_eye] = eyes_layer_np[is_eye] + [5, 0]
         self.update_base_uv_layer(base_layer_np)
         BODY_M.data.uv_layers.remove(eyes_layer)
 
@@ -501,7 +522,7 @@ class DazOptimizer:
         mouth_layer_np = np.array([v.uv for v in mouth_layer.data])
         is_mouth = np.all(mouth_layer_np > 0, axis=1)
         base_layer_np = self.get_base_uv_layer_np()
-        base_layer_np[is_mouth] = mouth_layer_np[is_mouth] + [6,0]
+        base_layer_np[is_mouth] = mouth_layer_np[is_mouth] + [6, 0]
         self.update_base_uv_layer(base_layer_np)
         BODY_M.data.uv_layers.remove(mouth_layer)
 
@@ -528,8 +549,6 @@ class DazOptimizer:
         gp_layer_np = np.array([v.uv for v in gp_layer.data])
         is_gp = np.all(gp_layer_np > 0, axis=1)
 
-
-
         uv_mask = self.get_uv_mask()
         uv_mask_size = uv_mask.shape[0]
 
@@ -549,9 +568,9 @@ class DazOptimizer:
         base_layer_np[pixel_class == RIGHT_LEG_COLOR, 0] += RIGHT_LEG_TRANS
         base_layer_np[pixel_class == BODY_COLOR] += BODY_TRANS
         base_layer_np[is_nails] = base_layer_np[is_nails] / 4 + [0.25, -0.5 / 4]
-        base_layer_np[is_eyes] = base_layer_np[is_eyes] / 4 + [-6/16 + 0.5 + 1/8, - 0.5 / 8]
-        base_layer_np[is_gp] = gp_layer_np[is_gp] * 14 / 64 + [(64-14) / 64, 0]
-        base_layer_np[is_mouth] = base_layer_np[is_mouth] / 4 + [1/8, -0.5 / 4]
+        base_layer_np[is_eyes] = base_layer_np[is_eyes] / 4 + [-6 / 16 + 0.5 + 1 / 8, - 0.5 / 8]
+        base_layer_np[is_gp] = gp_layer_np[is_gp] * 14 / 64 + [(64 - 14) / 64, 0]
+        base_layer_np[is_mouth] = base_layer_np[is_mouth] / 4 + [1 / 8, -0.5 / 4]
         self.update_base_uv_layer(base_layer_np)
 
     def separate_lip_uvs(self):
@@ -630,9 +649,9 @@ class DazOptimizer:
         pectorals = [('r_pectoral', r_pec_groups), ('l_pectoral', l_pec_groups)]
         for bone_name, vertex_groups in pectorals:
             for i in range(0, cuts):
-                subbone_name = bone_name+"."+str(i+1).zfill(3)
+                subbone_name = bone_name + "." + str(i + 1).zfill(3)
                 subbone = BODY_RIG.data.edit_bones[subbone_name]
-                subbone_name = subbone.name = bone_name+str(i+1)
+                subbone_name = subbone.name = bone_name + str(i + 1)
                 group = bpy.context.object.vertex_groups.new(name=subbone_name)
                 vertex_groups.append(group.index)
         BODY_M = self.get_body_mesh()
@@ -654,7 +673,7 @@ class DazOptimizer:
         for pec_weights, pec_groups in [(l_pec_weights, l_pec_groups), (r_pec_weights, r_pec_groups)]:
             max_weight = np.max(pec_weights)
             for i, subpec_group in enumerate(l_pec_groups):
-                subpec_weights = pec_weights - (i+1)/(cuts+1)
+                subpec_weights = pec_weights - (i + 1) / (cuts + 1)
 
     def save_textures(self):
         BODY_M = self.get_body_mesh()
@@ -666,35 +685,39 @@ class DazOptimizer:
             shutil.rmtree(tex_dir)
         bpy.ops.daz.save_local_textures()
 
-    def unify_golden_palace_uvs(self, BODY_M):
-        baked_gp_img = bpy.data.images['GP_Baked'] if 'GP_Baked' in bpy.data.images else bpy.data.images.new('GP_Baked', 1024 * 4, 1024 * 4)
-        new_gp_uv_map = 'unified_gp_uv'
-        if new_gp_uv_map not in BODY_M.data.uv_layers:
+    def unify_golden_palace_uvs(self):
+        BODY_M = self.get_body_mesh()
+        bpy.ops.object.select_all(action='DESELECT')
+        BODY_M.select_set(True)
+        bpy.context.view_layer.objects.active = BODY_M
+
+        if NEW_GP_UV_MAP not in BODY_M.data.uv_layers:
             gp_labia_majora = BODY_M.data.uv_layers['Golden Palace 2']
             gp_labia_minora = BODY_M.data.uv_layers['Golden Palace']
             gp_labia_majora.active = True
-            new_uv_layer = BODY_M.data.uv_layers.new(name=new_gp_uv_map)
+            new_uv_layer = BODY_M.data.uv_layers.new(name=NEW_GP_UV_MAP)
             new_uv_layer_np = np.array([v.uv for v in new_uv_layer.data])
             gp_labia_majora_np = np.array([v.uv for v in gp_labia_majora.data])
             gp_labia_minora_np = np.array([v.uv for v in gp_labia_minora.data])
             is_labia_majora = np.logical_and(0.285 < gp_labia_majora_np[:, 0], gp_labia_majora_np[:, 0] < 0.72)
-            vagina_symmetry_line = 1.26598
-            vagina_extent = 1.47191
+            vagina_symmetry_line = 0.26598
+            vagina_extent = 0.47191
             vagina_half_width = vagina_extent - vagina_symmetry_line
-            p1A = np.array([1.31444-vagina_symmetry_line, 0.912306])
-            p2A = np.array([1.4164-vagina_symmetry_line, 0.545495])
+            p1A = np.array([0.31444 - vagina_symmetry_line, 0.912306])
+            p2A = np.array([0.4164 - vagina_symmetry_line, 0.545495])
             vag_distance = np.absolute(gp_labia_minora_np[:, 0] - vagina_symmetry_line)
-            slopeA = (p2A[1]-p1A[1])/(p2A[0]-p1A[0])
+            slopeA = (p2A[1] - p1A[1]) / (p2A[0] - p1A[0])
             # p1[2] = p1[0] * slope + offset
             # p1[2] - p1[0] * slope = offset
             offsetA = p1A[1] - p1A[0] * slopeA
             offsetA += 0.05  # just for a good measure to avoid errors due to floating point precision
-            p1B = np.array([1.43189-vagina_symmetry_line, 0.317139])
-            p2B = np.array([1.40303-vagina_symmetry_line, 0.217741])
+            p1B = np.array([0.43189 - vagina_symmetry_line, 0.317139])
+            p2B = np.array([0.40303 - vagina_symmetry_line, 0.217741])
             slopeB = (p2B[1] - p1B[1]) / (p2B[0] - p1B[0])
             offsetB = p1B[1] - p1B[0] * slopeB
             offsetB -= 0.1  # just for a good measure to avoid errors due to floating point precision
-            is_labia_minora = np.logical_and(vag_distance * slopeB + offsetB < gp_labia_minora_np[:, 1], gp_labia_minora_np[:, 1] < vag_distance * slopeA + offsetA)
+            is_labia_minora = np.logical_and(vag_distance * slopeB + offsetB < gp_labia_minora_np[:, 1],
+                                             gp_labia_minora_np[:, 1] < vag_distance * slopeA + offsetA)
             is_labia_majora = np.logical_and(is_labia_majora, np.logical_not(is_labia_minora))
             is_anus = np.logical_and(np.all(gp_labia_majora_np > 0, axis=1), np.all(gp_labia_minora_np > 0, axis=1))
             is_anus = np.logical_and(is_anus, np.logical_not(np.logical_or(is_labia_majora, is_labia_minora)))
@@ -710,21 +733,28 @@ class DazOptimizer:
             is_insides = np.logical_or(is_vagina, is_anus)
             new_uv_layer_np[:, :] = 0
             vagina_margin = 0.08
-            new_uv_layer_np[is_labia_minora] = gp_labia_minora_np[is_labia_minora] - [1+vagina_margin, 0]
-            new_uv_layer_np[is_labia_majora] = gp_labia_majora_np[is_labia_majora] + [1-0.72, 0]
-            new_uv_layer_np[is_insides] = (gp_labia_minora_np[is_insides]-[1,0])*(1/8)+[vagina_half_width*2-vagina_margin,0]
+            new_uv_layer_np[is_labia_minora] = gp_labia_minora_np[is_labia_minora] - [vagina_margin, 0]
+            new_uv_layer_np[is_labia_majora] = gp_labia_majora_np[is_labia_majora] + [1 - 0.72, 0]
+            new_uv_layer_np[is_insides] = gp_labia_minora_np[is_insides] * (1 / 8) + [
+                vagina_half_width * 2 - vagina_margin, 0]
             for v, new_uv in zip(new_uv_layer.data, new_uv_layer_np):
                 v.uv = new_uv
-        return baked_gp_img
 
-    def bake_golden_palace(self):
+    def setup_golden_palace_for_baking(self):
         BODY_M = self.get_body_mesh()
-        baked_gp_img = self.unify_golden_palace_uvs(BODY_M)
+        bpy.ops.object.select_all(action='DESELECT')
+        BODY_M.select_set(True)
+        bpy.context.view_layer.objects.active = BODY_M
+        if 'GP_Baked' in bpy.data.images:
+            baked_gp_img = bpy.data.images['GP_Baked']
+        else:
+            baked_gp_img = bpy.data.images.new('GP_Baked', 1024 * 4, 1024 * 4)
         bpy.context.scene.render.engine = 'CYCLES'
         bpy.context.scene.cycles.bake_type = 'DIFFUSE'
+        bpy.context.scene.cycles.device = 'GPU'
         bpy.context.scene.render.bake.use_pass_direct = False
         bpy.context.scene.render.bake.use_pass_indirect = False
-
+        BODY_M.data.uv_layers[NEW_GP_UV_MAP].active = True
         for mat in BODY_M.data.materials:
             if mat.name.startswith('GP_'):
                 n = mat.node_tree.nodes
@@ -733,12 +763,11 @@ class DazOptimizer:
                 target_texture.image = baked_gp_img
                 uv_map = n.new('ShaderNodeUVMap')
                 uv_map.location = (-300, 200)
-                uv_map.uv_map = new_gp_uv_map
+                uv_map.uv_map = NEW_GP_UV_MAP
+
                 target_texture.location = (0, 200)
                 l.new(target_texture.inputs['Vector'], uv_map.outputs['UV'])
                 n.active = target_texture
-
-
 
     # *= 0.25# nails
     # -= 0.5 # nails
@@ -751,24 +780,6 @@ def save_textures(duf_filepath):
     blend_filepath = os.path.join(workdir, name + ".blend")
     bpy.ops.wm.save_as_mainfile(filepath=blend_filepath)
     DazOptimizer(workdir=workdir, name=name).save_textures()
-
-
-def install_libraries():
-    pil_missing = False
-    opencv_missing = False
-    try:
-        import PIL
-    except ModuleNotFoundError:
-        pil_missing = True
-    try:
-        import cv2
-    except ModuleNotFoundError:
-        opencv_missing = True
-    if pil_missing or opencv_missing:
-        py_exe = sys.executable
-        res_path = os.path.realpath(os.path.join(py_exe, "../../lib/site-packages"))
-        print("Run the following command as an admin: ")
-        print('&"' + py_exe + '" -m pip install pillow opencv-python "--target=' + res_path + '"')
 
 
 def run_outside_blender():
@@ -1138,6 +1149,36 @@ class DazConvertToUe5Skeleton_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class DazOptimizeGoldenPalaceUVs(bpy.types.Operator):
+    """ Optimize Golden Palace UVs """
+    bl_idname = "dazoptim.optim_gp_uvs"
+    bl_label = "Optimize Golden Palace UVs"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().unify_golden_palace_uvs()
+
+        return {'FINISHED'}
+
+
+class DazSetupGoldenPalaceForBaking(bpy.types.Operator):
+    """ Setup Golden Palace for Baking """
+    bl_idname = "dazoptim.bake_gp"
+    bl_label = "Bake Golden Palace"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().setup_golden_palace_for_baking()
+        return {'FINISHED'}
+
 class DazBakeGoldenPalace(bpy.types.Operator):
     """ Bake Golden Palace """
     bl_idname = "dazoptim.bake_gp"
@@ -1149,10 +1190,8 @@ class DazBakeGoldenPalace(bpy.types.Operator):
         return context.mode == "OBJECT"
 
     def execute(self, context):
-        DazOptimizer().bake_golden_palace()
-
+        bpy.ops.object.bake(type='DIFFUSE')
         return {'FINISHED'}
-
 
 class DazSendToUnreal(bpy.types.Operator):
     """ Send to unreal """
@@ -1181,7 +1220,7 @@ class DazOptimize_sidebar(bpy.types.Panel):
         col = self.layout.column(align=True)
         i = 0
         for op_class, op_text in operators:
-            prop = col.operator(op_class.bl_idname, text=str(i)+". "+op_text)
+            prop = col.operator(op_class.bl_idname, text=str(i) + ". " + op_text)
             i += 1
 
 
@@ -1189,10 +1228,12 @@ operators = [
     (DazDelCube_operator, "Delete default cube"),
     (DazLoad_operator, "Load Daz"),
     (DazSave_operator, "Save textures"),
-    (DazOptimizeEyes_operator,  "Optimize eyes"),
+    (DazOptimizeEyes_operator, "Optimize eyes"),
     (DazMergeGrografts_operator, "Merge Geografts"),
+    (DazOptimizeGoldenPalaceUVs, "Optimize golden palace UVs"),
+    (DazSetupGoldenPalaceForBaking, "golden palace prepare baking"),
     (DazBakeGoldenPalace, "Bake golden palace"),
-    (DazMergeEyes_operator,  "Merge eyes"),
+    (DazMergeEyes_operator, "Merge eyes"),
     (DazMergeMouth_operator, "Merge mouth"),
     (DazConcatTextures_operator, "Merge textures"),
     (DazOptimizeUVs_operator, "Optimize UVs"),
@@ -1207,9 +1248,9 @@ operators = [
 ]
 
 classes = [
-    DazOptimize_sidebar,
-    EasyImportPanel,
-] + [op for (op, _) in operators]
+              DazOptimize_sidebar,
+              EasyImportPanel,
+          ] + [op for (op, _) in operators]
 
 
 def register():

@@ -271,6 +271,75 @@ class DazOptimizer:
         bpy.ops.object.mode_set(mode='OBJECT')
         #
 
+    def simplify_materials(self):
+        BODY_M = self.get_body_mesh()
+
+        def backwards_search_for(node, t: type, outputs):
+            if node not in outputs:
+                if isinstance(node, t):
+                    outputs.add(node)
+                for i in node.inputs:
+                    from_socket_backwards_search_for(i, t, outputs)
+            return outputs
+
+        def from_socket_backwards_search_for(input_socket, t: type, outputs):
+            for link in input_socket.links:
+                backwards_search_for(link.from_node, t, outputs)
+            return outputs
+
+        def find_by_type(node_tree, t: type):
+            for node in node_tree.nodes:
+                if isinstance(node, t):
+                    return node
+
+        all_filepaths: {str: {str: [bpy.types.Image]}} = {}
+        for mat in BODY_M.data.materials:
+            output_node = find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
+            body_part = mat.name.rstrip('0123456789-_')
+            body_part_filepaths = all_filepaths[body_part] = {}
+            if output_node is not None:
+                for bsdf in from_socket_backwards_search_for(output_node.inputs['Surface'], bpy.types.ShaderNodeBsdfPrincipled, set()):
+                    for channel in ['Base Color', 'Roughness', 'Normal']:
+                        files = body_part_filepaths[channel] = []
+                        for img_node in from_socket_backwards_search_for(bsdf.inputs[channel],  bpy.types.ShaderNodeTexImage, set()):
+                            files.append(img_node.image)
+        for body_part_filepaths in all_filepaths.values():
+            occurrences = {}
+            for channel in body_part_filepaths.values():
+                for image in channel:
+                    if image not in occurrences:
+                        occurrences[image] = 1
+                    else:
+                        occurrences[image] += 1
+            for channel in body_part_filepaths.values():
+                channel.sort(key=lambda x: occurrences[x])
+
+        print(json.dumps({k:{k2:[v3.filepath for v3 in v2] for k2, v2 in v.items()} for k, v in all_filepaths.items()}, indent=2))
+        for mat in BODY_M.data.materials:
+            body_part = mat.name.rstrip('0123456789-_')
+            body_part_filepaths = all_filepaths[body_part]
+            ns = mat.node_tree.nodes
+            ls = mat.node_tree.links
+            ns.clear()
+            output_node = ns.new('ShaderNodeOutputMaterial')
+            output_node.location = (400, 0)
+            bsdf_node = ns.new('ShaderNodeBsdfPrincipled')
+            for idx, channel in enumerate(['Base Color', 'Roughness', 'Normal']):
+                tex_node = ns.new('ShaderNodeTexImage')
+                tex_node.location = (-600,-(idx-1) * 300)
+                tex_node.image = body_part_filepaths[channel][0]
+                if channel == 'Normal':
+                    norm_map_node = ns.new('ShaderNodeNormalMap')
+                    norm_map_node.location = (-200, -idx * 200)
+                    ls.new(bsdf_node.inputs[channel], norm_map_node.outputs['Normal'])
+                    ls.new(norm_map_node.inputs['Color'], tex_node.outputs['Color'])
+                else:
+                    ls.new(bsdf_node.inputs[channel], tex_node.outputs['Color'])
+            ls.new(output_node.inputs['Surface'], bsdf_node.outputs['BSDF'])
+
+
+
+
     def concat_textures(self):
         from PIL import Image
         import re
@@ -950,6 +1019,22 @@ class DazSave_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class DazSimplifyMaterials_operator(bpy.types.Operator):
+    """ Simplify materials """
+    bl_idname = "dazoptim.simpl_mats"
+    bl_label = "Simplify materials"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().simplify_materials()
+
+        return {'FINISHED'}
+
+
 class DazConcatTextures_operator(bpy.types.Operator):
     """ Concatenate textures into one """
     bl_idname = "dazoptim.concat"
@@ -1238,6 +1323,7 @@ operators = [
     (DazDelCube_operator, "Delete default cube"),
     (DazLoad_operator, "Load Daz"),
     (DazSave_operator, "Save textures"),
+    (DazSimplifyMaterials_operator, "Simplify materials"),
     (DazOptimizeEyes_operator, "Optimize eyes"),
     (DazOptimizeGoldenPalaceUVs, "Optimize golden palace UVs"),
     (DazSetupGoldenPalaceForBaking, "golden palace prepare baking"),

@@ -274,6 +274,18 @@ class DazOptimizer:
     def simplify_materials(self):
         BODY_M = self.get_body_mesh()
 
+        def collect_all_before(node, outputs):
+            if node not in outputs:
+                outputs.add(node)
+                for input_socket in node.inputs:
+                    for link in input_socket.links:
+                        collect_all_before(link.from_node, outputs)
+            return outputs
+
+        def delete_all_before(node_tree, node):
+            for node in collect_all_before(node, set()):
+                node_tree.nodes.remove(node)
+
         def backwards_search_for(node, t: type, outputs):
             if node not in outputs:
                 if isinstance(node, t):
@@ -296,13 +308,20 @@ class DazOptimizer:
         for mat in BODY_M.data.materials:
             output_node = find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
             body_part = mat.name.rstrip('0123456789-_')
-            body_part_filepaths = all_filepaths[body_part] = {}
+            body_part_filepaths = all_filepaths[body_part] = {'Base Color':set(), 'Roughness':set(), 'Normal':set()}
             if output_node is not None:
-                for bsdf in from_socket_backwards_search_for(output_node.inputs['Surface'], bpy.types.ShaderNodeBsdfPrincipled, set()):
-                    for channel in ['Base Color', 'Roughness', 'Normal']:
-                        files = body_part_filepaths[channel] = []
-                        for img_node in from_socket_backwards_search_for(bsdf.inputs[channel],  bpy.types.ShaderNodeTexImage, set()):
-                            files.append(img_node.image)
+                for bsdf in from_socket_backwards_search_for(output_node.inputs['Surface'], (bpy.types.ShaderNodeBsdfPrincipled, bpy.types.ShaderNodeGroup), set()):
+                    if isinstance(bsdf, bpy.types.ShaderNodeBsdfPrincipled):
+                        for channel in ['Base Color', 'Roughness', 'Normal']:
+                            for img_node in from_socket_backwards_search_for(bsdf.inputs[channel],  bpy.types.ShaderNodeTexImage, set()):
+                                body_part_filepaths[channel].add(img_node.image)
+                    elif bsdf.node_tree.name == 'DAZ Dual Lobe PBR':
+                        for img_node in from_socket_backwards_search_for(bsdf.inputs['Roughness 1'], bpy.types.ShaderNodeTexImage, set()):
+                            body_part_filepaths['Roughness'].add(img_node.image)
+                        for img_node in from_socket_backwards_search_for(bsdf.inputs['Roughness 2'], bpy.types.ShaderNodeTexImage, set()):
+                            body_part_filepaths['Roughness'].add(img_node.image)
+                        for img_node in from_socket_backwards_search_for(bsdf.inputs['Normal'], bpy.types.ShaderNodeTexImage, set()):
+                            body_part_filepaths['Normal'].add(img_node.image)
         for body_part_filepaths in all_filepaths.values():
             occurrences = {}
             for channel in body_part_filepaths.values():
@@ -311,34 +330,58 @@ class DazOptimizer:
                         occurrences[image] = 1
                     else:
                         occurrences[image] += 1
-            for channel in body_part_filepaths.values():
-                channel.sort(key=lambda x: occurrences[x])
+            for channel in body_part_filepaths:
+                body_part_filepaths[channel] = list(sorted(body_part_filepaths[channel], key=lambda x: occurrences[x]))
 
         print(json.dumps({k:{k2:[v3.filepath for v3 in v2] for k2, v2 in v.items()} for k, v in all_filepaths.items()}, indent=2))
-        for mat in BODY_M.data.materials:
-            body_part = mat.name.rstrip('0123456789-_')
-            body_part_filepaths = all_filepaths[body_part]
-            ns = mat.node_tree.nodes
-            ls = mat.node_tree.links
-            ns.clear()
-            output_node = ns.new('ShaderNodeOutputMaterial')
-            output_node.location = (400, 0)
+
+        def gen_simple_material(node_tree, filepaths, output_socket, shift_x=0, uvs=None):
+            ns = node_tree.nodes
+            ls = node_tree.links
             bsdf_node = ns.new('ShaderNodeBsdfPrincipled')
+            bsdf_node.location = (shift_x, 0)
+            if isinstance(uvs, str):
+                uv_node = ns.new('ShaderNodeUVMap')
+                uv_node.location = (-900+shift_x,0)
+                uv_node.uv_map = uvs
+                uvs = uv_node
+            if isinstance(uvs, bpy.types.ShaderNodeUVMap):
+                uvs = uvs.outputs['UV']
             for idx, channel in enumerate(['Base Color', 'Roughness', 'Normal']):
                 tex_node = ns.new('ShaderNodeTexImage')
-                tex_node.location = (-600,-(idx-1) * 300)
-                tex_node.image = body_part_filepaths[channel][0]
+                tex_node.location = (-600+shift_x, -(idx-1) * 300)
+                tex_node.image = filepaths[channel][0]
+                if uvs is not None:
+                    ls.new(tex_node.inputs['Vector'], uvs)
                 if channel == 'Normal':
                     norm_map_node = ns.new('ShaderNodeNormalMap')
-                    norm_map_node.location = (-200, -idx * 200)
+                    norm_map_node.location = (-200+shift_x, -idx * 200)
                     ls.new(bsdf_node.inputs[channel], norm_map_node.outputs['Normal'])
                     ls.new(norm_map_node.inputs['Color'], tex_node.outputs['Color'])
                 else:
                     ls.new(bsdf_node.inputs[channel], tex_node.outputs['Color'])
-            ls.new(output_node.inputs['Surface'], bsdf_node.outputs['BSDF'])
+            ls.new(output_socket, bsdf_node.outputs['BSDF'])
 
+        for mat in BODY_M.data.materials:
+            body_part = mat.name.rstrip('0123456789-_')
+            body_part_filepaths = all_filepaths[body_part]
+            mat.node_tree.nodes.clear()
+            output_node = mat.node_tree.nodes.new('ShaderNodeOutputMaterial')
+            output_node.location = (400, 0)
+            gen_simple_material(mat.node_tree, body_part_filepaths, output_node.inputs['Surface'])
 
-
+        body_part_filepaths = all_filepaths['Body']
+        if 'GoldenPalace_G9' in bpy.data.objects:
+            GOLD_PAL_M = bpy.data.objects['GoldenPalace_G9 Mesh']
+            for mat in GOLD_PAL_M.data.materials:
+                output_node = find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
+                tail = output_node.inputs['Surface'].links[0].from_node
+                while isinstance(tail, bpy.types.ShaderNodeGroup) and tail.node_tree.name.startswith('GoldenPalaceG9_Shell_'):
+                    output_node = tail
+                    tail = output_node.inputs['BSDF'].links[0].from_node
+                out_socket = output_node.inputs['BSDF']
+                delete_all_before(mat.node_tree, out_socket.links[0].from_node)
+                gen_simple_material(mat.node_tree, body_part_filepaths, out_socket, shift_x=output_node.location[0]-300,uvs='Default UVs')
 
     def concat_textures(self):
         from PIL import Image

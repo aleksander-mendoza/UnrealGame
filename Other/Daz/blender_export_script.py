@@ -275,9 +275,11 @@ class DazOptimizer:
         from PIL import Image
         import re
         import cv2
-
-        name_pattern = re.compile(
-            r"([A-Za-z0-9_-]+)_([Hh]ead|[Ee]yelashes|[Ll]egs|[Nn]ails|[Bb]ody|[Aa]rms|[Mm]outh|[Ee]yes_sclera[_0-9]*|[Ee]yes_iris[_0-9]*)[A-Za-z]?(_(D|NM|R|SSS|C|nm)(_[0-9]+)?)?\.(jpg|png)")
+        gp_baked_path = os.path.join(self.workdir, self.name + '_gp_baked.png')
+        if 'GP_Baked' in bpy.data.images:
+            bpy.data.images['GP_Baked'].save(filepath=gp_baked_path)
+        name_pattern = re.compile(r"head|eye(s|lashes|_sclera|_iris)?|legs|nails|body|arms|mouth")
+        map_type_pattern = re.compile(r"(D|NM|R|SSS|C)(?=[^a-z])|\bnm\b")
 
         img_file_paths = {}
         gp_map_types = {
@@ -290,27 +292,26 @@ class DazOptimizer:
             for file_name in files:
                 body_part = None
                 map_type = None
-                if file_name.startswith("G9GP_") and file_name.endswith(".jpg"):
-                    map_type = file_name[len("G9GP_"):-len(".jpg")]
-                    map_type = gp_map_types.get(map_type)
-                    body_part = "G9GP"
-                else:
-                    match = name_pattern.fullmatch(file_name)
-                    if match:
-                        object_name = match.group(1)
-                        body_part = match.group(2).lower()
-                        map_type = match.group(4)
-                        if map_type is None or map_type == '':
-                            map_type = 'D'
-                        else:
-                            map_type = map_type.rstrip('_')
-                        body_part = body_part.rstrip('_0123456789')
-                if body_part is not None and map_type is not None:
-                    file_path = os.path.join(root, file_name)
-                    if body_part not in img_file_paths:
-                        img_file_paths[body_part] = {}
-                    img_file_paths[body_part][map_type] = file_path
+                if file_name.endswith(".jpg") or file_name.endswith(".png"):
+                    if file_name.startswith("G9GP_"):
+                        map_type = file_name[len("G9GP_"):-len(".jpg")]
+                        map_type = gp_map_types.get(map_type)
+                        body_part = "G9GP"
+                    else:
+                        match = name_pattern.search(file_name.lower())
+                        if match:
+                            body_part = match.group()
+                        match = map_type_pattern.search(file_name)
+                        if match:
+                            map_type = match.group()
+                    if body_part is not None and map_type is not None:
+                        file_path = os.path.join(root, file_name)
+                        if body_part not in img_file_paths:
+                            img_file_paths[body_part] = {}
+                        img_file_paths[body_part][map_type] = file_path
 
+        if os.path.exists(gp_baked_path):
+            img_file_paths["G9GP"]["D"] = gp_baked_path
         uv_region_mask = self.get_uv_mask()
         MASK_TILE_SIZE = uv_region_mask.shape[0] // 2
         arms_region_mask = uv_region_mask[:MASK_TILE_SIZE, MASK_TILE_SIZE:]
@@ -685,20 +686,31 @@ class DazOptimizer:
             shutil.rmtree(tex_dir)
         bpy.ops.daz.save_local_textures()
 
-    def unify_golden_palace_uvs(self):
-        BODY_M = self.get_body_mesh()
+    def select_gp_or_body(self):
+        if 'GoldenPalace_G9 Mesh' in bpy.data.objects:
+            mesh = bpy.data.objects['GoldenPalace_G9 Mesh']
+        else:
+            mesh = self.get_body_mesh()
         bpy.ops.object.select_all(action='DESELECT')
-        BODY_M.select_set(True)
-        bpy.context.view_layer.objects.active = BODY_M
+        mesh.select_set(True)
+        bpy.context.view_layer.objects.active = mesh
+        return mesh
 
-        if NEW_GP_UV_MAP not in BODY_M.data.uv_layers:
-            gp_labia_majora = BODY_M.data.uv_layers['Golden Palace 2']
-            gp_labia_minora = BODY_M.data.uv_layers['Golden Palace']
+    def unify_golden_palace_uvs(self):
+
+        mesh = self.select_gp_or_body()
+        if NEW_GP_UV_MAP not in mesh.data.uv_layers:
+            gp_labia_majora = mesh.data.uv_layers['Golden Palace 2']
+            gp_labia_minora = mesh.data.uv_layers['Golden Palace']
             gp_labia_majora.active = True
-            new_uv_layer = BODY_M.data.uv_layers.new(name=NEW_GP_UV_MAP)
+            new_uv_layer = mesh.data.uv_layers.new(name=NEW_GP_UV_MAP)
             new_uv_layer_np = np.array([v.uv for v in new_uv_layer.data])
             gp_labia_majora_np = np.array([v.uv for v in gp_labia_majora.data])
             gp_labia_minora_np = np.array([v.uv for v in gp_labia_minora.data])
+            is_majora = np.all(gp_labia_majora_np > 0, axis=1)
+            is_minora = np.all(gp_labia_minora_np > 0, axis=1)
+            gp_labia_majora_np = np.mod(gp_labia_majora_np, 1)
+            gp_labia_minora_np = np.mod(gp_labia_minora_np, 1)
             is_labia_majora = np.logical_and(0.285 < gp_labia_majora_np[:, 0], gp_labia_majora_np[:, 0] < 0.72)
             vagina_symmetry_line = 0.26598
             vagina_extent = 0.47191
@@ -719,7 +731,7 @@ class DazOptimizer:
             is_labia_minora = np.logical_and(vag_distance * slopeB + offsetB < gp_labia_minora_np[:, 1],
                                              gp_labia_minora_np[:, 1] < vag_distance * slopeA + offsetA)
             is_labia_majora = np.logical_and(is_labia_majora, np.logical_not(is_labia_minora))
-            is_anus = np.logical_and(np.all(gp_labia_majora_np > 0, axis=1), np.all(gp_labia_minora_np > 0, axis=1))
+            is_anus = np.logical_and(is_minora, is_majora)
             is_anus = np.logical_and(is_anus, np.logical_not(np.logical_or(is_labia_majora, is_labia_minora)))
             p1 = (0.514551, 0.546842)  # point on circle boundary
             p2 = (0.499947, 0.550254)  # center
@@ -735,16 +747,12 @@ class DazOptimizer:
             vagina_margin = 0.08
             new_uv_layer_np[is_labia_minora] = gp_labia_minora_np[is_labia_minora] - [vagina_margin, 0]
             new_uv_layer_np[is_labia_majora] = gp_labia_majora_np[is_labia_majora] + [1 - 0.72, 0]
-            new_uv_layer_np[is_insides] = gp_labia_minora_np[is_insides] * (1 / 8) + [
-                vagina_half_width * 2 - vagina_margin, 0]
+            new_uv_layer_np[is_insides] = gp_labia_minora_np[is_insides] * (1 / 8) + [vagina_half_width * 2 - vagina_margin, 0]
             for v, new_uv in zip(new_uv_layer.data, new_uv_layer_np):
                 v.uv = new_uv
 
     def setup_golden_palace_for_baking(self):
-        BODY_M = self.get_body_mesh()
-        bpy.ops.object.select_all(action='DESELECT')
-        BODY_M.select_set(True)
-        bpy.context.view_layer.objects.active = BODY_M
+        mesh = self.select_gp_or_body()
         if 'GP_Baked' in bpy.data.images:
             baked_gp_img = bpy.data.images['GP_Baked']
         else:
@@ -754,8 +762,8 @@ class DazOptimizer:
         bpy.context.scene.cycles.device = 'GPU'
         bpy.context.scene.render.bake.use_pass_direct = False
         bpy.context.scene.render.bake.use_pass_indirect = False
-        BODY_M.data.uv_layers[NEW_GP_UV_MAP].active = True
-        for mat in BODY_M.data.materials:
+        mesh.data.uv_layers[NEW_GP_UV_MAP].active = True
+        for mat in mesh.data.materials:
             if mat.name.startswith('GP_'):
                 n = mat.node_tree.nodes
                 l = mat.node_tree.links
@@ -768,6 +776,7 @@ class DazOptimizer:
                 target_texture.location = (0, 200)
                 l.new(target_texture.inputs['Vector'], uv_map.outputs['UV'])
                 n.active = target_texture
+
 
     # *= 0.25# nails
     # -= 0.5 # nails
@@ -820,7 +829,7 @@ class EasyImportPanel(bpy.types.Panel):
         if op and op.bl_idname == "DAZ_OT_easy_import_daz":
             cls.directory = op.directory
             cls.filepath = op.filepath
-            context.scene['duf_filepath'] = op.filepath
+            #context.scene['duf_filepath'] = op.filepath
         return False
 
     # needs a draw method
@@ -1167,8 +1176,8 @@ class DazOptimizeGoldenPalaceUVs(bpy.types.Operator):
 
 class DazSetupGoldenPalaceForBaking(bpy.types.Operator):
     """ Setup Golden Palace for Baking """
-    bl_idname = "dazoptim.bake_gp"
-    bl_label = "Bake Golden Palace"
+    bl_idname = "dazoptim.setup_gp_bake"
+    bl_label = "Setup Golden Palace fro baking"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -1178,6 +1187,7 @@ class DazSetupGoldenPalaceForBaking(bpy.types.Operator):
     def execute(self, context):
         DazOptimizer().setup_golden_palace_for_baking()
         return {'FINISHED'}
+
 
 class DazBakeGoldenPalace(bpy.types.Operator):
     """ Bake Golden Palace """
@@ -1229,10 +1239,10 @@ operators = [
     (DazLoad_operator, "Load Daz"),
     (DazSave_operator, "Save textures"),
     (DazOptimizeEyes_operator, "Optimize eyes"),
-    (DazMergeGrografts_operator, "Merge Geografts"),
     (DazOptimizeGoldenPalaceUVs, "Optimize golden palace UVs"),
     (DazSetupGoldenPalaceForBaking, "golden palace prepare baking"),
     (DazBakeGoldenPalace, "Bake golden palace"),
+    (DazMergeGrografts_operator, "Merge Geografts"),
     (DazMergeEyes_operator, "Merge eyes"),
     (DazMergeMouth_operator, "Merge mouth"),
     (DazConcatTextures_operator, "Merge textures"),

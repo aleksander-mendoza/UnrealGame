@@ -8,6 +8,44 @@ import bmesh
 import json
 
 
+class NodesUtils:
+
+    @staticmethod
+    def collect_all_before(node, outputs):
+        if node not in outputs:
+            outputs.add(node)
+            for input_socket in node.inputs:
+                for link in input_socket.links:
+                    NodesUtils.collect_all_before(link.from_node, outputs)
+        return outputs
+
+    @staticmethod
+    def delete_all_before(node_tree, node):
+        for node in NodesUtils.collect_all_before(node, set()):
+            node_tree.nodes.remove(node)
+
+    @staticmethod
+    def backwards_search_for(node, t: type, outputs):
+        if node not in outputs:
+            if isinstance(node, t):
+                outputs.add(node)
+            for i in node.inputs:
+                NodesUtils.from_socket_backwards_search_for(i, t, outputs)
+        return outputs
+
+    @staticmethod
+    def from_socket_backwards_search_for(input_socket, t: type, outputs):
+        for link in input_socket.links:
+            NodesUtils.backwards_search_for(link.from_node, t, outputs)
+        return outputs
+
+    @staticmethod
+    def find_by_type(node_tree, t: type):
+        for node in node_tree.nodes:
+            if isinstance(node, t):
+                return node
+
+
 def install_libraries():
     pil_missing = False
     opencv_missing = False
@@ -271,56 +309,34 @@ class DazOptimizer:
         bpy.ops.object.mode_set(mode='OBJECT')
         #
 
-    def simplify_materials(self):
+    def find_body_parts_textures(self):
         BODY_M = self.get_body_mesh()
-
-        def collect_all_before(node, outputs):
-            if node not in outputs:
-                outputs.add(node)
-                for input_socket in node.inputs:
-                    for link in input_socket.links:
-                        collect_all_before(link.from_node, outputs)
-            return outputs
-
-        def delete_all_before(node_tree, node):
-            for node in collect_all_before(node, set()):
-                node_tree.nodes.remove(node)
-
-        def backwards_search_for(node, t: type, outputs):
-            if node not in outputs:
-                if isinstance(node, t):
-                    outputs.add(node)
-                for i in node.inputs:
-                    from_socket_backwards_search_for(i, t, outputs)
-            return outputs
-
-        def from_socket_backwards_search_for(input_socket, t: type, outputs):
-            for link in input_socket.links:
-                backwards_search_for(link.from_node, t, outputs)
-            return outputs
-
-        def find_by_type(node_tree, t: type):
-            for node in node_tree.nodes:
-                if isinstance(node, t):
-                    return node
 
         all_filepaths: {str: {str: [bpy.types.Image]}} = {}
         for mat in BODY_M.data.materials:
-            output_node = find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
+            output_node = NodesUtils.find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
             body_part = mat.name.rstrip('0123456789-_')
-            body_part_filepaths = all_filepaths[body_part] = {'Base Color':set(), 'Roughness':set(), 'Normal':set()}
+            body_part_filepaths = all_filepaths[body_part] = {'Base Color': set(), 'Roughness': set(), 'Normal': set()}
             if output_node is not None:
-                for bsdf in from_socket_backwards_search_for(output_node.inputs['Surface'], (bpy.types.ShaderNodeBsdfPrincipled, bpy.types.ShaderNodeGroup), set()):
+                for bsdf in NodesUtils.from_socket_backwards_search_for(output_node.inputs['Surface'], (bpy.types.ShaderNodeBsdfPrincipled, bpy.types.ShaderNodeGroup), set()):
                     if isinstance(bsdf, bpy.types.ShaderNodeBsdfPrincipled):
                         for channel in ['Base Color', 'Roughness', 'Normal']:
-                            for img_node in from_socket_backwards_search_for(bsdf.inputs[channel],  bpy.types.ShaderNodeTexImage, set()):
+                            for img_node in NodesUtils.from_socket_backwards_search_for(bsdf.inputs[channel],
+                                                                                        bpy.types.ShaderNodeTexImage,
+                                                                                        set()):
                                 body_part_filepaths[channel].add(img_node.image)
                     elif bsdf.node_tree.name == 'DAZ Dual Lobe PBR':
-                        for img_node in from_socket_backwards_search_for(bsdf.inputs['Roughness 1'], bpy.types.ShaderNodeTexImage, set()):
+                        for img_node in NodesUtils.from_socket_backwards_search_for(bsdf.inputs['Roughness 1'],
+                                                                                    bpy.types.ShaderNodeTexImage,
+                                                                                    set()):
                             body_part_filepaths['Roughness'].add(img_node.image)
-                        for img_node in from_socket_backwards_search_for(bsdf.inputs['Roughness 2'], bpy.types.ShaderNodeTexImage, set()):
+                        for img_node in NodesUtils.from_socket_backwards_search_for(bsdf.inputs['Roughness 2'],
+                                                                                    bpy.types.ShaderNodeTexImage,
+                                                                                    set()):
                             body_part_filepaths['Roughness'].add(img_node.image)
-                        for img_node in from_socket_backwards_search_for(bsdf.inputs['Normal'], bpy.types.ShaderNodeTexImage, set()):
+                        for img_node in NodesUtils.from_socket_backwards_search_for(bsdf.inputs['Normal'],
+                                                                                    bpy.types.ShaderNodeTexImage,
+                                                                                    set()):
                             body_part_filepaths['Normal'].add(img_node.image)
         for body_part_filepaths in all_filepaths.values():
             occurrences = {}
@@ -332,7 +348,11 @@ class DazOptimizer:
                         occurrences[image] += 1
             for channel in body_part_filepaths:
                 body_part_filepaths[channel] = list(sorted(body_part_filepaths[channel], key=lambda x: occurrences[x]))
+        return all_filepaths
 
+    def simplify_materials(self):
+        BODY_M = self.get_body_mesh()
+        all_filepaths = self.find_body_parts_textures()
         print(json.dumps({k:{k2:[v3.filepath for v3 in v2] for k2, v2 in v.items()} for k, v in all_filepaths.items()}, indent=2))
 
         def gen_simple_material(node_tree, filepaths, output_socket, shift_x=0, uvs=None):
@@ -374,13 +394,13 @@ class DazOptimizer:
         if 'GoldenPalace_G9' in bpy.data.objects:
             GOLD_PAL_M = bpy.data.objects['GoldenPalace_G9 Mesh']
             for mat in GOLD_PAL_M.data.materials:
-                output_node = find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
+                output_node = NodesUtils.find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
                 tail = output_node.inputs['Surface'].links[0].from_node
                 while isinstance(tail, bpy.types.ShaderNodeGroup) and tail.node_tree.name.startswith('GoldenPalaceG9_Shell_'):
                     output_node = tail
                     tail = output_node.inputs['BSDF'].links[0].from_node
                 out_socket = output_node.inputs['BSDF']
-                delete_all_before(mat.node_tree, out_socket.links[0].from_node)
+                NodesUtils.delete_all_before(mat.node_tree, out_socket.links[0].from_node)
                 gen_simple_material(mat.node_tree, body_part_filepaths, out_socket, shift_x=output_node.location[0]-300,uvs='Default UVs')
 
     def concat_textures(self):
@@ -889,7 +909,8 @@ class DazOptimizer:
                 l.new(target_texture.inputs['Vector'], uv_map.outputs['UV'])
                 n.active = target_texture
 
-
+    def make_single_material(self):
+        pass
     # *= 0.25# nails
     # -= 0.5 # nails
 

@@ -45,6 +45,48 @@ class NodesUtils:
             if isinstance(node, t):
                 return node
 
+    @staticmethod
+    def find_all_by_type(node_tree, t: type):
+        return [node for node in node_tree.nodes if isinstance(node, t)]
+
+    @staticmethod
+    def gen_simple_material(node_tree, filepaths, output_socket=None, shift_x=0, uvs=None):
+        ns = node_tree.nodes
+        ls = node_tree.links
+        bsdf_node = ns.new('ShaderNodeBsdfPrincipled')
+        bsdf_node.location = (shift_x, 0)
+        if output_socket is None:
+            output_node = ns.new('ShaderNodeOutputMaterial')
+            output_node.location = (shift_x+400, 0)
+            output_socket = output_node.inputs['Surface']
+        if isinstance(uvs, str):
+            uv_node = ns.new('ShaderNodeUVMap')
+            uv_node.location = (-900 + shift_x, 0)
+            uv_node.uv_map = uvs
+            uvs = uv_node
+        if isinstance(uvs, bpy.types.ShaderNodeUVMap):
+            uvs = uvs.outputs['UV']
+        for idx, channel in enumerate(['Base Color', 'Roughness', 'Normal']):
+            if channel in filepaths:
+                tex_node = ns.new('ShaderNodeTexImage')
+                tex_node.location = (-600 + shift_x, -(idx - 1) * 300)
+                filepath = filepaths[channel]
+                if isinstance(filepath, list):
+                    filepath = filepath[0]
+                if isinstance(filepath, str):
+                    filepath = bpy.data.images.load(filepath)
+                    filepath.colorspace_settings.name = 'sRGB' if channel == 'Base Color' else 'Non-Color'
+                tex_node.image = filepath
+                if uvs is not None:
+                    ls.new(tex_node.inputs['Vector'], uvs)
+                if channel == 'Normal':
+                    norm_map_node = ns.new('ShaderNodeNormalMap')
+                    norm_map_node.location = (-200 + shift_x, -idx * 200)
+                    ls.new(bsdf_node.inputs[channel], norm_map_node.outputs['Normal'])
+                    ls.new(norm_map_node.inputs['Color'], tex_node.outputs['Color'])
+                else:
+                    ls.new(bsdf_node.inputs[channel], tex_node.outputs['Color'])
+        ls.new(output_socket, bsdf_node.outputs['BSDF'])
 
 def install_libraries():
     pil_missing = False
@@ -257,6 +299,12 @@ class DazOptimizer:
         for v, new_uv in zip(self.get_base_uv_layer().data, base_layer_np):
             v.uv = new_uv
 
+    def get_concat_image_path(self, map_type):
+        return os.path.join(self.workdir, self.name + '_' + map_type + '.png')
+
+    def get_simplified_eyes_image_path(self, map_type):
+        return os.path.join(self.workdir, self.name + '_' + map_type + '_eyes.png')
+
     def optimize_eyes(self):
         EYES_M = self.get_eyes_mesh()
         bpy.ops.object.select_all(action='DESELECT')
@@ -309,6 +357,87 @@ class DazOptimizer:
         bpy.ops.object.mode_set(mode='OBJECT')
         #
 
+    def simplify_eyes_material(self):
+        from PIL import Image
+        textures = self.find_eyes_textures()
+        EYES_M = self.get_eyes_mesh()
+        EYES_M.data.materials.clear()
+        mat = bpy.data.materials.new(name="Eyes")
+        mat.use_nodes = True
+        mat.node_tree.nodes.clear()
+        EYES_M.data.materials.append(mat)
+
+
+        class EyeMapType:
+            def __init__(self, sclera:bpy.types.Image, iris:bpy.types.Image, simplified_texture:str):
+                self.sclera = sclera
+                self.iris = iris
+                self.simplified_texture = simplified_texture
+            def join(self, alpha_channel):
+                iris = Image.open(bpy.path.abspath(self.iris.filepath))
+                sclera = Image.open(bpy.path.abspath(self.sclera.filepath))
+                iris = np.array(iris)
+                sclera = np.array(sclera)
+                iris_rgb = iris[:, :, :3]
+                if iris_rgb.dtype.kind != 'f':
+                    iris_rgb = iris_rgb / np.float32(255)
+                if sclera.dtype.kind != 'f':
+                    sclera = sclera / np.float32(255)
+
+                sclera_h, sclera_w = sclera.shape[:2]
+                sclera_upper = sclera[:sclera_h//2].T
+                sclera_upper *= (1 - alpha_channel.T)
+                sclera_upper += iris_rgb.T * alpha_channel.T
+                sclera = Image.fromarray((sclera*255).astype(np.uint8))
+                sclera.save(self.simplified_texture)
+            def get_alpha(self):
+                iris = Image.open(bpy.path.abspath(self.iris.filepath))
+                iris = np.array(iris)
+                iris_a = iris[:, :, 3]
+                if iris_a.dtype.kind != 'f':
+                    iris_a = iris_a / np.float32(255)
+                return iris_a
+
+        maps: {str: EyeMapType} = {}
+        for channel, images in textures.items():
+            iris_img = None
+            sclera_img = None
+            simplified_texture = self.get_simplified_eyes_image_path(channel)
+            for image in images:
+                if 'iris' in image.filepath:
+                    iris_img = image
+                elif 'sclera' in image.filepath:
+                    sclera_img = image
+            if iris_img is not None and sclera_img is not None:
+                maps[channel] = EyeMapType(sclera_img, iris_img, simplified_texture)
+
+        a = maps['Base Color'].get_alpha()
+        body_part_filepaths = {}
+        for channel, eye_map in maps.items():
+            eye_map.join(a)
+            body_part_filepaths[channel] = eye_map.simplified_texture
+        NodesUtils.gen_simple_material(mat.node_tree, body_part_filepaths)
+
+
+
+    def find_eyes_textures(self)->{str:[bpy.types.Image]}:
+        EYES_M = self.get_eyes_mesh()
+        all_eyes_textures = {}
+        for mat in EYES_M.data.materials:
+            output_node = NodesUtils.find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
+            if output_node is not None:
+                for bsdf in NodesUtils.from_socket_backwards_search_for(output_node.inputs['Surface'], bpy.types.ShaderNodeBsdfPrincipled, set()):
+                    for channel in ['Base Color', 'Roughness', 'Normal']:
+                        all_eyes_textures[channel] = []
+                        for img_node in NodesUtils.from_socket_backwards_search_for(bsdf.inputs[channel],(bpy.types.ShaderNodeTexImage, bpy.types.ShaderNodeGroup), set()):
+                            if isinstance(img_node, bpy.types.ShaderNodeGroup):
+                                for img_node in NodesUtils.find_all_by_type(img_node.node_tree, bpy.types.ShaderNodeTexImage):
+                                    all_eyes_textures[channel].append(img_node.image)
+                            else:
+                                all_eyes_textures[channel].append(img_node.image)
+        print("eyes=", json.dumps({k: [v3.filepath for v3 in v] for k, v in all_eyes_textures.items()},indent=2))
+        return all_eyes_textures
+
     def find_body_parts_textures(self):
         BODY_M = self.get_body_mesh()
 
@@ -338,16 +467,25 @@ class DazOptimizer:
                                                                                     bpy.types.ShaderNodeTexImage,
                                                                                     set()):
                             body_part_filepaths['Normal'].add(img_node.image)
+
         for body_part_filepaths in all_filepaths.values():
             occurrences = {}
+            filenames = []
+            for channel in body_part_filepaths.values():
+                if len(channel)==1:
+                    first = next(iter(channel))
+                    filepath = first.filepath
+                    filenames.append(filepath)
+            lcp = os.path.commonprefix(filenames)
             for channel in body_part_filepaths.values():
                 for image in channel:
                     if image not in occurrences:
-                        occurrences[image] = 1
-                    else:
-                        occurrences[image] += 1
+                        occurrences[image] = 0
+                    occurrences[image] += 1 + (1000 if image.filepath.startswith(lcp) else 0)
+
             for channel in body_part_filepaths:
-                body_part_filepaths[channel] = list(sorted(body_part_filepaths[channel], key=lambda x: occurrences[x]))
+                body_part_filepaths[channel] = list(sorted(body_part_filepaths[channel], key=lambda x: -occurrences[x]))
+
         return all_filepaths
 
     def simplify_materials(self):
@@ -355,40 +493,15 @@ class DazOptimizer:
         all_filepaths = self.find_body_parts_textures()
         print(json.dumps({k:{k2:[v3.filepath for v3 in v2] for k2, v2 in v.items()} for k, v in all_filepaths.items()}, indent=2))
 
-        def gen_simple_material(node_tree, filepaths, output_socket, shift_x=0, uvs=None):
-            ns = node_tree.nodes
-            ls = node_tree.links
-            bsdf_node = ns.new('ShaderNodeBsdfPrincipled')
-            bsdf_node.location = (shift_x, 0)
-            if isinstance(uvs, str):
-                uv_node = ns.new('ShaderNodeUVMap')
-                uv_node.location = (-900+shift_x,0)
-                uv_node.uv_map = uvs
-                uvs = uv_node
-            if isinstance(uvs, bpy.types.ShaderNodeUVMap):
-                uvs = uvs.outputs['UV']
-            for idx, channel in enumerate(['Base Color', 'Roughness', 'Normal']):
-                tex_node = ns.new('ShaderNodeTexImage')
-                tex_node.location = (-600+shift_x, -(idx-1) * 300)
-                tex_node.image = filepaths[channel][0]
-                if uvs is not None:
-                    ls.new(tex_node.inputs['Vector'], uvs)
-                if channel == 'Normal':
-                    norm_map_node = ns.new('ShaderNodeNormalMap')
-                    norm_map_node.location = (-200+shift_x, -idx * 200)
-                    ls.new(bsdf_node.inputs[channel], norm_map_node.outputs['Normal'])
-                    ls.new(norm_map_node.inputs['Color'], tex_node.outputs['Color'])
-                else:
-                    ls.new(bsdf_node.inputs[channel], tex_node.outputs['Color'])
-            ls.new(output_socket, bsdf_node.outputs['BSDF'])
 
-        for mat in BODY_M.data.materials:
+        mats = list(BODY_M.data.materials)
+        if 'BreastacularG9 Mesh' in bpy.data.objects:
+            mats.extend(bpy.data.objects['BreastacularG9 Mesh'].data.materials)
+        for mat in mats:
             body_part = mat.name.rstrip('0123456789-_')
             body_part_filepaths = all_filepaths[body_part]
             mat.node_tree.nodes.clear()
-            output_node = mat.node_tree.nodes.new('ShaderNodeOutputMaterial')
-            output_node.location = (400, 0)
-            gen_simple_material(mat.node_tree, body_part_filepaths, output_node.inputs['Surface'])
+            NodesUtils.gen_simple_material(mat.node_tree, body_part_filepaths)
 
         body_part_filepaths = all_filepaths['Body']
         if 'GoldenPalace_G9' in bpy.data.objects:
@@ -401,7 +514,7 @@ class DazOptimizer:
                     tail = output_node.inputs['BSDF'].links[0].from_node
                 out_socket = output_node.inputs['BSDF']
                 NodesUtils.delete_all_before(mat.node_tree, out_socket.links[0].from_node)
-                gen_simple_material(mat.node_tree, body_part_filepaths, out_socket, shift_x=output_node.location[0]-300,uvs='Default UVs')
+                NodesUtils.gen_simple_material(mat.node_tree, body_part_filepaths, out_socket, shift_x=output_node.location[0]-300,uvs='Default UVs')
 
     def concat_textures(self):
         from PIL import Image
@@ -410,40 +523,24 @@ class DazOptimizer:
         gp_baked_path = os.path.join(self.workdir, self.name + '_gp_baked.png')
         if 'GP_Baked' in bpy.data.images:
             bpy.data.images['GP_Baked'].save(filepath=gp_baked_path)
-        name_pattern = re.compile(r"head|eye(s|lashes|_sclera|_iris)?|legs|nails|body|arms|mouth")
-        map_type_pattern = re.compile(r"(D|NM|R|SSS|C)(?=[^a-z])|\bnm\b")
-
-        img_file_paths = {}
-        gp_map_types = {
-            "Roughness": "R",
-            "NormalMap": "NM",
-            "Speculairty": "SSS",
-            "Color": "D",
-        }
-        for root, dirs, files in os.walk(self.textures_dir()):
-            for file_name in files:
-                body_part = None
-                map_type = None
-                if file_name.endswith(".jpg") or file_name.endswith(".png"):
-                    if file_name.startswith("G9GP_"):
-                        map_type = file_name[len("G9GP_"):-len(".jpg")]
-                        map_type = gp_map_types.get(map_type)
-                        body_part = "G9GP"
-                    else:
-                        match = name_pattern.search(file_name.lower())
-                        if match:
-                            body_part = match.group()
-                        match = map_type_pattern.search(file_name)
-                        if match:
-                            map_type = match.group()
-                    if body_part is not None and map_type is not None:
-                        file_path = os.path.join(root, file_name)
-                        if body_part not in img_file_paths:
-                            img_file_paths[body_part] = {}
-                        img_file_paths[body_part][map_type] = file_path
-
-        if os.path.exists(gp_baked_path):
-            img_file_paths["G9GP"]["D"] = gp_baked_path
+        all_filepaths = self.find_body_parts_textures()
+        head_filepaths = None
+        arms_filepaths = None
+        legs_filepaths = None
+        nails_filepaths = None
+        body_filepaths = None
+        for body_part, body_part_filepaths in all_filepaths.items():
+            body_part = body_part.lower()
+            if 'head' in body_part:
+                head_filepaths = body_part_filepaths
+            elif 'arms' in body_part:
+                arms_filepaths = body_part_filepaths
+            elif 'body' in body_part:
+                body_filepaths = body_part_filepaths
+            elif 'legs' in body_part:
+                legs_filepaths = body_part_filepaths
+            elif 'nails' in body_part:
+                nails_filepaths = body_part_filepaths
         uv_region_mask = self.get_uv_mask()
         MASK_TILE_SIZE = uv_region_mask.shape[0] // 2
         arms_region_mask = uv_region_mask[:MASK_TILE_SIZE, MASK_TILE_SIZE:]
@@ -451,16 +548,13 @@ class DazOptimizer:
         legs_region_mask = uv_region_mask[:MASK_TILE_SIZE, :MASK_TILE_SIZE]
         head_region_mask = uv_region_mask[MASK_TILE_SIZE:, :MASK_TILE_SIZE]
 
-        print(json.dumps(img_file_paths, indent=4))
         # from matplotlib import pyplot as plt
-        for map_type in ["D", "R", "NM", "SSS"]:
+        for map_type in ["Base Color", "Roughness", "Normal"]:
             print("map_type=", map_type)
-            head_file: str = img_file_paths['head'][map_type]
-            _, extension = head_file.rsplit('.', maxsplit=1)
-            head_tile = Image.open(head_file)
-            body_tile = Image.open(img_file_paths['body'][map_type])
-            arms_tile = Image.open(img_file_paths['arms'][map_type])
-            legs_tile = Image.open(img_file_paths['legs'][map_type])
+            head_tile = Image.open(head_filepaths[map_type][0])
+            body_tile = Image.open(body_filepaths[map_type][0])
+            arms_tile = Image.open(arms_filepaths[map_type][0])
+            legs_tile = Image.open(legs_filepaths[map_type][0])
 
             head_tile = np.array(head_tile)
             body_tile = np.array(body_tile)
@@ -547,9 +641,10 @@ class DazOptimizer:
             # packed[s:, s:] = body_tile
             # packed[:s, s:] = arms_tile
             packed = Image.fromarray(packed)
-            packed.save(os.path.join(self.workdir, self.name + '_' + map_type + '.png'))
+            packed.save(self.get_concat_image_path(map_type))
             # plt.imshow(packed)
             # plt.show()
+
 
     def merge_geografts(self):
         BODY_M = self.get_body_mesh()
@@ -1130,6 +1225,20 @@ class DazOptimizeEyes_operator(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class DazSimplifyEyesMaterial_operator(bpy.types.Operator):
+    """ Simplify eyes material """
+    bl_idname = "dazoptim.simpl_eyes_mat"
+    bl_label = "Simplify eyes material"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().simplify_eyes_material()
+
+        return {'FINISHED'}
 
 class DazMergeGrografts_operator(bpy.types.Operator):
     """ Merge geografts """
@@ -1388,7 +1497,8 @@ operators = [
     (DazLoad_operator, "Load Daz"),
     (DazSave_operator, "Save textures"),
     (DazSimplifyMaterials_operator, "Simplify materials"),
-    (DazOptimizeEyes_operator, "Optimize eyes"),
+    (DazOptimizeEyes_operator, "Optimize eyes mesh"),
+    (DazSimplifyEyesMaterial_operator, "Simplify eyes material"),
     (DazOptimizeGoldenPalaceUVs, "Optimize golden palace UVs"),
     (DazSetupGoldenPalaceForBaking, "golden palace prepare baking"),
     (DazBakeGoldenPalace, "Bake golden palace"),

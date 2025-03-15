@@ -698,6 +698,7 @@ class DazOptimizer:
 
 
     def merge_geografts(self):
+        bpy.ops.object.mode_set(mode='OBJECT')
         BODY_M = self.get_body_mesh()
         BODY_RIG = self.get_body_rig()
 
@@ -753,13 +754,13 @@ class DazOptimizer:
         bpy.ops.object.mode_set(mode='OBJECT')
 
     def merge_eyes(self):
-
+        bpy.ops.object.mode_set(mode='OBJECT')
         EYES_M = bpy.data.objects['Genesis 9 Eyes Mesh']
         BODY_M = self.get_body_mesh()
         EYES_RIG = bpy.data.objects['Genesis 9 Eyes']
         BODY_RIG = self.get_body_rig()
 
-        uv_map_name = EYES_M.data.uv_layers.active.name
+        old_uv_maps = [o.name for o in EYES_M.data.uv_layers]
 
         # merge meshes
         bpy.ops.object.select_all(action='DESELECT')
@@ -769,19 +770,20 @@ class DazOptimizer:
         bpy.ops.object.join()
 
         # merge UV maps
-        eyes_layer = BODY_M.data.uv_layers[uv_map_name]
+        eyes_layer = BODY_M.data.uv_layers[NEW_EYES_UV_MAP]
         eyes_layer_np = np.array([v.uv for v in eyes_layer.data])
         is_eye = np.all(eyes_layer_np > 0, axis=1)
         base_layer_np = self.get_base_uv_layer_np()
         base_layer_np[is_eye] = eyes_layer_np[is_eye] + [5, 0]
         self.update_base_uv_layer(base_layer_np)
-        BODY_M.data.uv_layers.remove(eyes_layer)
+        for o in old_uv_maps:
+            BODY_M.data.uv_layers.remove(BODY_M.data.uv_layers[o])
 
         # merge bones
         self.merge_two_rigs(BODY_RIG, EYES_RIG)
 
     def merge_mouth(self):
-
+        bpy.ops.object.mode_set(mode='OBJECT')
         MOUTH_M = bpy.data.objects['Genesis 9 Mouth Mesh']
         BODY_M = self.get_body_mesh()
         MOUTH_RIG = bpy.data.objects['Genesis 9 Mouth']
@@ -965,6 +967,7 @@ class DazOptimizer:
         bpy.ops.daz.save_local_textures()
 
     def select_gp_or_body(self):
+        bpy.ops.object.mode_set(mode='OBJECT')
         if 'GoldenPalace_G9 Mesh' in bpy.data.objects:
             mesh = bpy.data.objects['GoldenPalace_G9 Mesh']
         else:
@@ -1114,6 +1117,7 @@ class EasyImportPanel(bpy.types.Panel):
     def draw(self, context):
         pass
 
+UNLOCK = True
 
 class DazDelCube_operator(bpy.types.Operator):
     """ Delete default cube """
@@ -1123,13 +1127,14 @@ class DazDelCube_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return True # context.mode == "OBJECT"
+        return UNLOCK or 'daz_optim_stage' not in context.scene # context.mode == "OBJECT"
 
     def execute(self, context):
         for x in list(bpy.data.objects):
             bpy.data.objects.remove(x)
         for x in list(bpy.data.collections):
             bpy.data.collections.remove(x)
+        context.scene['daz_optim_stage'] = 0
         return {'FINISHED'}
 
 
@@ -1138,10 +1143,10 @@ class DazLoad_operator(bpy.types.Operator):
     bl_idname = "dazoptim.load"
     bl_label = "Load Daz character"
     bl_options = {"REGISTER", "UNDO"}
-
+    idx = 1
     @classmethod
     def poll(cls, context):
-        return True # context.mode == "OBJECT"
+        return UNLOCK or 'daz_optim_stage' not in context.scene or int(context.scene['daz_optim_stage']) < DazLoad_operator.idx
 
     def execute(self, context):
         bpy.ops.daz.easy_import_daz('INVOKE_DEFAULT',
@@ -1205,6 +1210,7 @@ class DazLoad_operator(bpy.types.Operator):
                                     clothesColor=(0.09, 0.01, 0.015, 1),
                                     useApplyRestPoses=True,
                                     favoPath="")
+        context.scene['daz_optim_stage'] = DazLoad_operator.idx
         return {'FINISHED'}
 
 
@@ -1213,10 +1219,10 @@ class DazSave_operator(bpy.types.Operator):
     bl_idname = "dazoptim.save"
     bl_label = "Load Daz character"
     bl_options = {"REGISTER", "UNDO"}
-
+    idx = 2
     @classmethod
     def poll(cls, context):
-        return True #context.mode == "OBJECT"
+        return UNLOCK or int(context.scene['daz_optim_stage']) == 1 #context.mode == "OBJECT"
 
     def execute(self, context):
         if bpy.types.dazoptim_easy_import_panel.filepath is None and 'duf_filepath' not in bpy.context.scene:
@@ -1225,6 +1231,7 @@ class DazSave_operator(bpy.types.Operator):
         if bpy.types.dazoptim_easy_import_panel.filepath is not None and 'duf_filepath' not in bpy.context.scene:
             bpy.context.scene['duf_filepath'] = bpy.types.dazoptim_easy_import_panel.filepath
         save_textures(bpy.context.scene['duf_filepath'])
+        context.scene['daz_optim_stage'] = DazSave_operator.idx
         return {'FINISHED'}
 
 
@@ -1233,31 +1240,17 @@ class DazSimplifyMaterials_operator(bpy.types.Operator):
     bl_idname = "dazoptim.simpl_mats"
     bl_label = "Simplify materials"
     bl_options = {"REGISTER", "UNDO"}
+    idx = 3
 
     @classmethod
     def poll(cls, context):
-        return True # context.mode == "OBJECT"
+        return UNLOCK or DazSave_operator.idx <= int(context.scene['daz_optim_stage']) < DazSimplifyMaterials_operator.idx
 
     def execute(self, context):
         DazOptimizer().simplify_materials()
 
         return {'FINISHED'}
 
-
-class DazConcatTextures_operator(bpy.types.Operator):
-    """ Concatenate textures into one """
-    bl_idname = "dazoptim.concat"
-    bl_label = "Concatenate textures"
-    bl_options = {"REGISTER", "UNDO"}
-
-    @classmethod
-    def poll(cls, context):
-        return True # context.mode == "OBJECT"
-
-    def execute(self, context):
-        DazOptimizer().concat_textures()
-
-        return {'FINISHED'}
 
 
 class DazOptimizeEyes_operator(bpy.types.Operator):
@@ -1268,7 +1261,7 @@ class DazOptimizeEyes_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return True # context.mode == "OBJECT"
+        return UNLOCK # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().optimize_eyes()
@@ -1283,7 +1276,7 @@ class DazSimplifyEyesMaterial_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return True # context.mode == "OBJECT"
+        return UNLOCK # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().simplify_eyes_material()
@@ -1298,7 +1291,7 @@ class DazSeparateIrisUVs_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return True # context.mode == "OBJECT"
+        return UNLOCK # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().separate_iris_uvs()
@@ -1313,7 +1306,7 @@ class DazMergeGrografts_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return True # context.mode == "OBJECT"
+        return UNLOCK # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().merge_geografts()
@@ -1329,7 +1322,7 @@ class DazMergeEyes_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return True # context.mode == "OBJECT"
+        return UNLOCK # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().merge_eyes()
@@ -1345,13 +1338,29 @@ class DazMergeMouth_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return True # context.mode == "OBJECT"
+        return UNLOCK # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().merge_mouth()
 
         return {'FINISHED'}
 
+
+class DazConcatTextures_operator(bpy.types.Operator):
+    """ Concatenate textures into one """
+    bl_idname = "dazoptim.concat"
+    bl_label = "Concatenate textures"
+    bl_options = {"REGISTER", "UNDO"}
+    idx = 4
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK or DazSimplifyMaterials_operator.idx <= int(context.scene['daz_optim_stage']) < DazConcatTextures_operator.idx
+
+    def execute(self, context):
+        DazOptimizer().concat_textures()
+
+        return {'FINISHED'}
 
 class DazOptimizeUVs_operator(bpy.types.Operator):
     """ Optimize UVs """
@@ -1361,7 +1370,7 @@ class DazOptimizeUVs_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return True # context.mode == "OBJECT"
+        return UNLOCK # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().pack_uvs()
@@ -1377,7 +1386,7 @@ class DazSeparateLipUVs_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         DazOptimizer().separate_lip_uvs()
@@ -1393,7 +1402,7 @@ class DazAddBreastBones_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         DazOptimizer().subdivide_breast_bones()
@@ -1409,7 +1418,7 @@ class DazAddGluteBones_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         DazOptimizer().pack_uvs()
@@ -1425,7 +1434,7 @@ class DazAddThighBones_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         DazOptimizer().pack_uvs()
@@ -1441,7 +1450,7 @@ class DazFitClothes_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         DazOptimizer().pack_uvs()
@@ -1457,7 +1466,7 @@ class DazOptimizeHair_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         DazOptimizer().pack_uvs()
@@ -1473,7 +1482,7 @@ class DazConvertToUe5Skeleton_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         DazOptimizer().pack_uvs()
@@ -1489,7 +1498,7 @@ class DazOptimizeGoldenPalaceUVs(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         DazOptimizer().unify_golden_palace_uvs()
@@ -1505,7 +1514,7 @@ class DazSetupGoldenPalaceForBaking(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         DazOptimizer().setup_golden_palace_for_baking()
@@ -1520,7 +1529,7 @@ class DazBakeGoldenPalace(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         bpy.ops.object.bake(type='DIFFUSE')
@@ -1534,7 +1543,7 @@ class DazSendToUnreal(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return UNLOCK
 
     def execute(self, context):
         DazOptimizer().pack_uvs()

@@ -121,6 +121,7 @@ TOP_ARM_COLOR = (255 * 256 + 0) * 256 + 0
 BODY_COLOR = (21 * 256 + 211) * 256 + 91
 HEAD_COLOR = (204 * 256 + 162) * 256 + 20
 NEW_GP_UV_MAP = 'unified_gp_uv'
+NEW_EYES_UV_MAP = 'optimised_eyes_uvs'
 UE5_BONE_HIERARCHY = {'pelvis': '', 'spine_01': 'pelvis', 'spine_02': 'spine_01', 'spine_03': 'spine_02',
                       'spine_04': 'spine_03', 'spine_05': 'spine_04', 'neck_01': 'spine_05', 'neck_02': 'neck_01',
                       'head': 'neck_02', 'clavicle_l': 'spine_05', 'upperarm_l': 'clavicle_l',
@@ -373,32 +374,30 @@ class DazOptimizer:
                 self.sclera = sclera
                 self.iris = iris
                 self.simplified_texture = simplified_texture
-            def join(self, alpha_channel):
+            def join(self):
                 iris = Image.open(bpy.path.abspath(self.iris.filepath))
                 sclera = Image.open(bpy.path.abspath(self.sclera.filepath))
                 iris = np.array(iris)
                 sclera = np.array(sclera)
-                iris_rgb = iris[:, :, :3]
-                if iris_rgb.dtype.kind != 'f':
-                    iris_rgb = iris_rgb / np.float32(255)
+                if iris.dtype.kind != 'f':
+                    iris = iris / np.float32(255)
                 if sclera.dtype.kind != 'f':
                     sclera = sclera / np.float32(255)
+                iris_rgb = iris[:, :, :3]
+                iris_a = iris[:, :, 3]
 
                 sclera_h, sclera_w = sclera.shape[:2]
-                sclera_upper = sclera[:sclera_h//2].T
-                sclera_upper *= (1 - alpha_channel.T)
-                sclera_upper += iris_rgb.T * alpha_channel.T
+                sclera_half = sclera[:sclera_h//2].T
+                sclera_half *= (1 - iris_a.T)
+                sclera_half += iris_rgb.T * iris_a.T
+                sclera_half = sclera_half.T
+                sclera[sclera_h // 2:] = sclera_half
                 sclera = Image.fromarray((sclera*255).astype(np.uint8))
                 sclera.save(self.simplified_texture)
-            def get_alpha(self):
-                iris = Image.open(bpy.path.abspath(self.iris.filepath))
-                iris = np.array(iris)
-                iris_a = iris[:, :, 3]
-                if iris_a.dtype.kind != 'f':
-                    iris_a = iris_a / np.float32(255)
                 return iris_a
 
-        maps: {str: EyeMapType} = {}
+
+        body_part_filepaths = {}
         for channel, images in textures.items():
             iris_img = None
             sclera_img = None
@@ -409,16 +408,68 @@ class DazOptimizer:
                 elif 'sclera' in image.filepath:
                     sclera_img = image
             if iris_img is not None and sclera_img is not None:
-                maps[channel] = EyeMapType(sclera_img, iris_img, simplified_texture)
+                eye_map = EyeMapType(sclera_img, iris_img, simplified_texture)
+                eye_map.join()
+                body_part_filepaths[channel] = eye_map.simplified_texture
 
-        a = maps['Base Color'].get_alpha()
-        body_part_filepaths = {}
-        for channel, eye_map in maps.items():
-            eye_map.join(a)
-            body_part_filepaths[channel] = eye_map.simplified_texture
+
+
+
         NodesUtils.gen_simple_material(mat.node_tree, body_part_filepaths)
 
+    def separate_iris_uvs(self):
+        EYES_M = self.get_eyes_mesh()
+        old_uv_layer = EYES_M.data.uv_layers.active
+        new_uv_layer = EYES_M.data.uv_layers.new(name=NEW_EYES_UV_MAP)
+        new_uv_layer.active = True
+        new_uv_layer.active_render = True
+        bpy.ops.object.mode_set(mode='OBJECT')
+        # pack UVs
+        bpy.ops.object.select_all(action='DESELECT')
+        EYES_M.select_set(True)
+        bpy.context.view_layer.objects.active = EYES_M
+        bpy.ops.object.mode_set(mode='EDIT')
 
+        bpy.context.scene.tool_settings.use_uv_select_sync = False
+        bpy.ops.uv.select_all(action='DESELECT')
+        bpy.ops.mesh.select_all(action='DESELECT')
+
+        me = bpy.context.object.data
+        bm = bmesh.from_edit_mesh(me)
+        uv_layer = bm.loops.layers.uv.verify()
+
+        # for v in bm.verts:
+        #    v.select_set(False)
+        iris_uv_radius = 0.86577 - 0.75 + 0.001
+
+        for face in bm.faces:
+            full_loop = True
+            for loop in face.loops:
+                loop_uv = loop[uv_layer]
+                uv = np.array(loop_uv.uv)
+                is_iris = np.linalg.norm(np.mod(uv, 0.5) - 0.25) < iris_uv_radius
+                full_loop = full_loop and is_iris
+            face.select_set(full_loop)
+
+        # bm.select_mode = {'VERT', 'EDGE', 'FACE'}
+        bm.select_flush_mode()
+        # bpy.context.tool_settings.mesh_select_mode = (False, False, True)
+        bpy.ops.uv.select_all(action='SELECT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.uv.select_split()
+
+        bpy.ops.object.mode_set(mode='OBJECT')
+        new_uv_layer_np = np.array([v.uv for v in EYES_M.data.uv_layers.active.data])
+        # old_uv_layer_np = np.array([v.uv for v in old_uv_layer.data])
+        selection = np.array([v.select for v in EYES_M.data.uv_layers.active.data], dtype=bool)
+        new_uv_layer_np[selection, 1] -= 0.5
+        for v, new_uv in zip(EYES_M.data.uv_layers.active.data, new_uv_layer_np):
+            v.uv = new_uv
+        # += [0.043945, 0.006836] # top arm
+        # += [-0.072266 , 0.085937] # obttom arm
+        # += [0.008526, 0.019377] # torso
+        # *= 0.25# nails
+        # -= 0.5 # nails
 
     def find_eyes_textures(self)->{str:[bpy.types.Image]}:
         EYES_M = self.get_eyes_mesh()
@@ -924,7 +975,6 @@ class DazOptimizer:
         return mesh
 
     def unify_golden_palace_uvs(self):
-
         mesh = self.select_gp_or_body()
         if NEW_GP_UV_MAP not in mesh.data.uv_layers:
             gp_labia_majora = mesh.data.uv_layers['Golden Palace 2']
@@ -1073,7 +1123,7 @@ class DazDelCube_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True # context.mode == "OBJECT"
 
     def execute(self, context):
         for x in list(bpy.data.objects):
@@ -1091,7 +1141,7 @@ class DazLoad_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True # context.mode == "OBJECT"
 
     def execute(self, context):
         bpy.ops.daz.easy_import_daz('INVOKE_DEFAULT',
@@ -1166,7 +1216,7 @@ class DazSave_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True #context.mode == "OBJECT"
 
     def execute(self, context):
         if bpy.types.dazoptim_easy_import_panel.filepath is None and 'duf_filepath' not in bpy.context.scene:
@@ -1186,7 +1236,7 @@ class DazSimplifyMaterials_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().simplify_materials()
@@ -1202,7 +1252,7 @@ class DazConcatTextures_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().concat_textures()
@@ -1218,7 +1268,7 @@ class DazOptimizeEyes_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().optimize_eyes()
@@ -1233,10 +1283,25 @@ class DazSimplifyEyesMaterial_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().simplify_eyes_material()
+
+        return {'FINISHED'}
+
+class DazSeparateIrisUVs_operator(bpy.types.Operator):
+    """ Separate iris UVs """
+    bl_idname = "dazoptim.sep_iris_uvs"
+    bl_label = "Separate iris UVs"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return True # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().separate_iris_uvs()
 
         return {'FINISHED'}
 
@@ -1248,7 +1313,7 @@ class DazMergeGrografts_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().merge_geografts()
@@ -1264,7 +1329,7 @@ class DazMergeEyes_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().merge_eyes()
@@ -1280,7 +1345,7 @@ class DazMergeMouth_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().merge_mouth()
@@ -1296,7 +1361,7 @@ class DazOptimizeUVs_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == "OBJECT"
+        return True # context.mode == "OBJECT"
 
     def execute(self, context):
         DazOptimizer().pack_uvs()
@@ -1499,6 +1564,7 @@ operators = [
     (DazSimplifyMaterials_operator, "Simplify materials"),
     (DazOptimizeEyes_operator, "Optimize eyes mesh"),
     (DazSimplifyEyesMaterial_operator, "Simplify eyes material"),
+    (DazSeparateIrisUVs_operator, "Separate iris UVs"),
     (DazOptimizeGoldenPalaceUVs, "Optimize golden palace UVs"),
     (DazSetupGoldenPalaceForBaking, "golden palace prepare baking"),
     (DazBakeGoldenPalace, "Bake golden palace"),

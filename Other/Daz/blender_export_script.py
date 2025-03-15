@@ -879,6 +879,7 @@ class DazOptimizer:
         self.update_base_uv_layer(base_layer_np)
 
     def separate_lip_uvs(self):
+        bpy.ops.object.mode_set(mode='OBJECT')
         BODY_M = self.get_body_mesh()
         # pack UVs
         bpy.ops.object.select_all(action='DESELECT')
@@ -1152,7 +1153,18 @@ class DazOptimizer:
                 bpy.data.images[name].save(filepath=gp_baked_path)
 
     def make_single_material(self):
-        pass
+        body_m = self.select_body()
+        mat = NodesUtils.remove_all_mats(body_m, "UnifiedSkin")
+        filepaths = {}
+        for channel in ['Base Color', 'Roughness', 'Normal']:
+            filepaths[channel] = self.get_concat_image_path(channel)
+        NodesUtils.gen_simple_material(mat.node_tree, filepaths)
+        old_uv_maps = [o.name for o in body_m.data.uv_layers]
+        for uv_layer_name in old_uv_maps:
+            if uv_layer_name != 'Base Multi UDIM':
+                l = body_m.data.uv_layers[uv_layer_name]
+                body_m.data.uv_layers.remove(l)
+
     # *= 0.25# nails
     # -= 0.5 # nails
 
@@ -1551,6 +1563,22 @@ class DazOptimizeUVs_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class DazMakeSingleMaterial_operator(bpy.types.Operator):
+    """ Make a single unified skin material """
+    bl_idname = "dazoptim.single_material"
+    bl_label = "Make a single unified skin material"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().make_single_material()
+
+        return {'FINISHED'}
+
+
 class DazSeparateLipUVs_operator(bpy.types.Operator):
     """ Separate Lip UVs """
     bl_idname = "dazoptim.sep_lip_uvs"
@@ -1762,6 +1790,7 @@ operators = [
     (DazConcatTextures_operator, "Merge textures"),
     (DazOptimizeUVs_operator, "Optimize UVs"),
     (DazSeparateLipUVs_operator, "Separate Lip UVs"),
+    (DazMakeSingleMaterial_operator, "Unify skin materials into one"),
     (DazAddBreastBones_operator, "Subdivide breast bones"),
     (DazAddGluteBones_operator, "Add glute bones"),
     (DazAddThighBones_operator, "Add thigh bones"),

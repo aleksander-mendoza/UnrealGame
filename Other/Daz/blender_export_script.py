@@ -824,22 +824,30 @@ class DazOptimizer:
     def pack_uvs(self):
 
         # ========= Concat UVs =========
+        bpy.ops.object.mode_set(mode='OBJECT')
         BODY_M = self.get_body_mesh()
         # pack UVs
         bpy.ops.object.select_all(action='DESELECT')
         BODY_M.select_set(True)
         bpy.context.view_layer.objects.active = BODY_M
-        bpy.ops.object.mode_set(mode='OBJECT')
         base_layer_np = self.get_base_uv_layer_np()
+        is_arms_legs_head_body = base_layer_np[:, 0] < 4
         is_nails = np.logical_and(4 < base_layer_np[:, 0], base_layer_np[:, 0] < 5)
         is_eyes = np.logical_and(5 < base_layer_np[:, 0], base_layer_np[:, 0] < 6)
+        is_eyes_sclera = np.logical_and(is_eyes, base_layer_np[:, 1] > 0.5)
+        is_eyes_iris = np.logical_and(is_eyes, base_layer_np[:, 1] < 0.5)
         is_mouth = np.logical_and(6 < base_layer_np[:, 0], base_layer_np[:, 0] < 7)
-        base_layer_np *= 0.5
-        out_of_bounds = base_layer_np[:, 0] > 1
+        base_layer_np[is_arms_legs_head_body] *= 0.5
+        out_of_bounds = np.logical_and(1 < base_layer_np[:, 0], is_arms_legs_head_body)
         base_layer_np[out_of_bounds] += [-1, 0.5]
-        gp_layer = BODY_M.data.uv_layers['Golden Palace']
+        gp_layer = BODY_M.data.uv_layers[NEW_GP_UV_MAP]
         gp_layer_np = np.array([v.uv for v in gp_layer.data])
         is_gp = np.all(gp_layer_np > 0, axis=1)
+        nails_np = base_layer_np[is_nails]
+        sclera_np = base_layer_np[is_eyes_sclera]
+        iris_np = base_layer_np[is_eyes_iris]
+        mouth_np = base_layer_np[is_mouth]
+        gp_np = gp_layer_np[is_gp]
 
         uv_mask = self.get_uv_mask()
         uv_mask_size = uv_mask.shape[0]
@@ -854,15 +862,20 @@ class DazOptimizer:
 
         pixel_class = get_pixel_class()
 
+        s2 = 1
+        s = 0.5
+        s4 = 1/8
+        s8 = 1/16
         base_layer_np[pixel_class == BOT_ARM_COLOR] += BOT_ARM_TRANS
         base_layer_np[pixel_class == TOP_ARM_COLOR] += TOP_ARM_TRANS
         base_layer_np[pixel_class == RIGHT_LEG_COLOR, 1] = 1.5 - base_layer_np[pixel_class == RIGHT_LEG_COLOR, 1]
         base_layer_np[pixel_class == RIGHT_LEG_COLOR, 0] += RIGHT_LEG_TRANS
         base_layer_np[pixel_class == BODY_COLOR] += BODY_TRANS
-        base_layer_np[is_nails] = base_layer_np[is_nails] / 4 + [0.25, -0.5 / 4]
-        base_layer_np[is_eyes] = base_layer_np[is_eyes] / 4 + [-6 / 16 + 0.5 + 1 / 8, - 0.5 / 8]
-        base_layer_np[is_gp] = gp_layer_np[is_gp] * 14 / 64 + [(64 - 14) / 64, 0]
-        base_layer_np[is_mouth] = base_layer_np[is_mouth] / 4 + [1 / 8, -0.5 / 4]
+        base_layer_np[is_nails] = np.mod(nails_np,1) / 8 + [s, 0]
+        base_layer_np[is_eyes_sclera] = np.mod(sclera_np, 1) / 8 + [s + s4 * 1, s4 - s8]
+        base_layer_np[is_eyes_iris] = np.mod(iris_np, 1) / 8 + [s + s4 * 2, s4]
+        base_layer_np[is_gp] = np.mod(gp_np, 1) / 8 + [s + s4 * 2, 0]
+        base_layer_np[is_mouth] = np.mod(mouth_np, 1) / 8 + [s + s4, 0]
         self.update_base_uv_layer(base_layer_np)
 
     def separate_lip_uvs(self):

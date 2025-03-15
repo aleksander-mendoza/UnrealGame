@@ -547,13 +547,13 @@ class DazOptimizer:
 
             for channel in body_part_filepaths:
                 body_part_filepaths[channel] = list(sorted(body_part_filepaths[channel], key=lambda x: -occurrences[x]))
-
+        print(json.dumps({k: {k2: [v3.filepath for v3 in v2] for k2, v2 in v.items()} for k, v in all_filepaths.items()}, indent=2))
         return all_filepaths
 
     def simplify_materials(self):
         BODY_M = self.get_body_mesh()
         all_filepaths = self.find_body_parts_textures()
-        print(json.dumps({k:{k2:[v3.filepath for v3 in v2] for k2, v2 in v.items()} for k, v in all_filepaths.items()}, indent=2))
+
 
 
         mats = list(BODY_M.data.materials)
@@ -580,12 +580,14 @@ class DazOptimizer:
 
 
 
+
     def concat_textures(self):
         from PIL import Image
         import re
         import cv2
 
         all_filepaths = self.find_body_parts_textures()
+
         head_filepaths = {}
         arms_filepaths = {}
         legs_filepaths = {}
@@ -593,6 +595,7 @@ class DazOptimizer:
         body_filepaths = {}
         mouth_filepaths = {}
         eyes_filepaths = {}
+        gp_filepaths = {}
         for body_part, body_part_filepaths in all_filepaths.items():
             body_part = body_part.lower()
             if 'head' in body_part:
@@ -609,6 +612,8 @@ class DazOptimizer:
                 mouth_filepaths = body_part_filepaths
             elif 'eyes' in body_part:
                 eyes_filepaths = body_part_filepaths
+            elif body_part.startswith('gp_'):
+                gp_filepaths = body_part_filepaths
         uv_region_mask = self.get_uv_mask()
         MASK_TILE_SIZE = uv_region_mask.shape[0] // 2
         arms_region_mask = uv_region_mask[:MASK_TILE_SIZE, MASK_TILE_SIZE:]
@@ -616,48 +621,48 @@ class DazOptimizer:
         legs_region_mask = uv_region_mask[:MASK_TILE_SIZE, :MASK_TILE_SIZE]
         head_region_mask = uv_region_mask[MASK_TILE_SIZE:, :MASK_TILE_SIZE]
 
+        def open_img(filepaths, map_type, resize=None):
+            fp = filepaths[map_type]
+            if isinstance(fp, list):
+                fp = fp[0]
+            if isinstance(fp, bpy.types.Image):
+                fp = bpy.path.abspath(fp.filepath)
+            tile = Image.open(fp)
+            tile = np.array(tile)
+            print("Reading ",fp," of size ", tile.shape," and type ", tile.dtype)
+            if map_type == "Roughness" and tile.ndim>2 and tile.shape[2]>1:
+                tile = np.average(tile, axis=2)
+                tile = tile.astype(np.uint8)
+                print("Converted to greyscale ", tile.shape, " ",tile.dtype)
+            if resize is not None:
+                tile = cv2.resize(tile, [s4, s4])
+                print("Resized to ", tile.shape, " ", tile.dtype)
+            return tile
+
         # from matplotlib import pyplot as plt
         for map_type in ["Base Color", "Roughness", "Normal"]:
             print("map_type=", map_type)
-            head_tile = Image.open(head_filepaths[map_type][0])
-            body_tile = Image.open(body_filepaths[map_type][0])
-            arms_tile = Image.open(arms_filepaths[map_type][0])
-            legs_tile = Image.open(legs_filepaths[map_type][0])
-
-            head_tile = np.array(head_tile)
-            body_tile = np.array(body_tile)
-            arms_tile = np.array(arms_tile)
-            legs_tile = np.array(legs_tile)
+            head_tile = open_img(head_filepaths, map_type)
+            body_tile = open_img(body_filepaths, map_type)
+            arms_tile = open_img(arms_filepaths, map_type)
+            legs_tile = open_img(legs_filepaths, map_type)
 
             s = legs_tile.shape[0]
             s2 = s * 2
             s4 = s // 4
             s8 = s // 8
+            mouth_tile = None
+            if map_type in mouth_filepaths and len(mouth_filepaths[map_type]) > 0:
+                mouth_tile = open_img(mouth_filepaths, map_type,  [s4, s4])
             eyes_tile = None
             if map_type in eyes_filepaths and len(eyes_filepaths[map_type])>0:
-                eyes_tile = Image.open(eyes_filepaths[map_type][0])
-                eyes_tile = np.array(eyes_tile)
-                eyes_tile = cv2.resize(eyes_tile, [s4, s4])
-
-
+                eyes_tile = open_img(eyes_filepaths, map_type,  [s4, s4])
             nails_tile = None
             if map_type in nails_filepaths and len(nails_filepaths[map_type])>0:
-                nails_tile = Image.open(nails_filepaths[map_type][0])
-                nails_tile = np.array(nails_tile)
-                if map_type == "R":
-                    nails_tile = np.average(nails_tile, axis=2)
-                    nails_tile = nails_tile.astype(legs_tile.dtype)
-                nails_tile = cv2.resize(nails_tile, (s4, s4))
+                nails_tile = open_img(nails_filepaths, map_type,  [s4, s4])
             gp_tile = None
-            if "G9GP" in img_file_paths and map_type in img_file_paths["G9GP"]:
-                gp_tile = Image.open(img_file_paths['G9GP'][map_type])
-                gp_tile = np.array(gp_tile)
-                gp_tile_size = s2 * 14 // 64
-                if map_type == "R":
-                    gp_tile = np.average(gp_tile, axis=2)
-                    gp_tile = gp_tile.astype(legs_tile.dtype)
-                gp_tile = cv2.resize(gp_tile, (gp_tile_size, gp_tile_size))
-
+            if map_type in gp_filepaths and len(gp_filepaths[map_type])>0:
+                gp_tile = open_img(gp_filepaths, map_type, [s4, s4])
 
             def shift_img(img: np.ndarray, y0, y1, x0, x1, mask: np.ndarray, translation: [float, float], hflip=False):
                 shape = [s2, s2, legs_tile.shape[2]] if len(legs_tile.shape) > 2 else [s2, s2]
@@ -684,11 +689,15 @@ class DazOptimizer:
             # packed += shift_img(head, s, s2, s, s2, head_region_mask == HEAD_COLOR, [0.008526, 0.019377])
             packed[s:, :s] = head_tile
             if nails_tile is not None:
-                packed[s2 - nails_tile_size:s2, s:s + nails_tile_size] = nails_tile
+                packed[s2 - s4:s2, s:s + s4] = nails_tile
+            if mouth_tile is not None:
+                packed[s2 - s4:s2, s+s4:s + s4*2] = mouth_tile
+            if eyes_tile is not None:
+                packed[s2 - s4 - s8:s2 - s4, s + s4 * 1:s + s4 * 2] = eyes_tile[:s8]
+                packed[s2 - s4 - s8:s2 - s4, s + s4 * 2:s + s4 * 3] = eyes_tile[s8:]
             if gp_tile is not None:
-                packed[s2 - gp_tile_size:s2, s2 - gp_tile_size:s2] += gp_tile
-            if eyes is not None:
-                packed[s2 - s // 4 - s // 8:s2 - s // 4, s + s // 4:s + s // 2] = eyes
+                packed[s2 - s4:s2, s+s4*2:s + s4*3] = gp_tile
+
 
             # packed[:s, :s] = legs_tile
             # packed[s:, s:] = body_tile

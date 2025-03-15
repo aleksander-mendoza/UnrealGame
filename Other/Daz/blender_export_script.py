@@ -50,6 +50,21 @@ class NodesUtils:
         return [node for node in node_tree.nodes if isinstance(node, t)]
 
     @staticmethod
+    def new_mat(name):
+        mat = bpy.data.materials.new(name=name)
+        mat.use_nodes = True
+        mat.node_tree.nodes.clear()
+        return mat
+
+    @staticmethod
+    def remove_all_mats(mesh_object, name=None):
+        mesh_object.data.materials.clear()
+        if name is not None:
+            mat = NodesUtils.new_mat(name)
+            mesh_object.data.materials.append(mat)
+            return mat
+
+    @staticmethod
     def gen_simple_material(node_tree, filepaths, output_socket=None, shift_x=0, uvs=None):
         ns = node_tree.nodes
         ls = node_tree.links
@@ -362,11 +377,7 @@ class DazOptimizer:
         from PIL import Image
         textures = self.find_eyes_textures()
         EYES_M = self.get_eyes_mesh()
-        EYES_M.data.materials.clear()
-        mat = bpy.data.materials.new(name="Eyes")
-        mat.use_nodes = True
-        mat.node_tree.nodes.clear()
-        EYES_M.data.materials.append(mat)
+        mat = NodesUtils.remove_all_mats(EYES_M, "Eyes")
 
 
         class EyeMapType:
@@ -567,19 +578,21 @@ class DazOptimizer:
                 NodesUtils.delete_all_before(mat.node_tree, out_socket.links[0].from_node)
                 NodesUtils.gen_simple_material(mat.node_tree, body_part_filepaths, out_socket, shift_x=output_node.location[0]-300,uvs='Default UVs')
 
+
+
     def concat_textures(self):
         from PIL import Image
         import re
         import cv2
-        gp_baked_path = os.path.join(self.workdir, self.name + '_gp_baked.png')
-        if 'GP_Baked' in bpy.data.images:
-            bpy.data.images['GP_Baked'].save(filepath=gp_baked_path)
+
         all_filepaths = self.find_body_parts_textures()
-        head_filepaths = None
-        arms_filepaths = None
-        legs_filepaths = None
-        nails_filepaths = None
-        body_filepaths = None
+        head_filepaths = {}
+        arms_filepaths = {}
+        legs_filepaths = {}
+        nails_filepaths = {}
+        body_filepaths = {}
+        mouth_filepaths = {}
+        eyes_filepaths = {}
         for body_part, body_part_filepaths in all_filepaths.items():
             body_part = body_part.lower()
             if 'head' in body_part:
@@ -592,6 +605,10 @@ class DazOptimizer:
                 legs_filepaths = body_part_filepaths
             elif 'nails' in body_part:
                 nails_filepaths = body_part_filepaths
+            elif 'mouth' in body_part:
+                mouth_filepaths = body_part_filepaths
+            elif 'eyes' in body_part:
+                eyes_filepaths = body_part_filepaths
         uv_region_mask = self.get_uv_mask()
         MASK_TILE_SIZE = uv_region_mask.shape[0] // 2
         arms_region_mask = uv_region_mask[:MASK_TILE_SIZE, MASK_TILE_SIZE:]
@@ -614,38 +631,24 @@ class DazOptimizer:
 
             s = legs_tile.shape[0]
             s2 = s * 2
-            if ('eyes_iris' in img_file_paths and 'eyes_sclera' in img_file_paths
-                    and map_type in img_file_paths['eyes_iris'] and map_type in img_file_paths['eyes_sclera']):
-                iris = Image.open(img_file_paths['eyes_iris'][map_type])
-                sclera = Image.open(img_file_paths['eyes_sclera'][map_type])
-                iris = np.array(iris)
-                iris_rgb = iris[:, :, :3]
-                iris_a = iris[:, :, 3]
-                if iris_a.dtype.kind != 'f':
-                    iris_a = iris_a / 255
-                sclera = np.array(sclera)
-                sclera_h, sclera_w = sclera.shape[:2]
-                sclera_h = sclera_h // 2
-                sclera = sclera[:sclera_h]
-                iris_h, iris_w = s // 8, s // 4
-                eyes = iris_rgb.T * iris_a.T + sclera.T * (1 - iris_a.T)
-                eyes = eyes.T
-                eyes = cv2.resize(eyes, [iris_w, iris_h])
+            s4 = s // 4
+            s8 = s // 8
+            eyes_tile = None
+            if map_type in eyes_filepaths and len(eyes_filepaths[map_type])>0:
+                eyes_tile = Image.open(eyes_filepaths[map_type][0])
+                eyes_tile = np.array(eyes_tile)
+                eyes_tile = cv2.resize(eyes_tile, [s4, s4])
 
-            else:
-                eyes = None
 
-            if map_type != "NM":
-                nails_tile = Image.open(img_file_paths['nails'][map_type])
+            nails_tile = None
+            if map_type in nails_filepaths and len(nails_filepaths[map_type])>0:
+                nails_tile = Image.open(nails_filepaths[map_type][0])
                 nails_tile = np.array(nails_tile)
-                nails_tile_size = s2 // 8
                 if map_type == "R":
                     nails_tile = np.average(nails_tile, axis=2)
                     nails_tile = nails_tile.astype(legs_tile.dtype)
-                nails_tile = cv2.resize(nails_tile, (nails_tile_size, nails_tile_size))
-
-            else:
-                nails_tile = None
+                nails_tile = cv2.resize(nails_tile, (s4, s4))
+            gp_tile = None
             if "G9GP" in img_file_paths and map_type in img_file_paths["G9GP"]:
                 gp_tile = Image.open(img_file_paths['G9GP'][map_type])
                 gp_tile = np.array(gp_tile)
@@ -654,8 +657,7 @@ class DazOptimizer:
                     gp_tile = np.average(gp_tile, axis=2)
                     gp_tile = gp_tile.astype(legs_tile.dtype)
                 gp_tile = cv2.resize(gp_tile, (gp_tile_size, gp_tile_size))
-            else:
-                gp_tile = None
+
 
             def shift_img(img: np.ndarray, y0, y1, x0, x1, mask: np.ndarray, translation: [float, float], hflip=False):
                 shape = [s2, s2, legs_tile.shape[2]] if len(legs_tile.shape) > 2 else [s2, s2]
@@ -966,6 +968,22 @@ class DazOptimizer:
             shutil.rmtree(tex_dir)
         bpy.ops.daz.save_local_textures()
 
+    def select_gp(self):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        mesh = bpy.data.objects['GoldenPalace_G9 Mesh']
+        bpy.ops.object.select_all(action='DESELECT')
+        mesh.select_set(True)
+        bpy.context.view_layer.objects.active = mesh
+        return mesh
+
+    def select_body(self):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        mesh = self.get_body_mesh()
+        bpy.ops.object.select_all(action='DESELECT')
+        mesh.select_set(True)
+        bpy.context.view_layer.objects.active = mesh
+        return mesh
+
     def select_gp_or_body(self):
         bpy.ops.object.mode_set(mode='OBJECT')
         if 'GoldenPalace_G9 Mesh' in bpy.data.objects:
@@ -1031,31 +1049,85 @@ class DazOptimizer:
             for v, new_uv in zip(new_uv_layer.data, new_uv_layer_np):
                 v.uv = new_uv
 
+    def simplify_golden_palace_material(self):
+        mesh = self.select_gp_or_body()
+        filepaths = {}
+        for channel in ['Base Color', 'Roughness', 'Normal']:
+            name = 'GP_Baked_' + channel
+            filepaths[channel] = bpy.data.images[name]
+        for mat in mesh.data.materials:
+            if mat.name.startswith("GP_"):
+                mat.node_tree.nodes.clear()
+                NodesUtils.gen_simple_material(mat.node_tree, filepaths, uvs=NEW_GP_UV_MAP)
+
+
     def setup_golden_palace_for_baking(self):
         mesh = self.select_gp_or_body()
-        if 'GP_Baked' in bpy.data.images:
-            baked_gp_img = bpy.data.images['GP_Baked']
-        else:
-            baked_gp_img = bpy.data.images.new('GP_Baked', 1024 * 4, 1024 * 4)
+
         bpy.context.scene.render.engine = 'CYCLES'
-        bpy.context.scene.cycles.bake_type = 'DIFFUSE'
         bpy.context.scene.cycles.device = 'GPU'
-        bpy.context.scene.render.bake.use_pass_direct = False
-        bpy.context.scene.render.bake.use_pass_indirect = False
+
         mesh.data.uv_layers[NEW_GP_UV_MAP].active = True
+        baked_gp_imgs = {}
+        for idx, channel in enumerate(['Base Color', 'Roughness', 'Normal']):
+            name = 'GP_Baked_'+channel
+            if 'GP_Baked' in bpy.data.images:
+                baked_gp_img = bpy.data.images[name]
+            else:
+                gp_baked_path = os.path.join(self.workdir, self.name + "_" + channel + '_gp_baked.png')
+                if os.path.exists(gp_baked_path):
+                    baked_gp_img = bpy.data.images.load(gp_baked_path)
+                    baked_gp_img.name = name
+                else:
+                    baked_gp_img = bpy.data.images.new(name, 1024 * 4, 1024 * 4)
+                baked_gp_img.colorspace_settings.name = 'sRGB' if channel == 'Base Color' else 'Non-Color'
+            baked_gp_imgs[channel] = baked_gp_img
         for mat in mesh.data.materials:
             if mat.name.startswith('GP_'):
                 n = mat.node_tree.nodes
                 l = mat.node_tree.links
-                target_texture = n.new('ShaderNodeTexImage')
-                target_texture.image = baked_gp_img
                 uv_map = n.new('ShaderNodeUVMap')
                 uv_map.location = (-300, 200)
                 uv_map.uv_map = NEW_GP_UV_MAP
+                uv_map.name = 'GP_Baked_UVs'
+                for idx, channel in enumerate(['Base Color', 'Roughness', 'Normal']):
+                    name = 'GP_Baked_' + channel
+                    target_texture = n.new('ShaderNodeTexImage')
+                    target_texture.image = baked_gp_imgs[channel]
+                    target_texture.name = name+' Texture'
+                    target_texture.location = (0, 200 + 300 * idx)
+                    l.new(target_texture.inputs['Vector'], uv_map.outputs['UV'])
+                    n.active = target_texture
 
-                target_texture.location = (0, 200)
-                l.new(target_texture.inputs['Vector'], uv_map.outputs['UV'])
+    def select_gp_color_for_baking(self):
+        bpy.context.scene.cycles.bake_type = 'DIFFUSE'
+        bpy.context.scene.render.bake.use_pass_direct = False
+        bpy.context.scene.render.bake.use_pass_indirect = False
+        self.select_golden_palace_for_baking('Base Color')
+
+    def select_gp_normals_for_baking(self):
+        bpy.context.scene.cycles.bake_type = 'NORMAL'
+        self.select_golden_palace_for_baking('Normal')
+
+    def select_gp_roughness_for_baking(self):
+        bpy.context.scene.cycles.bake_type = 'ROUGHNESS'
+        self.select_golden_palace_for_baking('Roughness')
+
+    def select_golden_palace_for_baking(self, channel):
+        mesh = self.select_gp_or_body()
+        for mat in mesh.data.materials:
+            if mat.name.startswith('GP_'):
+                n = mat.node_tree.nodes
+                target_texture = n[ 'GP_Baked_' + channel+' Texture']
+                target_texture.select = True
                 n.active = target_texture
+
+    def save_gp_textures(self):
+        for channel in ['Base Color', 'Roughness', 'Normal']:
+            gp_baked_path = os.path.join(self.workdir, self.name +"_"+ channel+'_gp_baked.png')
+            name = 'GP_Baked_' + channel
+            if name in bpy.data.images:
+                bpy.data.images[name].save(filepath=gp_baked_path)
 
     def make_single_material(self):
         pass
@@ -1063,13 +1135,13 @@ class DazOptimizer:
     # -= 0.5 # nails
 
 
-def save_textures(duf_filepath):
+def save_blend_file(duf_filepath):
     duf_filepath = os.path.abspath(duf_filepath)
     workdir = os.path.dirname(duf_filepath)
     name = os.path.basename(duf_filepath)[:-len(".duf")]
     blend_filepath = os.path.join(workdir, name + ".blend")
     bpy.ops.wm.save_as_mainfile(filepath=blend_filepath)
-    DazOptimizer(workdir=workdir, name=name).save_textures()
+
 
 
 def run_outside_blender():
@@ -1214,15 +1286,14 @@ class DazLoad_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class DazSave_operator(bpy.types.Operator):
-    """ Load daz character """
-    bl_idname = "dazoptim.save"
-    bl_label = "Load Daz character"
+class DazSaveBlend_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.save_blend"
+    bl_label = "Save blend file"
     bl_options = {"REGISTER", "UNDO"}
     idx = 2
     @classmethod
     def poll(cls, context):
-        return UNLOCK or int(context.scene['daz_optim_stage']) == 1 #context.mode == "OBJECT"
+        return UNLOCK or int(context.scene['daz_optim_stage']) == DazLoad_operator.idx
 
     def execute(self, context):
         if bpy.types.dazoptim_easy_import_panel.filepath is None and 'duf_filepath' not in bpy.context.scene:
@@ -1230,8 +1301,88 @@ class DazSave_operator(bpy.types.Operator):
             return {'CANCELLED'}
         if bpy.types.dazoptim_easy_import_panel.filepath is not None and 'duf_filepath' not in bpy.context.scene:
             bpy.context.scene['duf_filepath'] = bpy.types.dazoptim_easy_import_panel.filepath
-        save_textures(bpy.context.scene['duf_filepath'])
-        context.scene['daz_optim_stage'] = DazSave_operator.idx
+        save_blend_file(bpy.context.scene['duf_filepath'])
+        context.scene['daz_optim_stage'] = DazSaveBlend_operator.idx
+        return {'FINISHED'}
+
+
+class DazSaveTextures_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.save_textures"
+    bl_label = "Save Daz textures"
+    bl_options = {"REGISTER", "UNDO"}
+    idx = 3
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK or int(context.scene['daz_optim_stage']) == DazSaveBlend_operator.idx #context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().save_textures()
+        return {'FINISHED'}
+
+
+class DazSelectGoldenPalaceColor_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.select_gp_color"
+    bl_label = "Select golden palace base color for baking"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().select_gp_color_for_baking()
+        return {'FINISHED'}
+
+class DazSelectGoldenPalaceNormals_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.select_gp_normal"
+    bl_label = "Select golden palace normal maps for baking"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().select_gp_normals_for_baking()
+        return {'FINISHED'}
+
+class DazSelectGoldenPalaceRoughness_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.select_gp_roughness"
+    bl_label = "Select golden palace roughness maps for baking"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().select_gp_roughness_for_baking()
+        return {'FINISHED'}
+
+class DazSaveGoldenPalaceBaked_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.save_gp_baked"
+    bl_label = "Save baked golden palace textures"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().save_gp_textures()
+        return {'FINISHED'}
+
+class DazSimplifyGoldenPalaceMaterials_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.simplify_gp_mats"
+    bl_label = "Simplify golden palace materials after baking"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().simplify_golden_palace_material()
         return {'FINISHED'}
 
 
@@ -1244,7 +1395,7 @@ class DazSimplifyMaterials_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return UNLOCK or DazSave_operator.idx <= int(context.scene['daz_optim_stage']) < DazSimplifyMaterials_operator.idx
+        return UNLOCK or DazSaveBlend_operator.idx <= int(context.scene['daz_optim_stage']) < DazSimplifyMaterials_operator.idx
 
     def execute(self, context):
         DazOptimizer().simplify_materials()
@@ -1563,21 +1714,27 @@ class DazOptimize_sidebar(bpy.types.Panel):
         i = 0
         for op_class, op_text in operators:
             prop = col.operator(op_class.bl_idname, text=str(i) + ". " + op_text)
+            op_class.idx = i
             i += 1
 
 
 operators = [
     (DazDelCube_operator, "Delete default cube"),
     (DazLoad_operator, "Load Daz"),
-    (DazSave_operator, "Save textures"),
+    (DazSaveBlend_operator, "Save blend file"),
+    (DazSaveTextures_operator, "Save textures"),
     (DazSimplifyMaterials_operator, "Simplify materials"),
     (DazOptimizeEyes_operator, "Optimize eyes mesh"),
     (DazSimplifyEyesMaterial_operator, "Simplify eyes material"),
     (DazSeparateIrisUVs_operator, "Separate iris UVs"),
     (DazOptimizeGoldenPalaceUVs, "Optimize golden palace UVs"),
     (DazSetupGoldenPalaceForBaking, "golden palace prepare baking"),
-    (DazBakeGoldenPalace, "Bake golden palace"),
+    (DazSelectGoldenPalaceColor_operator, "select golden palace color for baking"),
+    (DazSelectGoldenPalaceNormals_operator, "select golden palace normals for baking"),
+    (DazSelectGoldenPalaceRoughness_operator, "select golden palace roughness for baking"),
+    (DazSaveGoldenPalaceBaked_operator, "Save baked golden palace textures"),
     (DazMergeGrografts_operator, "Merge Geografts"),
+    (DazSimplifyGoldenPalaceMaterials_operator, "Simplify golden palace materials"),
     (DazMergeEyes_operator, "Merge eyes"),
     (DazMergeMouth_operator, "Merge mouth"),
     (DazConcatTextures_operator, "Merge textures"),

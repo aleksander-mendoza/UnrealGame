@@ -239,7 +239,75 @@ UE5_BONE_HIERARCHY = {'pelvis': '', 'spine_01': 'pelvis', 'spine_02': 'spine_01'
                       'AimTarget': '', 'ik_foot_root': '', 'ik_foot_l': 'ik_foot_root', 'ik_foot_r': 'ik_foot_root',
                       'ik_hand_root': '', 'ik_hand_gun': 'ik_hand_root', 'ik_hand_l': 'ik_hand_gun',
                       'ik_hand_r': 'ik_hand_gun'}
-
+UE5_IK_BONES = {
+    'ik_foot_root': '',
+    'ik_foot_l': 'foot_l',
+    'ik_foot_r': 'foot_r',
+    'ik_hand_root': '',
+    'ik_hand_gun': 'hand_r',
+    'ik_hand_l': 'hand_l',
+    'ik_hand_r': 'hand_r',
+    'center_of_mass': ''
+}
+DAZ_G9_TO_UE5_BONES = {
+    'r_toes': 'ball_r',
+    'l_toes': 'ball_l',
+    'r_foot': 'foot_r',
+    'l_foot': 'foot_l',
+    'r_shin': 'calf_r',
+    'l_shin': 'calf_l',
+    'l_thigh': 'thigh_l',
+    'r_thigh': 'thigh_r',
+    'hip': 'pelvis',
+    'pelvis': 'spine_01',
+    'spine1': 'spine_02',
+    'spine2': 'spine_03',
+    'spine3': 'spine_04',
+    'l_pectoral': 'clavicle_pec_l',
+    'r_pectoral': 'clavicle_pec_r',
+    'spine4': 'spine_05',
+    'l_shoulder': 'clavicle_l',
+    'r_shoulder': 'clavicle_r',
+    'l_upperarm': 'upperarm_l',
+    'r_upperarm': 'upperarm_r',
+    'l_forearm': 'lowerarm_l',
+    'r_forearm': 'lowerarm_r',
+    'l_hand': 'hand_l',
+    'r_hand': 'hand_r',
+    'l_thumb1': 'thumb_01_l',
+    'r_thumb1': 'thumb_01_r',
+    'l_thumb2': 'thumb_02_l',
+    'r_thumb2': 'thumb_02_r',
+    'l_thumb3': 'thumb_03_l',
+    'r_thumb3': 'thumb_03_r',
+    'l_index1': 'index_01_l',
+    'r_index1': 'index_01_r',
+    'l_index2': 'index_02_l',
+    'r_index2': 'index_02_r',
+    'l_index3': 'index_03_l',
+    'r_index3': 'index_03_r',
+    'l_mid1': 'middle_01_l',
+    'r_mid1': 'middle_01_r',
+    'l_mid2': 'middle_02_l',
+    'r_mid2': 'middle_02_r',
+    'l_mid3': 'middle_03_l',
+    'r_mid3': 'middle_03_r',
+    'l_ring1': 'ring_01_l',
+    'r_ring1': 'ring_01_r',
+    'l_ring2': 'ring_02_l',
+    'r_ring2': 'ring_02_r',
+    'l_ring3': 'ring_03_l',
+    'r_ring3': 'ring_03_r',
+    'l_pinky1': 'pinky_01_l',
+    'r_pinky1': 'pinky_01_r',
+    'l_pinky2': 'pinky_02_l',
+    'r_pinky2': 'pinky_02_r',
+    'l_pinky3': 'pinky_03_l',
+    'r_pinky3': 'pinky_03_r',
+    'neck1': 'neck_01',
+    'neck2': 'neck_02',
+    'head': 'head',
+}
 
 def select_bone(bone):
     bone.select = True
@@ -1165,6 +1233,136 @@ class DazOptimizer:
                 l = body_m.data.uv_layers[uv_layer_name]
                 body_m.data.uv_layers.remove(l)
 
+    def convert_daz_to_ue5_skeleton(self):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        rig = self.get_body_rig()
+        body = self.get_body_mesh()
+        bpy.ops.object.select_all(action='DESELECT')
+        rig.select_set(True)
+        bpy.context.view_layer.objects.active = rig
+        bpy.ops.object.mode_set(mode='EDIT')
+        hip = rig.data.edit_bones['hip']
+        pelvis = rig.data.edit_bones['pelvis']
+        hip_head = np.array(hip.head)
+        hip_tail = np.array(hip.tail)
+        pelvis_head = np.array(pelvis.head)
+        pelvis_tail = np.array(pelvis.tail)
+        t = 0.80
+        mid = pelvis_tail * t + pelvis_head  * (1-t)
+        hip.head = hip_tail
+        hip.tail = mid
+        pelvis.head = mid
+        pelvis.tail = pelvis_head
+        pelvis_children = list(pelvis.children)
+        for c in pelvis_children:
+            c.parent = hip
+        rig.data.edit_bones['spine1'].parent = pelvis
+        for daz_name, ue5_name in DAZ_G9_TO_UE5_BONES.items():
+            bone = rig.data.edit_bones[daz_name]
+            bone.name = bone.name + "_tmp_suffix"
+        for daz_name, ue5_name in DAZ_G9_TO_UE5_BONES.items():
+            bone = rig.data.edit_bones[daz_name + "_tmp_suffix"]
+            bone.name = ue5_name
+        rig.name = 'root'
+        body.name = 'root Mesh'
+
+    def add_ue5_ik_bones(self):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        rig = self.get_body_rig()
+        bpy.ops.object.select_all(action='DESELECT')
+        rig.select_set(True)
+        bpy.context.view_layer.objects.active = rig
+        bpy.ops.object.mode_set(mode='EDIT')
+        for ik_bone_name, fk_bone_name in UE5_IK_BONES.items():
+            ik_bone = rig.data.edit_bones.new(ik_bone_name)
+            ik_bone.use_deform = False
+            ik_bone.use_connect = False
+            if fk_bone_name != '':
+                head = np.array(rig.data.edit_bones[fk_bone_name].head)
+                ik_bone.head = head
+            ik_bone.tail = np.array(ik_bone.head)
+            ik_bone.tail.y += 0.2
+        for ik_bone_name in UE5_IK_BONES:
+            parent_ik_bone_name = UE5_BONE_HIERARCHY[ik_bone_name]
+            if parent_ik_bone_name != '':
+                rig.data.edit_bones[ik_bone_name].parent = rig.data.edit_bones[parent_ik_bone_name]
+
+    def scale_to_ue5_units(self):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        s = bpy.context.scene.unit_settings.scale_length
+        bpy.context.scene.unit_settings.scale_length = 0.01
+        rig = self.get_body_rig()
+        z = s/0.01
+        rig.scale = (z,z,z)
+        stack = [rig]
+        visited = {rig}
+        while len(stack)>0:
+            bpy.ops.object.select_all(action='DESELECT')
+            obj = stack.pop()
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+            for child in obj.children:
+                if child not in visited:
+                    visited.add(child)
+                    stack.append(child)
+
+    def export_to_fbx(self):
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        body = self.get_body_mesh()
+        rig = self.get_body_rig()
+        bpy.ops.object.select_all(action='DESELECT')
+        rig.select_set(True)
+        body.select_set(True)
+        bpy.context.view_layer.objects.active = rig
+
+        p = os.path.join(self.workdir, self.name + '.fbx')
+        bpy.ops.export_scene.fbx(filepath=p,
+                                 check_existing=False,
+                                 filter_glob='*.fbx',
+                                 use_selection=True,
+                                 use_visible=False,
+                                 use_active_collection=False,
+                                 collection='',
+                                 global_scale=1.0,
+                                 apply_unit_scale=True,
+                                 apply_scale_options='FBX_SCALE_NONE',
+                                 use_space_transform=True,
+                                 bake_space_transform=False,
+                                 object_types={'ARMATURE', 'CAMERA', 'EMPTY', 'LIGHT', 'MESH', 'OTHER'},
+                                 use_mesh_modifiers=True,
+                                 use_mesh_modifiers_render=True,
+                                 mesh_smooth_type='OFF',
+                                 colors_type='SRGB',
+                                 prioritize_active_color=False,
+                                 use_subsurf=False,
+                                 use_mesh_edges=False,
+                                 use_tspace=False,
+                                 use_triangles=False,
+                                 use_custom_props=False,
+                                 add_leaf_bones=False,
+                                 primary_bone_axis='Y',
+                                 secondary_bone_axis='X',
+                                 use_armature_deform_only=False,
+                                 armature_nodetype='NULL',
+                                 bake_anim=False,
+                                 bake_anim_use_all_bones=True,
+                                 bake_anim_use_nla_strips=True,
+                                 bake_anim_use_all_actions=True,
+                                 bake_anim_force_startend_keying=True,
+                                 bake_anim_step=1.0,
+                                 bake_anim_simplify_factor=1.0,
+                                 path_mode='AUTO',
+                                 embed_textures=False,
+                                 batch_mode='OFF',
+                                 use_batch_own_dir=True,
+                                 use_metadata=True,
+                                 axis_forward='-Z',
+                                 axis_up='Y')
+
+
+
     # *= 0.25# nails
     # -= 0.5 # nails
 
@@ -1598,7 +1796,7 @@ class DazSeparateLipUVs_operator(bpy.types.Operator):
 class DazAddBreastBones_operator(bpy.types.Operator):
     """ Add breast bones """
     bl_idname = "dazoptim.breast_bones"
-    bl_label = "Optimize UVs"
+    bl_label = "Subdivide breast bones"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -1622,7 +1820,6 @@ class DazAddGluteBones_operator(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-        DazOptimizer().pack_uvs()
 
         return {'FINISHED'}
 
@@ -1638,7 +1835,6 @@ class DazAddThighBones_operator(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-        DazOptimizer().pack_uvs()
 
         return {'FINISHED'}
 
@@ -1654,7 +1850,6 @@ class DazFitClothes_operator(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-        DazOptimizer().pack_uvs()
 
         return {'FINISHED'}
 
@@ -1670,7 +1865,6 @@ class DazOptimizeHair_operator(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-        DazOptimizer().pack_uvs()
 
         return {'FINISHED'}
 
@@ -1686,7 +1880,7 @@ class DazConvertToUe5Skeleton_operator(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-        DazOptimizer().pack_uvs()
+        DazOptimizer().convert_daz_to_ue5_skeleton()
 
         return {'FINISHED'}
 
@@ -1736,10 +1930,10 @@ class DazBakeGoldenPalace(bpy.types.Operator):
         bpy.ops.object.bake(type='DIFFUSE')
         return {'FINISHED'}
 
-class DazSendToUnreal(bpy.types.Operator):
-    """ Send to unreal """
-    bl_idname = "dazoptim.send_to_ue5"
-    bl_label = "Send to unreal"
+class DazScaleToUnreal(bpy.types.Operator):
+    """ Scale to unreal """
+    bl_idname = "dazoptim.scale_to_ue5"
+    bl_label = "Scale to unreal"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -1747,7 +1941,22 @@ class DazSendToUnreal(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-        DazOptimizer().pack_uvs()
+        DazOptimizer().scale_to_ue5_units()
+
+        return {'FINISHED'}
+
+class DazExportFbx(bpy.types.Operator):
+    """ export fbx """
+    bl_idname = "dazoptim.export_fbx"
+    bl_label = "Export fbx"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().export_to_fbx()
 
         return {'FINISHED'}
 
@@ -1797,7 +2006,8 @@ operators = [
     (DazFitClothes_operator, "Fit Clothes"),
     (DazOptimizeHair_operator, "Optimize hair"),
     (DazConvertToUe5Skeleton_operator, "Convert to UE5 Skeleton"),
-    (DazSendToUnreal, "Send to unreal"),
+    (DazScaleToUnreal, "Scale to ue5 units"),
+    (DazExportFbx, "Export to fbx"),
 ]
 
 classes = [

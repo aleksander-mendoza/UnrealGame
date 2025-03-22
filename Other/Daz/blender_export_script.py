@@ -70,6 +70,7 @@ class NodesUtils:
         ls = node_tree.links
         bsdf_node = ns.new('ShaderNodeBsdfPrincipled')
         bsdf_node.location = (shift_x, 0)
+        bsdf_node.name = 'simple_material_bsdf'
         if output_socket is None:
             output_node = ns.new('ShaderNodeOutputMaterial')
             output_node.location = (shift_x+400, 0)
@@ -84,6 +85,7 @@ class NodesUtils:
         for idx, channel in enumerate(['Base Color', 'Roughness', 'Normal']):
             if channel in filepaths:
                 tex_node = ns.new('ShaderNodeTexImage')
+                tex_node.name = 'simple_material_'+channel
                 tex_node.location = (-600 + shift_x, -(idx - 1) * 300)
                 filepath = filepaths[channel]
                 if isinstance(filepath, list):
@@ -97,6 +99,7 @@ class NodesUtils:
                 if channel == 'Normal':
                     norm_map_node = ns.new('ShaderNodeNormalMap')
                     norm_map_node.location = (-200 + shift_x, -idx * 200)
+                    norm_map_node.name = 'simple_material_normal_map'
                     ls.new(bsdf_node.inputs[channel], norm_map_node.outputs['Normal'])
                     ls.new(norm_map_node.inputs['Color'], tex_node.outputs['Color'])
                 else:
@@ -1145,7 +1148,11 @@ class DazOptimizer:
         filepaths = {}
         for channel in ['Base Color', 'Roughness', 'Normal']:
             name = 'GP_Baked_' + channel
-            filepaths[channel] = bpy.data.images[name]
+            if name in bpy.data.images:
+                filepaths[channel] = bpy.data.images[name]
+            else:
+                p = os.path.join(self.workdir, self.name + "_" + channel + '_gp_baked.png')
+                filepaths[channel] = bpy.data.images.load(p)
         for mat in mesh.data.materials:
             if mat.name.startswith("GP_"):
                 mat.node_tree.nodes.clear()
@@ -1181,7 +1188,18 @@ class DazOptimizer:
                 uv_map.location = (-300, 200)
                 uv_map.uv_map = NEW_GP_UV_MAP
                 uv_map.name = 'GP_Baked_UVs'
+                bsdf_node = n['simple_material_bsdf']
+                diffuse_node = n.new('ShaderNodeBsdfDiffuse')
+                diffuse_node.location = bsdf_node.location
+                diffuse_node.location.x -= 300
+                diffuse_node.location.y += 200
+                diffuse_node.name = 'simple_material_diffuse'
                 for idx, channel in enumerate(['Base Color', 'Roughness', 'Normal']):
+                    bsdf_links = bsdf_node.inputs[channel].links
+                    before_bsdf = bsdf_links[0].from_socket
+                    diffuse_socket_name = 'Color' if channel == 'Base Color' else channel
+                    l.new(diffuse_node.inputs[diffuse_socket_name], before_bsdf)
+
                     name = 'GP_Baked_' + channel
                     target_texture = n.new('ShaderNodeTexImage')
                     target_texture.image = baked_gp_imgs[channel]
@@ -1189,6 +1207,20 @@ class DazOptimizer:
                     target_texture.location = (0, 200 + 300 * idx)
                     l.new(target_texture.inputs['Vector'], uv_map.outputs['UV'])
                     n.active = target_texture
+                l.new(bsdf_node.outputs['BSDF'].links[0].to_socket, diffuse_node.outputs['BSDF'])
+
+
+    def unselect_golden_palace_for_baking(self):
+        mesh = self.select_gp_or_body()
+        for mat in mesh.data.materials:
+            if mat.name.startswith('GP_'):
+                n = mat.node_tree.nodes
+                l = mat.node_tree.links
+                bsdf_node = n['simple_material_bsdf']
+                diffuse_node = n['simple_material_diffuse']
+                diffuse_links = diffuse_node.outputs['BSDF'].links
+                if len(diffuse_links) > 0:
+                    l.new(diffuse_links[0].to_socket, bsdf_node.outputs['BSDF'])
 
     def select_gp_color_for_baking(self):
         bpy.context.scene.cycles.bake_type = 'DIFFUSE'
@@ -1209,9 +1241,29 @@ class DazOptimizer:
         for mat in mesh.data.materials:
             if mat.name.startswith('GP_'):
                 n = mat.node_tree.nodes
+                l = mat.node_tree.links
                 target_texture = n[ 'GP_Baked_' + channel+' Texture']
                 target_texture.select = True
                 n.active = target_texture
+                # color_texture = n['simple_material_Base Color']
+                # bsdf_node = n['simple_material_bsdf']
+                # bsdf_out = bsdf_node.outputs['BSDF']
+                # color_out = color_texture.outputs['Color']
+                # is_bsdf_connected = len(bsdf_out.links)>0
+                # if channel == 'Base Color':
+                #     if is_bsdf_connected:
+                #         after_bsdf = bsdf_out.links[0].to_socket
+                #         l.remove(bsdf_out.links[0])
+                #         l.new(after_bsdf, color_out)
+                # else:
+                #     if not is_bsdf_connected:
+                #         for color_link in color_out.links:
+                #             if color_link.to_node != bsdf_node:
+                #                 after_bsdf = color_link.to_socket
+                #                 l.remove(color_link)
+                #                 l.new(after_bsdf, bsdf_out)
+                #                 break
+
 
     def save_gp_textures(self):
         for channel in ['Base Color', 'Roughness', 'Normal']:
@@ -1219,6 +1271,7 @@ class DazOptimizer:
             name = 'GP_Baked_' + channel
             if name in bpy.data.images:
                 bpy.data.images[name].save(filepath=gp_baked_path)
+
 
     def make_single_material(self):
         body_m = self.select_body()
@@ -1317,6 +1370,9 @@ class DazOptimizer:
         body.select_set(True)
         bpy.context.view_layer.objects.active = rig
 
+        if "Subsurf" in body.modifiers:
+            body.modifiers.remove(body.modifiers["Subsurf"])
+
         p = os.path.join(self.workdir, self.name + '.fbx')
         bpy.ops.export_scene.fbx(filepath=p,
                                  check_existing=False,
@@ -1333,7 +1389,7 @@ class DazOptimizer:
                                  object_types={'ARMATURE', 'CAMERA', 'EMPTY', 'LIGHT', 'MESH', 'OTHER'},
                                  use_mesh_modifiers=True,
                                  use_mesh_modifiers_render=True,
-                                 mesh_smooth_type='OFF',
+                                 mesh_smooth_type='FACE',
                                  colors_type='SRGB',
                                  prioritize_active_color=False,
                                  use_subsurf=False,
@@ -1563,6 +1619,20 @@ class DazSelectGoldenPalaceColor_operator(bpy.types.Operator):
 
     def execute(self, context):
         DazOptimizer().select_gp_color_for_baking()
+        return {'FINISHED'}
+
+
+class DazUnselectGoldenPalace_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.unselect_gp_baking"
+    bl_label = "Unselect golden palace base for baking"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().unselect_golden_palace_for_baking()
         return {'FINISHED'}
 
 class DazSelectGoldenPalaceNormals_operator(bpy.types.Operator):
@@ -1930,6 +2000,21 @@ class DazBakeGoldenPalace(bpy.types.Operator):
         bpy.ops.object.bake(type='DIFFUSE')
         return {'FINISHED'}
 
+class AddUe5IkBones(bpy.types.Operator):
+    """ Add UE5 IK bones """
+    bl_idname = "dazoptim.add_ue5_ik_bones"
+    bl_label = "Add UE5 IK bones"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().add_ue5_ik_bones()
+
+        return {'FINISHED'}
+
 class DazScaleToUnreal(bpy.types.Operator):
     """ Scale to unreal """
     bl_idname = "dazoptim.scale_to_ue5"
@@ -1991,6 +2076,7 @@ operators = [
     (DazSelectGoldenPalaceColor_operator, "select golden palace color for baking"),
     (DazSelectGoldenPalaceNormals_operator, "select golden palace normals for baking"),
     (DazSelectGoldenPalaceRoughness_operator, "select golden palace roughness for baking"),
+    (DazUnselectGoldenPalace_operator, "unselect golden palace for baking"),
     (DazSaveGoldenPalaceBaked_operator, "Save baked golden palace textures"),
     (DazMergeGrografts_operator, "Merge Geografts"),
     (DazSimplifyGoldenPalaceMaterials_operator, "Simplify golden palace materials"),
@@ -2006,6 +2092,7 @@ operators = [
     (DazFitClothes_operator, "Fit Clothes"),
     (DazOptimizeHair_operator, "Optimize hair"),
     (DazConvertToUe5Skeleton_operator, "Convert to UE5 Skeleton"),
+    (AddUe5IkBones, "Add UE5 IK bones"),
     (DazScaleToUnreal, "Scale to ue5 units"),
     (DazExportFbx, "Export to fbx"),
 ]

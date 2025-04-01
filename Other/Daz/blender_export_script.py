@@ -452,6 +452,7 @@ class DazOptimizer:
     def merge_all_rigs(self):
         body_rig = self.get_body_rig()
         select_object(body_rig)
+        meshes = []
         for o in bpy.data.objects:
             if isinstance(o.data, bpy.types.Armature):
                 if 'hair' in o.name.lower():
@@ -465,11 +466,19 @@ class DazOptimizer:
                     o.hide_set(False)
                     # o.data.hide_set(False)
                     o.select_set(True)
+                meshes.append((o.data, o.parent))
         bpy.ops.daz.merge_rigs()
         for o in bpy.data.objects:
             o.hide_viewport = False
             o.hide_render = False
             o.hide_set(False)
+        for mesh, parent in meshes:
+            for mod in mesh.modifiers:
+                if isinstance(mod, bpy.types.ArmatureModifier):
+                    if mod.object is None:
+                        mod.object = body_rig
+            if mesh.parent is None:
+                mesh.parent = parent
 
     def simplify_eyes_material(self):
         from PIL import Image
@@ -849,51 +858,57 @@ class DazOptimizer:
         bpy.ops.object.mode_set(mode='OBJECT')
 
     def merge_eyes(self):
-        EYES_M = bpy.data.objects['Genesis 9 Eyes Mesh']
-        BODY_M = self.get_body_mesh()
-        EYES_RIG = bpy.data.objects['Genesis 9 Eyes']
-        BODY_RIG = self.get_body_rig()
-        select_object(BODY_M)
-        EYES_M.select_set(True)
-        old_uv_maps = [o.name for o in EYES_M.data.uv_layers]
-        # merge meshes
-        bpy.ops.object.join()
+        if 'Genesis 9 Eyes Mesh' in bpy.data.objects:
+            EYES_M = bpy.data.objects['Genesis 9 Eyes Mesh']
+            BODY_M = self.get_body_mesh()
 
-        # merge UV maps
-        eyes_layer = BODY_M.data.uv_layers[NEW_EYES_UV_MAP]
-        eyes_layer_np = np.array([v.uv for v in eyes_layer.data])
-        is_eye = np.all(eyes_layer_np > 0, axis=1)
-        base_layer_np = self.get_base_uv_layer_np()
-        base_layer_np[is_eye] = eyes_layer_np[is_eye] + [5, 0]
-        self.update_base_uv_layer(base_layer_np)
-        for o in old_uv_maps:
-            BODY_M.data.uv_layers.remove(BODY_M.data.uv_layers[o])
+            BODY_RIG = self.get_body_rig()
+            select_object(BODY_M)
+            EYES_M.select_set(True)
+            old_uv_maps = [o.name for o in EYES_M.data.uv_layers]
+            # merge meshes
+            bpy.ops.object.join()
 
-        # merge bones
-        self.merge_two_rigs(BODY_RIG, EYES_RIG)
+            # merge UV maps
+            eyes_layer = BODY_M.data.uv_layers[NEW_EYES_UV_MAP]
+            eyes_layer_np = np.array([v.uv for v in eyes_layer.data])
+            is_eye = np.all(eyes_layer_np > 0, axis=1)
+            base_layer_np = self.get_base_uv_layer_np()
+            base_layer_np[is_eye] = eyes_layer_np[is_eye] + [5, 0]
+            self.update_base_uv_layer(base_layer_np)
+            for o in old_uv_maps:
+                BODY_M.data.uv_layers.remove(BODY_M.data.uv_layers[o])
+
+            # merge bones
+            if 'Genesis 9 Eyes' in bpy.data.objects:
+                EYES_RIG = bpy.data.objects['Genesis 9 Eyes']
+                self.merge_two_rigs(BODY_RIG, EYES_RIG)
 
     def merge_mouth(self):
-        MOUTH_M = bpy.data.objects['Genesis 9 Mouth Mesh']
-        BODY_M = self.get_body_mesh()
-        MOUTH_RIG = bpy.data.objects['Genesis 9 Mouth']
-        BODY_RIG = self.get_body_rig()
-        select_object(BODY_M)
-        uv_map_name = MOUTH_M.data.uv_layers.active.name
-        # merge meshes
-        MOUTH_M.select_set(True)
-        bpy.ops.object.join()
+        if 'Genesis 9 Mouth Mesh' in bpy.data.objects:
+            MOUTH_M = bpy.data.objects['Genesis 9 Mouth Mesh']
+            BODY_M = self.get_body_mesh()
 
-        # merge UV maps
-        mouth_layer = BODY_M.data.uv_layers[uv_map_name]
-        mouth_layer_np = np.array([v.uv for v in mouth_layer.data])
-        is_mouth = np.all(mouth_layer_np > 0, axis=1)
-        base_layer_np = self.get_base_uv_layer_np()
-        base_layer_np[is_mouth] = mouth_layer_np[is_mouth] + [6, 0]
-        self.update_base_uv_layer(base_layer_np)
-        BODY_M.data.uv_layers.remove(mouth_layer)
+            BODY_RIG = self.get_body_rig()
+            select_object(BODY_M)
+            uv_map_name = MOUTH_M.data.uv_layers.active.name
+            # merge meshes
+            MOUTH_M.select_set(True)
+            bpy.ops.object.join()
 
-        # merge bones
-        self.merge_two_rigs(BODY_RIG, MOUTH_RIG)
+            # merge UV maps
+            mouth_layer = BODY_M.data.uv_layers[uv_map_name]
+            mouth_layer_np = np.array([v.uv for v in mouth_layer.data])
+            is_mouth = np.all(mouth_layer_np > 0, axis=1)
+            base_layer_np = self.get_base_uv_layer_np()
+            base_layer_np[is_mouth] = mouth_layer_np[is_mouth] + [6, 0]
+            self.update_base_uv_layer(base_layer_np)
+            BODY_M.data.uv_layers.remove(mouth_layer)
+
+            if 'Genesis 9 Mouth' in bpy.data.objects:
+                # merge bones
+                MOUTH_RIG = bpy.data.objects['Genesis 9 Mouth']
+                self.merge_two_rigs(BODY_RIG, MOUTH_RIG)
 
     def pack_uvs(self):
 

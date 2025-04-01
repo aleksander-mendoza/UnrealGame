@@ -324,6 +324,12 @@ def find_body_rig():
         o = o.parent
     return o
 
+def select_object(obj):
+    if bpy.context.view_layer.objects.active is not None:
+        bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode='OBJECT')
 
 class DazOptimizer:
 
@@ -393,10 +399,9 @@ class DazOptimizer:
         return os.path.join(self.workdir, self.name + '_' + map_type + '_eyes.png')
 
     def optimize_eyes(self):
+
         EYES_M = self.get_eyes_mesh()
-        bpy.ops.object.select_all(action='DESELECT')
-        EYES_M.select_set(True)
-        bpy.context.view_layer.objects.active = EYES_M
+        select_object(EYES_M)
 
         # uv_layer = EYES_M.data.uv_layers.active
         # uvs = np.array([v.uv for v in uv_layer.data], dtype=bool)
@@ -443,6 +448,28 @@ class DazOptimizer:
 
         bpy.ops.object.mode_set(mode='OBJECT')
         #
+
+    def merge_all_rigs(self):
+        body_rig = self.get_body_rig()
+        select_object(body_rig)
+        for o in bpy.data.objects:
+            if isinstance(o.data, bpy.types.Armature):
+                if 'hair' in o.name.lower():
+                    if o.parent != body_rig:
+                        o.parent = body_rig
+                    o.hide_viewport = True
+                    o.hide_set(True)
+                else:
+                    o.hide_viewport = False
+                    o.hide_render = False
+                    o.hide_set(False)
+                    # o.data.hide_set(False)
+                    o.select_set(True)
+        bpy.ops.daz.merge_rigs()
+        for o in bpy.data.objects:
+            o.hide_viewport = False
+            o.hide_render = False
+            o.hide_set(False)
 
     def simplify_eyes_material(self):
         from PIL import Image
@@ -505,11 +532,7 @@ class DazOptimizer:
         new_uv_layer = EYES_M.data.uv_layers.new(name=NEW_EYES_UV_MAP)
         new_uv_layer.active = True
         new_uv_layer.active_render = True
-        bpy.ops.object.mode_set(mode='OBJECT')
-        # pack UVs
-        bpy.ops.object.select_all(action='DESELECT')
-        EYES_M.select_set(True)
-        bpy.context.view_layer.objects.active = EYES_M
+        select_object(EYES_M)
         bpy.ops.object.mode_set(mode='EDIT')
 
         bpy.context.scene.tool_settings.use_uv_select_sync = False
@@ -577,7 +600,7 @@ class DazOptimizer:
         all_filepaths: {str: {str: [bpy.types.Image]}} = {}
         for mat in BODY_M.data.materials:
             output_node = NodesUtils.find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
-            body_part = mat.name.rstrip('0123456789-_')
+            body_part = mat.name.rstrip('0123456789-_.')
             body_part_filepaths = all_filepaths[body_part] = {'Base Color': set(), 'Roughness': set(), 'Normal': set()}
             if output_node is not None:
                 for bsdf in NodesUtils.from_socket_backwards_search_for(output_node.inputs['Surface'], (bpy.types.ShaderNodeBsdfPrincipled, bpy.types.ShaderNodeGroup), set()):
@@ -600,8 +623,7 @@ class DazOptimizer:
                                                                                     bpy.types.ShaderNodeTexImage,
                                                                                     set()):
                             body_part_filepaths['Normal'].add(img_node.image)
-
-        for body_part_filepaths in all_filepaths.values():
+        for body_part_name, body_part_filepaths in all_filepaths.items():
             occurrences = {}
             filenames = []
             for channel in body_part_filepaths.values():
@@ -614,7 +636,7 @@ class DazOptimizer:
                 for image in channel:
                     if image not in occurrences:
                         occurrences[image] = 0
-                    occurrences[image] += 1 + (1000 if image.filepath.startswith(lcp) else 0)
+                    occurrences[image] += 1 + len(os.path.commonprefix([image.filepath, lcp]))
 
             for channel in body_part_filepaths:
                 body_part_filepaths[channel] = list(sorted(body_part_filepaths[channel], key=lambda x: -occurrences[x]))
@@ -631,13 +653,13 @@ class DazOptimizer:
         if 'BreastacularG9 Mesh' in bpy.data.objects:
             mats.extend(bpy.data.objects['BreastacularG9 Mesh'].data.materials)
         for mat in mats:
-            body_part = mat.name.rstrip('0123456789-_')
+            body_part = mat.name.rstrip('0123456789-_.')
             body_part_filepaths = all_filepaths[body_part]
             mat.node_tree.nodes.clear()
             NodesUtils.gen_simple_material(mat.node_tree, body_part_filepaths)
 
         body_part_filepaths = all_filepaths['Body']
-        if 'GoldenPalace_G9' in bpy.data.objects:
+        if 'GoldenPalace_G9 Mesh' in bpy.data.objects:
             GOLD_PAL_M = bpy.data.objects['GoldenPalace_G9 Mesh']
             for mat in GOLD_PAL_M.data.materials:
                 output_node = NodesUtils.find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
@@ -780,37 +802,28 @@ class DazOptimizer:
 
 
     def merge_geografts(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
         BODY_M = self.get_body_mesh()
         BODY_RIG = self.get_body_rig()
-
+        select_object(BODY_M)
         # merge meshes
-        bpy.ops.object.select_all(action='DESELECT')
-        GOLD_PAL_RIG = None
-        if 'GoldenPalace_G9' in bpy.data.objects:
+        if 'GoldenPalace_G9 Mesh' in bpy.data.objects:
             GOLD_PAL_M = bpy.data.objects['GoldenPalace_G9 Mesh']
-            GOLD_PAL_RIG = bpy.data.objects['GoldenPalace_G9']
             GOLD_PAL_M.select_set(True)
-        BREASTACULAR_RIG = None
-        if 'BreastacularG9' in bpy.data.objects:
+        if 'GoldenPalace_G9 Mesh' in bpy.data.objects:
             BREASTACULAR_M = bpy.data.objects['BreastacularG9 Mesh']
-            BREASTACULAR_RIG = bpy.data.objects['BreastacularG9']
             BREASTACULAR_M.select_set(True)
-        BODY_M.select_set(True)
-        bpy.context.view_layer.objects.active = BODY_M
         bpy.ops.daz.merge_geografts()
 
         # merge bones
-        if GOLD_PAL_RIG is not None:
-            self.merge_two_rigs(BODY_RIG, GOLD_PAL_RIG)
-        if BREASTACULAR_RIG is not None:
-            self.merge_two_rigs(BODY_RIG, BREASTACULAR_RIG)
+        if 'GoldenPalace_G9' in bpy.data.objects:
+            self.merge_two_rigs(BODY_RIG, bpy.data.objects['GoldenPalace_G9'])
+        if 'BreastacularG9' in bpy.data.objects:
+            self.merge_two_rigs(BODY_RIG,  bpy.data.objects['BreastacularG9'])
 
     def merge_two_rigs(self, original, addon):
-        bpy.ops.object.select_all(action='DESELECT')
+        select_object(original)
         addon.select_set(True)
-        bpy.context.view_layer.objects.active = original
-        bpy.ops.object.mode_set(mode='OBJECT')
+
 
         deform_bones = {bone.name for bone in addon.data.bones if bone.use_deform}
         parents = {bone.name: bone.parent.name for bone in addon.data.bones if bone.parent is not None}
@@ -836,19 +849,14 @@ class DazOptimizer:
         bpy.ops.object.mode_set(mode='OBJECT')
 
     def merge_eyes(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
         EYES_M = bpy.data.objects['Genesis 9 Eyes Mesh']
         BODY_M = self.get_body_mesh()
         EYES_RIG = bpy.data.objects['Genesis 9 Eyes']
         BODY_RIG = self.get_body_rig()
-
-        old_uv_maps = [o.name for o in EYES_M.data.uv_layers]
-
-        # merge meshes
-        bpy.ops.object.select_all(action='DESELECT')
+        select_object(BODY_M)
         EYES_M.select_set(True)
-        BODY_M.select_set(True)
-        bpy.context.view_layer.objects.active = BODY_M
+        old_uv_maps = [o.name for o in EYES_M.data.uv_layers]
+        # merge meshes
         bpy.ops.object.join()
 
         # merge UV maps
@@ -865,19 +873,14 @@ class DazOptimizer:
         self.merge_two_rigs(BODY_RIG, EYES_RIG)
 
     def merge_mouth(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
         MOUTH_M = bpy.data.objects['Genesis 9 Mouth Mesh']
         BODY_M = self.get_body_mesh()
         MOUTH_RIG = bpy.data.objects['Genesis 9 Mouth']
         BODY_RIG = self.get_body_rig()
-
+        select_object(BODY_M)
         uv_map_name = MOUTH_M.data.uv_layers.active.name
-
         # merge meshes
-        bpy.ops.object.select_all(action='DESELECT')
         MOUTH_M.select_set(True)
-        BODY_M.select_set(True)
-        bpy.context.view_layer.objects.active = BODY_M
         bpy.ops.object.join()
 
         # merge UV maps
@@ -895,12 +898,9 @@ class DazOptimizer:
     def pack_uvs(self):
 
         # ========= Concat UVs =========
-        bpy.ops.object.mode_set(mode='OBJECT')
         BODY_M = self.get_body_mesh()
         # pack UVs
-        bpy.ops.object.select_all(action='DESELECT')
-        BODY_M.select_set(True)
-        bpy.context.view_layer.objects.active = BODY_M
+        select_object(BODY_M)
         base_layer_np = self.get_base_uv_layer_np()
         is_arms_legs_head_body = base_layer_np[:, 0] < 4
         is_nails = np.logical_and(4 < base_layer_np[:, 0], base_layer_np[:, 0] < 5)
@@ -950,12 +950,9 @@ class DazOptimizer:
         self.update_base_uv_layer(base_layer_np)
 
     def separate_lip_uvs(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
         BODY_M = self.get_body_mesh()
         # pack UVs
-        bpy.ops.object.select_all(action='DESELECT')
-        BODY_M.select_set(True)
-        bpy.context.view_layer.objects.active = BODY_M
+        select_object(BODY_M)
         bpy.ops.object.mode_set(mode='EDIT')
 
         uv_mask = self.get_uv_mask()
@@ -1063,30 +1060,21 @@ class DazOptimizer:
         bpy.ops.daz.save_local_textures()
 
     def select_gp(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
         mesh = bpy.data.objects['GoldenPalace_G9 Mesh']
-        bpy.ops.object.select_all(action='DESELECT')
-        mesh.select_set(True)
-        bpy.context.view_layer.objects.active = mesh
+        select_object(mesh)
         return mesh
 
     def select_body(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
         mesh = self.get_body_mesh()
-        bpy.ops.object.select_all(action='DESELECT')
-        mesh.select_set(True)
-        bpy.context.view_layer.objects.active = mesh
+        select_object(mesh)
         return mesh
 
     def select_gp_or_body(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
         if 'GoldenPalace_G9 Mesh' in bpy.data.objects:
             mesh = bpy.data.objects['GoldenPalace_G9 Mesh']
         else:
             mesh = self.get_body_mesh()
-        bpy.ops.object.select_all(action='DESELECT')
-        mesh.select_set(True)
-        bpy.context.view_layer.objects.active = mesh
+        select_object(mesh)
         return mesh
 
     def unify_golden_palace_uvs(self):
@@ -1164,6 +1152,7 @@ class DazOptimizer:
 
         bpy.context.scene.render.engine = 'CYCLES'
         bpy.context.scene.cycles.device = 'GPU'
+        bpy.context.scene.view_settings.view_transform = 'Standard'
 
         mesh.data.uv_layers[NEW_GP_UV_MAP].active = True
         baked_gp_imgs = {}
@@ -1210,7 +1199,7 @@ class DazOptimizer:
                 l.new(bsdf_node.outputs['BSDF'].links[0].to_socket, diffuse_node.outputs['BSDF'])
 
 
-    def unselect_golden_palace_for_baking(self):
+    def select_golden_palace_for_bsdf_mode_baking(self, principled_bsdf):
         mesh = self.select_gp_or_body()
         for mat in mesh.data.materials:
             if mat.name.startswith('GP_'):
@@ -1218,23 +1207,28 @@ class DazOptimizer:
                 l = mat.node_tree.links
                 bsdf_node = n['simple_material_bsdf']
                 diffuse_node = n['simple_material_diffuse']
-                diffuse_links = diffuse_node.outputs['BSDF'].links
-                if len(diffuse_links) > 0:
-                    l.new(diffuse_links[0].to_socket, bsdf_node.outputs['BSDF'])
+                good_node, bad_node = (bsdf_node, diffuse_node) if principled_bsdf else (diffuse_node, bsdf_node)
+                bad_links = bad_node.outputs['BSDF'].links
+                if len(bad_links) > 0:
+                    l.new(bad_links[0].to_socket, good_node.outputs['BSDF'])
+
 
     def select_gp_color_for_baking(self):
         bpy.context.scene.cycles.bake_type = 'DIFFUSE'
         bpy.context.scene.render.bake.use_pass_direct = False
         bpy.context.scene.render.bake.use_pass_indirect = False
         self.select_golden_palace_for_baking('Base Color')
+        self.select_golden_palace_for_bsdf_mode_baking(principled_bsdf=False)
 
     def select_gp_normals_for_baking(self):
         bpy.context.scene.cycles.bake_type = 'NORMAL'
         self.select_golden_palace_for_baking('Normal')
+        self.select_golden_palace_for_bsdf_mode_baking(principled_bsdf=True)
 
     def select_gp_roughness_for_baking(self):
         bpy.context.scene.cycles.bake_type = 'ROUGHNESS'
         self.select_golden_palace_for_baking('Roughness')
+        self.select_golden_palace_for_bsdf_mode_baking(principled_bsdf=True)
 
     def select_golden_palace_for_baking(self, channel):
         mesh = self.select_gp_or_body()
@@ -1287,44 +1281,55 @@ class DazOptimizer:
                 body_m.data.uv_layers.remove(l)
 
     def convert_daz_to_ue5_skeleton(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
-        rig = self.get_body_rig()
-        body = self.get_body_mesh()
-        bpy.ops.object.select_all(action='DESELECT')
-        rig.select_set(True)
-        bpy.context.view_layer.objects.active = rig
-        bpy.ops.object.mode_set(mode='EDIT')
-        hip = rig.data.edit_bones['hip']
-        pelvis = rig.data.edit_bones['pelvis']
-        hip_head = np.array(hip.head)
-        hip_tail = np.array(hip.tail)
-        pelvis_head = np.array(pelvis.head)
-        pelvis_tail = np.array(pelvis.tail)
-        t = 0.80
-        mid = pelvis_tail * t + pelvis_head  * (1-t)
-        hip.head = hip_tail
-        hip.tail = mid
-        pelvis.head = mid
-        pelvis.tail = pelvis_head
-        pelvis_children = list(pelvis.children)
-        for c in pelvis_children:
-            c.parent = hip
-        rig.data.edit_bones['spine1'].parent = pelvis
-        for daz_name, ue5_name in DAZ_G9_TO_UE5_BONES.items():
-            bone = rig.data.edit_bones[daz_name]
-            bone.name = bone.name + "_tmp_suffix"
-        for daz_name, ue5_name in DAZ_G9_TO_UE5_BONES.items():
-            bone = rig.data.edit_bones[daz_name + "_tmp_suffix"]
-            bone.name = ue5_name
-        rig.name = 'root'
-        body.name = 'root Mesh'
+        body_rig = self.get_body_rig()
+        body_mesh = self.get_body_mesh()
+        def convert_rig(rig, mid = None):
+            select_object(rig)
+            bpy.ops.object.mode_set(mode='EDIT')
+            pelvis = None
+            if mid is None:
+                pelvis = rig.data.edit_bones['pelvis']
+                pelvis_head = np.array(pelvis.head)
+                pelvis_tail = np.array(pelvis.tail)
+                t = 0.80
+                mid = pelvis_tail * t + pelvis_head * (1 - t)
+            if 'pelvis' in rig.data.edit_bones:
+                pelvis = rig.data.edit_bones['pelvis']
+                pelvis_head = np.array(pelvis.head)
+                pelvis.head = mid
+                pelvis.tail = pelvis_head
+            if 'hip' in rig.data.edit_bones:
+                hip = rig.data.edit_bones['hip']
+                hip_tail = np.array(hip.tail)
+                hip.head = hip_tail
+                hip.tail = mid
+                if pelvis is not None:
+                    pelvis_children = list(pelvis.children)
+                    for c in pelvis_children:
+                        c.parent = hip
+            if 'spine1' in rig.data.edit_bones and pelvis is not None:
+                rig.data.edit_bones['spine1'].parent = pelvis
+            for daz_name, ue5_name in DAZ_G9_TO_UE5_BONES.items():
+                if daz_name in rig.data.edit_bones:
+                    bone = rig.data.edit_bones[daz_name]
+                    bone.name = bone.name + "_tmp_suffix"
+            for daz_name, ue5_name in DAZ_G9_TO_UE5_BONES.items():
+                daz_name = daz_name + "_tmp_suffix"
+                if daz_name in rig.data.edit_bones:
+                    bone = rig.data.edit_bones[daz_name]
+                    bone.name = ue5_name
+            return mid
+
+        mid_pelvis_loc = convert_rig(body_rig)
+        body_rig.name = 'root'
+        body_mesh.name = 'root Mesh'
+        for other_rig in bpy.data.objects:
+            if isinstance(other_rig.data, bpy.types.Armature):
+                convert_rig(other_rig, mid=mid_pelvis_loc)
 
     def add_ue5_ik_bones(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
         rig = self.get_body_rig()
-        bpy.ops.object.select_all(action='DESELECT')
-        rig.select_set(True)
-        bpy.context.view_layer.objects.active = rig
+        select_object(rig)
         bpy.ops.object.mode_set(mode='EDIT')
         for ik_bone_name, fk_bone_name in UE5_IK_BONES.items():
             ik_bone = rig.data.edit_bones.new(ik_bone_name)
@@ -1341,10 +1346,10 @@ class DazOptimizer:
                 rig.data.edit_bones[ik_bone_name].parent = rig.data.edit_bones[parent_ik_bone_name]
 
     def scale_to_ue5_units(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
         s = bpy.context.scene.unit_settings.scale_length
         bpy.context.scene.unit_settings.scale_length = 0.01
         rig = self.get_body_rig()
+        select_object(rig)
         z = s/0.01
         rig.scale = (z,z,z)
         stack = [rig]
@@ -1361,14 +1366,10 @@ class DazOptimizer:
                     stack.append(child)
 
     def export_to_fbx(self):
-        bpy.ops.object.mode_set(mode='OBJECT')
-
         body = self.get_body_mesh()
         rig = self.get_body_rig()
-        bpy.ops.object.select_all(action='DESELECT')
-        rig.select_set(True)
+        select_object(rig)
         body.select_set(True)
-        bpy.context.view_layer.objects.active = rig
 
         if "Subsurf" in body.modifiers:
             body.modifiers.remove(body.modifiers["Subsurf"])
@@ -1608,6 +1609,19 @@ class DazSaveTextures_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class DazMergeAllRigs_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.merge_all_rigs"
+    bl_label = "Merge all rigs (except hair)"
+    bl_options = {"REGISTER", "UNDO"}
+    idx = 3
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().merge_all_rigs()
+        return {'FINISHED'}
+
 class DazSelectGoldenPalaceColor_operator(bpy.types.Operator):
     bl_idname = "dazoptim.select_gp_color"
     bl_label = "Select golden palace base color for baking"
@@ -1622,9 +1636,9 @@ class DazSelectGoldenPalaceColor_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class DazUnselectGoldenPalace_operator(bpy.types.Operator):
-    bl_idname = "dazoptim.unselect_gp_baking"
-    bl_label = "Unselect golden palace base for baking"
+class DazGoldenPalaceBsdf_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.gp_baking_principled"
+    bl_label = " golden palace use principle bsdf for baking"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -1632,7 +1646,20 @@ class DazUnselectGoldenPalace_operator(bpy.types.Operator):
         return UNLOCK # context.mode == "OBJECT"
 
     def execute(self, context):
-        DazOptimizer().unselect_golden_palace_for_baking()
+        DazOptimizer().select_golden_palace_for_bsdf_mode_baking(True)
+        return {'FINISHED'}
+
+class DazGoldenPalaceDiffuse_operator(bpy.types.Operator):
+    bl_idname = "dazoptim.gp_baking_diffuse"
+    bl_label = " golden palace use diffuse node for baking"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().select_golden_palace_for_bsdf_mode_baking(False)
         return {'FINISHED'}
 
 class DazSelectGoldenPalaceNormals_operator(bpy.types.Operator):
@@ -2067,6 +2094,7 @@ operators = [
     (DazLoad_operator, "Load Daz"),
     (DazSaveBlend_operator, "Save blend file"),
     (DazSaveTextures_operator, "Save textures"),
+    (DazMergeAllRigs_operator, "Merge all rigs"),
     (DazSimplifyMaterials_operator, "Simplify materials"),
     (DazOptimizeEyes_operator, "Optimize eyes mesh"),
     (DazSimplifyEyesMaterial_operator, "Simplify eyes material"),
@@ -2076,7 +2104,8 @@ operators = [
     (DazSelectGoldenPalaceColor_operator, "select golden palace color for baking"),
     (DazSelectGoldenPalaceNormals_operator, "select golden palace normals for baking"),
     (DazSelectGoldenPalaceRoughness_operator, "select golden palace roughness for baking"),
-    (DazUnselectGoldenPalace_operator, "unselect golden palace for baking"),
+    (DazGoldenPalaceBsdf_operator, "use principled bsdf"),
+    (DazGoldenPalaceDiffuse_operator, "use diffuse bsdf"),
     (DazSaveGoldenPalaceBaked_operator, "Save baked golden palace textures"),
     (DazMergeGrografts_operator, "Merge Geografts"),
     (DazSimplifyGoldenPalaceMaterials_operator, "Simplify golden palace materials"),

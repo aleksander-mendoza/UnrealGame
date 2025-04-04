@@ -133,6 +133,7 @@ BODY_TRANS = [0.0, 0.170266]
 LIP_TRANS = [1 / 4 + 1 / 16, -1 / 32]
 LEFT_LEG_COLOR = (64 * 256 + 24) * 256 + 126
 RIGHT_LEG_COLOR = (42 * 256 + 126) * 256 + 24
+BUTT_COLOR = (255 * 256 + 24) * 256 + 255
 BOT_ARM_COLOR = (62 * 256 + 21) * 256 + 211
 LIP_COLOR = (21 * 256 + 109) * 256 + 211
 TOP_ARM_COLOR = (255 * 256 + 0) * 256 + 0
@@ -311,7 +312,14 @@ DAZ_G9_TO_UE5_BONES = {
     'neck2': 'neck_02',
     'head': 'head',
 }
-
+BUTT_EXTRA_BONES = {
+    'l_butt_01': ((0.0750763937830925, -0.07929152250289917, 0.004994665738195181), (0.07388557493686676, -0.06475628912448883, 0.07164420187473297)),
+    'l_butt_02': ((0.0, 0.0, 0.0), (0.00088588084327057, 0.034035515040159225, 0.001118007581681013)),
+    'l_butt_03': ((0.0, 0.0, 0.0), (-0.0003263086546212435, 0.022132765501737595, 0.0002884981222450733)),
+    'r_butt_01': ((-0.07502999901771545, -0.07925647497177124, 0.004993385635316372), (-0.07388557493686676, -0.06475628912448883, 0.07164420187473297)),
+    'r_butt_02': ((0.0, 0.0, 0.0), (-0.0008686043438501656, 0.03403671085834503, 0.001094963401556015)),
+    'r_butt_03': ((0.0, 0.0, 0.0), (0.0003263087710365653, 0.022132769227027893, 0.00028849835507571697))
+}
 def select_bone(bone):
     bone.select = True
     bone.select_head = True
@@ -326,6 +334,7 @@ def find_body_rig():
 
 def select_object(obj):
     if bpy.context.view_layer.objects.active is not None:
+        bpy.ops.object.mode_set(mode='OBJECT')
         bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
@@ -466,19 +475,19 @@ class DazOptimizer:
                     o.hide_set(False)
                     # o.data.hide_set(False)
                     o.select_set(True)
-                meshes.append((o.data, o.parent))
+                meshes.extend(o.children)
         bpy.ops.daz.merge_rigs()
         for o in bpy.data.objects:
             o.hide_viewport = False
             o.hide_render = False
             o.hide_set(False)
-        for mesh, parent in meshes:
+        for mesh in meshes:
             for mod in mesh.modifiers:
                 if isinstance(mod, bpy.types.ArmatureModifier):
                     if mod.object is None:
                         mod.object = body_rig
             if mesh.parent is None:
-                mesh.parent = parent
+                mesh.parent = body_rig
 
     def simplify_eyes_material(self):
         from PIL import Image
@@ -786,7 +795,7 @@ class DazOptimizer:
             packed += shift_img(arms_tile, 0, s, s, s2, arms_region_mask == TOP_ARM_COLOR, TOP_ARM_TRANS)
             packed += shift_img(legs_tile, 0, s, 0, s, legs_region_mask == LEFT_LEG_COLOR, [0, 0])
             packed += shift_img(legs_tile, 0, s, 0, s, legs_region_mask == RIGHT_LEG_COLOR, [RIGHT_LEG_TRANS, 0], True)
-            packed += shift_img(body_tile, s, s2, s, s2, body_region_mask == BODY_COLOR, BODY_TRANS)
+            packed += shift_img(body_tile, s, s2, s, s2, np.logical_or(body_region_mask == BODY_COLOR, body_region_mask == BUTT_COLOR), BODY_TRANS)
             packed += shift_img(head_tile, s, s2, 0, s, head_region_mask == LIP_COLOR, LIP_TRANS)
             # packed += shift_img(head, s, s2, s, s2, head_region_mask == HEAD_COLOR, [0.008526, 0.019377])
             packed[s:, :s] = head_tile
@@ -956,7 +965,7 @@ class DazOptimizer:
         base_layer_np[pixel_class == TOP_ARM_COLOR] += TOP_ARM_TRANS
         base_layer_np[pixel_class == RIGHT_LEG_COLOR, 1] = 1.5 - base_layer_np[pixel_class == RIGHT_LEG_COLOR, 1]
         base_layer_np[pixel_class == RIGHT_LEG_COLOR, 0] += RIGHT_LEG_TRANS
-        base_layer_np[pixel_class == BODY_COLOR] += BODY_TRANS
+        base_layer_np[np.logical_or(pixel_class == BODY_COLOR, pixel_class == BUTT_COLOR)] += BODY_TRANS
         base_layer_np[is_nails] = np.mod(nails_np,1) / 8 + [s, 0]
         base_layer_np[is_eyes_sclera] = np.mod(sclera_np, 1) / 8 + [s + s4 * 1, s4 - s8]
         base_layer_np[is_eyes_iris] = np.mod(iris_np, 1) / 8 + [s + s4 * 2, s4]
@@ -1561,7 +1570,7 @@ class DazLoad_operator(bpy.types.Operator):
                                     useTransferFace=True,
                                     useTransferHair=False,
                                     useTransferGeografts=True,
-                                    useTransferClothes=True,
+                                    useTransferClothes=False,
                                     useTransferHD=True,
                                     useMergeGeografts=False,
                                     useMakePosable=True,

@@ -84,10 +84,13 @@ def get_uv_mask(filename):
     uv_region_mask = (uv_region_mask[:, :, 0] * 256 + uv_region_mask[:, :, 1]) * 256 + uv_region_mask[:, :, 2]
     return uv_region_mask
 
-def main(filename, colors, display):
-    if display:
-        from matplotlib import pyplot as plt
+def disp(rle, shape):
+    from matplotlib import pyplot as plt
+    m = rle_decode(rle, shape)
+    plt.imshow(m)
+    plt.show()
 
+def main(filename, colors, display):
     img = get_uv_mask(filename)
     for name, color, region in colors:
         if region is None:
@@ -102,24 +105,23 @@ def main(filename, colors, display):
         else:
             bools = tile==color
         rle:np.ndarray = rlencode(bools)
-        print(name, "=", rle.tolist())
+        print(name, "= np.array(", rle.tolist(),", dtype=np.uint32)")
         if display:
-            m = rle_decode(rle, tile.shape)
-            plt.imshow(m)
-            plt.show()
-
+            disp(rle, tile.shape)
 
 
 def body_main(display=True):
+    a = 1024*4
+    b = 1024*8
     main("uv_region_mask.png",[
-        ('HEAD_RLE', (HEAD_COLOR, LIP_COLOR), (0,4048,4048,8192)),
-        ('BODY_RLE', (BODY_COLOR, BUTT_COLOR), (4048,8192,4048,8192)),
-        ('LEFT_LEG_RLE', LEFT_LEG_COLOR, (0,4048,0,4048)),
-        ('RIGHT_LEG_RLE', RIGHT_LEG_COLOR, (0,4048,0,4048)),
-        ('BUTT_RLE', BUTT_COLOR, (4048,8192,4048,8192)),
-        ('BOT_ARM_RLE', BOT_ARM_COLOR, (4048,8192,0,4048)),
-        ('LIP_RLE', LIP_COLOR,  (0,4048,4048,8192)),
-        ('TOP_ARM_RLE', TOP_ARM_COLOR, (4048,8192,0,4048)),
+        ('HEAD_RLE', (HEAD_COLOR, LIP_COLOR), (0,a,a,b)),
+        ('BODY_RLE', (BODY_COLOR, BUTT_COLOR), (a,b,a,b)),
+        ('LEFT_LEG_RLE', LEFT_LEG_COLOR, (0,a,0,a)),
+        ('RIGHT_LEG_RLE', RIGHT_LEG_COLOR, (0,a,0,a)),
+        ('BUTT_RLE', BUTT_COLOR, (a,b,a,b)),
+        ('BOT_ARM_RLE', BOT_ARM_COLOR, (a,b,0,a)),
+        ('LIP_RLE', LIP_COLOR,  (0,a,a,b)),
+        ('TOP_ARM_RLE', TOP_ARM_COLOR, (a,b,0,a)),
     ],display)
 
 def body_eyelashes(display=True):
@@ -129,5 +131,5 @@ def body_eyelashes(display=True):
 
 
 if __name__ == '__main__':
-
-    body_eyelashes()
+    # disp(, (4048,4048))
+    body_main(display=False)

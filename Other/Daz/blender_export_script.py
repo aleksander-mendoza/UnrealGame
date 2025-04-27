@@ -965,6 +965,21 @@ class DazOptimizer:
         l.new(bsdf.inputs['Base Color'], target_texture.outputs['Color'])
         l.new(bsdf.inputs['Alpha'], target_texture.outputs['Alpha'])
 
+        m = obj.modifiers.new(name='FitEyebrows', type="SHRINKWRAP")
+        m.target = BODY
+        m.offset = 0.003
+        m.wrap_mode = 'ON_SURFACE'
+
+        ma = obj.modifiers.new(name='Armature', type="ARMATURE")
+        ma.object = RIG
+
+        select_object(obj)
+        bpy.ops.object.modifier_apply(modifier=m.name)
+
+        for g in ['head', 'centerbrow', 'r_browouter', 'l_browouter', 'r_browinner', 'l_browinner']:
+            transfer_weights_to_object(BODY, obj, g)
+
+
     def optimize_eyelashes(self):
         EYELASHES_M = self.get_eyelashes_mesh()
         select_object(EYELASHES_M)
@@ -1273,16 +1288,17 @@ class DazOptimizer:
         if 'GoldenPalace_G9 Mesh' in bpy.data.objects:
             GOLD_PAL_M = bpy.data.objects['GoldenPalace_G9 Mesh']
             for mat in GOLD_PAL_M.data.materials:
+                print("mat=", mat)
                 output_node = NodesUtils.find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
+                bsdf, = NodesUtils.from_socket_backwards_search_for(output_node.inputs['Surface'], bpy.types.ShaderNodeBsdfPrincipled, set())
                 tail = output_node.inputs['Surface'].links[0].from_node
-                while isinstance(tail, bpy.types.ShaderNodeGroup) and tail.node_tree.name.startswith('GoldenPalaceG9_Shell_'):
+                while isinstance(tail, bpy.types.ShaderNodeGroup) and 'BSDF' in output_node.inputs:
                     output_node = tail
                     tail = output_node.inputs['BSDF'].links[0].from_node
-                out_socket = output_node.inputs['BSDF']
-                NodesUtils.delete_all_before(mat.node_tree, out_socket.links[0].from_node)
+                print("output_node=", output_node)
+                out_socket = bsdf.outputs['BSDF'].links[0].to_socket
+                NodesUtils.delete_all_before(mat.node_tree, bsdf)
                 NodesUtils.gen_simple_material(mat.node_tree, body_part_filepaths, out_socket, shift_x=output_node.location[0]-300,uvs='Default UVs')
-
-
 
 
     def concat_textures(self):
@@ -1983,6 +1999,29 @@ class DazOptimizer:
         l_thigh_jiggle.tail = l_thigh_jiggle.head
         l_thigh_jiggle.tail.y += d
 
+        body_mesh = self.get_body_mesh()
+        select_object(body_mesh)
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        r_thigh = body_mesh.vertex_groups['r_thightwist1']
+        l_thigh = body_mesh.vertex_groups['l_thightwist1']
+        r_thigh_jiggle = body_mesh.vertex_groups.new(name='r_thigh_jiggle')
+        l_thigh_jiggle = body_mesh.vertex_groups.new(name='l_thigh_jiggle')
+        r_thigh_idx = r_thigh.index
+        l_thigh_idx = l_thigh.index
+        epsilon = 0.001
+        diff = 0.2
+        for idx, vert in enumerate(body_mesh.data.vertices):
+            for g in vert.groups:
+                if g.group == r_thigh_idx:
+                    w = g.weight
+                    if w > diff+epsilon:
+                        r_thigh_jiggle.add(index=(idx,), weight=w-diff, type='REPLACE')
+                elif g.group == l_thigh_idx:
+                    w = g.weight
+                    if w > diff + epsilon:
+                        l_thigh_jiggle.add(index=(idx,), weight=w - diff, type='REPLACE')
+
     def add_glute_bones(self):
         body_mesh = self.get_body_mesh()
         body_rig = self.get_body_rig()
@@ -2065,27 +2104,26 @@ class DazOptimizer:
     def transfer_missing_bones_to_clothes(self):
         BODY_M = self.get_body_mesh()
         groups = []
+        def add_subdivided(name):
+            i = 1
+            while True:
+                group = 'l_'+name + str(i)
+                if group in BODY_M.vertex_groups:
+                    groups.append(group)
+                    groups.append('r_'+name + str(i))
+                    i += 1
+                else:
+                    break
+
         if 'l_glute' in BODY_M.vertex_groups:
             groups.append('l_glute')
             groups.append('r_glute')
-        i = 1
-        while True:
-            group = 'l_glute'+str(i)
-            if group in BODY_M.vertex_groups:
-                groups.append(group)
-                groups.append('r_glute'+str(i))
-                i += 1
-            else:
-                break
-        i = 1
-        while True:
-            group = 'l_pectoral'+str(i)
-            if group in BODY_M.vertex_groups:
-                groups.append(group)
-                groups.append('r_pectoral'+str(i))
-                i += 1
-            else:
-                break
+            add_subdivided('glute')
+        if 'l_thigh_jiggle' in BODY_M.vertex_groups:
+            groups.append('l_thigh_jiggle')
+            groups.append('r_thigh_jiggle')
+            add_subdivided('thigh_jiggle')
+        add_subdivided('pectoral')
         clothes = find_all_clothes()
         transfer_weights(BODY_M, clothes, groups)
 

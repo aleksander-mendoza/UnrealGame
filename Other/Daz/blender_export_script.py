@@ -600,14 +600,6 @@ DAZ_G9_TO_UE5_BONES = {
     'neck2': 'neck_02',
     'head': 'head',
 }
-BUTT_EXTRA_BONES = {
-    'l_butt_01': ((0.0750763937830925, -0.07929152250289917, 0.004994665738195181), (0.07388557493686676, -0.06475628912448883, 0.07164420187473297)),
-    'l_butt_02': ((0.0, 0.0, 0.0), (0.00088588084327057, 0.034035515040159225, 0.001118007581681013)),
-    'l_butt_03': ((0.0, 0.0, 0.0), (-0.0003263086546212435, 0.022132765501737595, 0.0002884981222450733)),
-    'r_butt_01': ((-0.07502999901771545, -0.07925647497177124, 0.004993385635316372), (-0.07388557493686676, -0.06475628912448883, 0.07164420187473297)),
-    'r_butt_02': ((0.0, 0.0, 0.0), (-0.0008686043438501656, 0.03403671085834503, 0.001094963401556015)),
-    'r_butt_03': ((0.0, 0.0, 0.0), (0.0003263087710365653, 0.022132769227027893, 0.00028849835507571697))
-}
 def select_bone(bone):
     bone.select = True
     bone.select_head = True
@@ -1428,33 +1420,6 @@ class DazOptimizer:
         pixel_coords = (pixel_coords * MASK_SHAPE[0]).clip(0, MASK_SHAPE[0] - 1)
         pixel_coords = np.int32(pixel_coords)
         uv_mask = rle_decode(RIGHT_LEG_RLE, MASK_SHAPE)
-        # bpy.ops.object.mode_set(mode='EDIT')
-        # me = bpy.context.object.data
-        # bm = bmesh.from_edit_mesh(me)
-        # uv_layer = bm.loops.layers.uv.verify()
-        # for face in bm.faces:
-        #     full_loop = True
-        #     for loop in face.loops:
-        #         loop_uv = loop[uv_layer]
-        #         uv = np.array(loop_uv.uv)
-        #         uv[1] = 1 - uv[1]
-        #         if 2 < uv[0] < 3:
-        #             uv[0] -= 2
-        #             pixel_coord = (uv * MASK_SHAPE[0]).clip(0, MASK_SHAPE[0] - 1)
-        #             pixel_coord = np.int32(pixel_coord)
-        #             matched = uv_mask[pixel_coord[1], pixel_coord[0]]
-        #             # loop_uv.select = matched
-        #             full_loop = full_loop and matched
-        #         else:
-        #             full_loop = False
-        #             break
-        #         # if matched:
-        #         #    loop.vert.select_set(True)
-        #     face.select_set(full_loop)
-        #
-        # # bm.select_mode = {'VERT', 'EDGE', 'FACE'}
-        # bm.select_flush_mode()
-        # return
 
         is_right_leg = uv_mask[pixel_coords[:, 1], pixel_coords[:, 0]]
         is_right_leg = np.logical_and(is_legs, is_right_leg)
@@ -1576,30 +1541,26 @@ class DazOptimizer:
                 select_object(obj)
                 bpy.ops.object.modifier_apply(modifier='FitSkinTightClothes')
 
-    def subdivide_breast_bones(self, cuts = 2):
-        BODY_M = self.get_body_mesh()
-        BODY_RIG = self.get_body_rig()
-        select_object(BODY_RIG)
+    def subdivide_bone(self, cuts, mesh, rig, bone_name):
+        if cuts < 1:
+            return
+        select_object(rig)
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.armature.select_all(action='DESELECT')
-        for bone_name in ['r_pectoral', 'l_pectoral']:
-            bone = BODY_RIG.data.edit_bones[bone_name]
-            select_bone(bone)
+        bone = rig.data.edit_bones[bone_name]
+        select_bone(bone)
         bpy.ops.armature.subdivide(number_cuts=cuts)
-        l_new_pec_groups = []
-        r_new_pec_groups = []
-        for bone_name, vertex_groups in [('r_pectoral', r_new_pec_groups), ('l_pectoral', l_new_pec_groups)]:
-            for i in range(0, cuts):
-                subbone_name = bone_name + "." + str(i + 1).zfill(3)
-                subbone = BODY_RIG.data.edit_bones[subbone_name]
-                subbone_name = subbone.name = bone_name + str(i + 1)
-                group = BODY_M.vertex_groups.new(name=subbone_name)
-                vertex_groups.append(group)
+        vertex_groups = []
+        for i in range(0, cuts):
+            subbone_name = bone_name + "." + str(i + 1).zfill(3)
+            subbone = rig.data.edit_bones[subbone_name]
+            subbone_name = subbone.name = bone_name + str(i + 1)
+            group = mesh.vertex_groups.new(name=subbone_name)
+            vertex_groups.append(group)
 
 
-        l_old_pec_group = BODY_M.vertex_groups['l_pectoral']
-        r_old_pec_group = BODY_M.vertex_groups['r_pectoral']
-        select_object(BODY_M)
+        old_group = mesh.vertex_groups[bone_name]
+        select_object(mesh)
         bpy.ops.object.mode_set(mode='EDIT')
 
         def contains_group(vertex, group_index):
@@ -1608,20 +1569,24 @@ class DazOptimizer:
                     return g.weight
             return 0
 
-        l_pec_idx = l_old_pec_group.index
-        r_pec_idx = r_old_pec_group.index
-        l_old_pec_weights = np.array([contains_group(v, l_pec_idx) for v in BODY_M.data.vertices])
-        r_old_pec_weights = np.array([contains_group(v, r_pec_idx) for v in BODY_M.data.vertices])
+        group_idx = old_group.index
+        old_weights = np.array([contains_group(v, group_idx) for v in mesh.data.vertices])
         bpy.ops.object.mode_set(mode='OBJECT')
-        for old_pec_weights, new_pec_groups in [(l_old_pec_weights, l_new_pec_groups), (r_old_pec_weights, r_new_pec_groups)]:
-            max_weight = np.max(old_pec_weights)
-            steps = len(new_pec_groups) + 1
-            step = max_weight / steps
-            #pec_weights_normalised = pec_weights/max_weight
-            for i, subpec_group in enumerate(new_pec_groups):
-                subpec_weights = old_pec_weights - step * (i + 1)
-                # subpec_weights = subpec_weights.clip(0, step)
-                apply_vertex_group_weights(subpec_group, subpec_weights)
+        max_weight = np.max(old_weights)
+        steps = len(vertex_groups) + 1
+        step = max_weight / steps
+        #pec_weights_normalised = pec_weights/max_weight
+        for i, subpec_group in enumerate(vertex_groups):
+            subpec_weights = old_weights - step * (i + 1)
+            # subpec_weights = subpec_weights.clip(0, step)
+            apply_vertex_group_weights(subpec_group, subpec_weights)
+
+    def subdivide_breast_bones(self, cuts = 2):
+        BODY_M = self.get_body_mesh()
+        BODY_RIG = self.get_body_rig()
+        self.subdivide_bone(cuts, BODY_M, BODY_RIG,'r_pectoral')
+        self.subdivide_bone(cuts, BODY_M, BODY_RIG,'l_pectoral')
+
 
     def save_textures(self):
         BODY_M = self.get_body_mesh()
@@ -1854,6 +1819,103 @@ class DazOptimizer:
                 l = body_m.data.uv_layers[uv_layer_name]
                 body_m.data.uv_layers.remove(l)
 
+    def add_thigh_bones(self):
+        body_rig = self.get_body_rig()
+        select_object(body_rig)
+        bpy.ops.object.mode_set(mode='EDIT')
+        r_thigh = body_rig.data.edit_bones['r_thigh']
+        l_thigh = body_rig.data.edit_bones['l_thigh']
+        l_thigh_jiggle = body_rig.data.edit_bones.new('l_thigh_jiggle')
+        r_thigh_jiggle = body_rig.data.edit_bones.new('r_thigh_jiggle')
+        l_thigh_jiggle.parent = l_thigh
+        r_thigh_jiggle.parent = r_thigh
+        p = 0.75
+        d = 0.05
+        l_thigh_jiggle.head = np.array(l_thigh.head)*p+np.array(l_thigh.tail)*(1-p)
+        r_thigh_jiggle.head = np.array(r_thigh.head)*p+np.array(r_thigh.tail)*(1-p)
+        r_thigh_jiggle.tail = r_thigh_jiggle.head
+        r_thigh_jiggle.tail.y += d
+        l_thigh_jiggle.tail = l_thigh_jiggle.head
+        l_thigh_jiggle.tail.y += d
+
+    def add_glute_bones(self):
+        body_mesh = self.get_body_mesh()
+        body_rig = self.get_body_rig()
+        select_object(body_rig)
+        bpy.ops.object.mode_set(mode='EDIT')
+        pelvis = body_rig.data.edit_bones['pelvis']
+        r_thigh = body_rig.data.edit_bones['r_thigh']
+        l_thigh = body_rig.data.edit_bones['l_thigh']
+        l_glute = body_rig.data.edit_bones.new('l_glute')
+        r_glute = body_rig.data.edit_bones.new('r_glute')
+        l_glute.parent = pelvis
+        r_glute.parent = pelvis
+        l_glute.head = l_thigh.head
+        r_glute.head = r_thigh.head
+        l_glute.tail = l_thigh.head
+        r_glute.tail = r_thigh.head
+        dy = 0.05
+        dz = -0.01
+        r_glute.tail.y += dy
+        l_glute.tail.y += dy
+        r_glute.tail.z += dz
+        l_glute.tail.z += dz
+
+        # pack UVs
+        select_object(body_mesh)
+
+        bpy.ops.object.mode_set(mode='EDIT')
+
+        bpy.context.scene.tool_settings.use_uv_select_sync = False
+        me = body_mesh.data
+        bm = bmesh.from_edit_mesh(me)
+        uv_layer = bm.loops.layers.uv.verify()
+        uv_mask = rle_decode(BUTT_RLE, MASK_SHAPE)
+        vertex_mask = np.zeros((len(me.vertices), 2), dtype=np.float32)
+        for face in bm.faces:
+            for loop in face.loops:
+                loop_uv = loop[uv_layer]
+                uv = np.array(loop_uv.uv)
+                if 1 < uv[0] < 2:
+                    uv[0] -= 1
+                    uv2 = np.array([uv[0], 1-uv[1]])
+                    pixel_coord = (uv2 * MASK_SHAPE[0]).clip(0, MASK_SHAPE[0] - 1)
+                    pixel_coord = np.int32(pixel_coord)
+                    matched = uv_mask[pixel_coord[1], pixel_coord[0]]
+                    if matched:
+                        vertex_mask[loop.vert.index] = uv
+                    else:
+                        vertex_mask[loop.vert.index] = -uv
+        bpy.ops.object.mode_set(mode='OBJECT')
+        l_glute_group = body_mesh.vertex_groups.new(name="l_glute")
+        r_glute_group = body_mesh.vertex_groups.new(name="r_glute")
+
+        is_left = vertex_mask[:, 0] > 0.5
+        is_cheek = vertex_mask[:, 1] > 0
+        is_left_cheek = np.logical_and(is_left, is_cheek)
+        is_right_cheek = np.logical_and(np.logical_not(is_left), is_cheek)
+        r_cheek = vertex_mask[is_right_cheek]
+        l_cheek = vertex_mask[is_left_cheek]
+        r_center = (0.12788, 0.27)
+        l_center = (0.87212, 0.27)
+        r_cheek = np.linalg.norm(r_cheek - r_center, axis=1)
+        l_cheek = np.linalg.norm(l_cheek - l_center, axis=1)
+        max_radius = 0.13
+        r_cheek = 1 - r_cheek/max_radius
+        l_cheek = 1 - l_cheek/max_radius
+        l_cheek_indices, = np.where(is_left_cheek)
+        r_cheek_indices, = np.where(is_right_cheek)
+        for val, idx in zip(l_cheek.tolist(), l_cheek_indices.tolist()):
+            l_glute_group.add(index=(idx,), weight=val, type='REPLACE')
+        for val, idx in zip(r_cheek.tolist(), r_cheek_indices.tolist()):
+            r_glute_group.add(index=(idx,), weight=val, type='REPLACE')
+
+
+
+
+
+
+
     def convert_daz_to_ue5_skeleton(self):
         body_rig = self.get_body_rig()
         body_mesh = self.get_body_mesh()
@@ -1991,6 +2053,8 @@ class DazOptimizer:
                                  use_metadata=True,
                                  axis_forward='-Z',
                                  axis_up='Y')
+
+
 
 
 def save_blend_file(duf_filepath):
@@ -2533,7 +2597,7 @@ class DazAddGluteBones_operator(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-
+        DazOptimizer().add_glute_bones()
         return {'FINISHED'}
 
 
@@ -2548,7 +2612,7 @@ class DazAddThighBones_operator(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-
+        DazOptimizer().add_thigh_bones()
         return {'FINISHED'}
 
 
@@ -2803,6 +2867,9 @@ operators = [
     (SaveFemaleMorphs, "Save female fav morphs"),
     (LoadMorphs, "Load fav morphs"),
     (TransferMorphsToGeografts, "Transfer morphs to geografts"),
+    (DazAddBreastBones_operator, "Subdivide breast bones"),
+    (DazAddGluteBones_operator, "Add glute bones"),
+    (DazAddThighBones_operator, "Add thigh bones"),
     (DazSimplifyMaterials_operator, "Simplify materials"),
     (DazOptimizeEyes_operator, "Optimize eyes mesh"),
     (DazOptimizeEyelashes_operator, "Optimize eyelashes"),
@@ -2826,9 +2893,6 @@ operators = [
     (DazOptimizeUVsHalfGP_operator, "Optimize UVs (half GP)"),
     (DazSeparateLipUVs_operator, "Separate Lip UVs"),
     (DazMakeSingleMaterial_operator, "Unify skin materials into one"),
-    (DazAddBreastBones_operator, "Subdivide breast bones"),
-    (DazAddGluteBones_operator, "Add glute bones"),
-    (DazAddThighBones_operator, "Add thigh bones"),
     (DazFitSkinTightClothes_operator, "Fit skin-tight clothes"),
     (DazApplyFitSkinTightClothes_operator, "Apply skin-tight clothes"),
     (DazOptimizeHair_operator, "Optimize hair"),

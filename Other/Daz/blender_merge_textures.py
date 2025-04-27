@@ -131,5 +131,5 @@ def body_eyelashes(display=True):
 
 
 if __name__ == '__main__':
-    # disp(, (4048,4048))
+    # disp(, (4096, 4096))
     body_main(display=False)

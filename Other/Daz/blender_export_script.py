@@ -427,6 +427,7 @@ CLOTHES = {
     "Romance Panties":ClothesMeta('4110-7999-3890', True),
     "Romance Thigh Straps":ClothesMeta('7852-15680-7840', True),
 }
+
 NEW_GP_UV_MAP = 'unified_gp_uv'
 NEW_EYES_UV_MAP = 'optimised_eyes_uvs'
 UE5_BONE_HIERARCHY = {'pelvis': '', 'spine_01': 'pelvis', 'spine_02': 'spine_01', 'spine_03': 'spine_02',
@@ -549,7 +550,9 @@ DAZ_G9_TO_UE5_BONES = {
     'r_shin': 'calf_r',
     'l_shin': 'calf_l',
     'l_thigh': 'thigh_l',
+    'l_thightwist1': 'thigh_twist_01_l',
     'r_thigh': 'thigh_r',
+    'r_thightwist1': 'thigh_twist_01_r',
     'hip': 'pelvis',
     'pelvis': 'spine_01',
     'spine1': 'spine_02',
@@ -562,8 +565,12 @@ DAZ_G9_TO_UE5_BONES = {
     'r_shoulder': 'clavicle_r',
     'l_upperarm': 'upperarm_l',
     'r_upperarm': 'upperarm_r',
+    'r_upperarmtwist1': 'upperarm_twist_01_r',
+    'l_upperarmtwist1': 'upperarm_twist_01_l',
     'l_forearm': 'lowerarm_l',
     'r_forearm': 'lowerarm_r',
+    'r_forearmtwist1':'lowerarm_twist_02_r',
+    'l_forearmtwist1':'lowerarm_twist_02_l',
     'l_hand': 'hand_l',
     'r_hand': 'hand_r',
     'l_thumb1': 'thumb_01_l',
@@ -600,6 +607,142 @@ DAZ_G9_TO_UE5_BONES = {
     'neck2': 'neck_02',
     'head': 'head',
 }
+
+
+def find_all_clothes():
+    clothes = []
+    for obj in bpy.data.objects:
+        if obj.name.endswith(" Mesh"):
+            name = obj.name[:-len(" Mesh")]
+            meta: ClothesMeta = CLOTHES.get(name)
+            if meta is not None:
+                clothes.append(obj)
+    return clothes
+
+def remove_unnecessary_shape_keys(objs=None, tolerance=0.001):
+    if objs is None:
+        objs = bpy.context.selected_objects
+    if isinstance(objs, str):
+        objs = bpy.data.objects[objs]
+    if isinstance(objs, bpy.types.Object):
+        objs = [objs]
+
+    assert bpy.context.mode == 'OBJECT', "Must be in object mode!"
+
+    for ob in objs:
+        if ob.type != 'MESH': continue
+        if not ob.data.shape_keys: continue
+        if not ob.data.shape_keys.use_relative: continue
+
+        kbs = ob.data.shape_keys.key_blocks
+        nverts = len(ob.data.vertices)
+        to_delete = []
+
+        # Cache locs for rel keys since many keys have the same rel key
+        cache = {}
+
+        locs = np.empty(3 * nverts, dtype=np.float32)
+
+        for kb in kbs:
+            if kb == kb.relative_key: continue
+
+            kb.data.foreach_get("co", locs)
+
+            if kb.relative_key.name not in cache:
+                rel_locs = np.empty(3 * nverts, dtype=np.float32)
+                kb.relative_key.data.foreach_get("co", rel_locs)
+                cache[kb.relative_key.name] = rel_locs
+            rel_locs = cache[kb.relative_key.name]
+
+            locs -= rel_locs
+            if (np.abs(locs) < tolerance).all():
+                to_delete.append(kb.name)
+
+        for kb_name in to_delete:
+            ob.shape_key_remove(ob.data.shape_keys.key_blocks[kb_name])
+
+
+def transfer_weights_to_object(src_obj, dst_obj, vg_name=None, interp='POLYINTERP_NEAREST'):
+    if vg_name is not None:
+        if vg_name not in src_obj.vertex_groups:
+            raise Exception(vg_name + " does not exist in " + src_obj)
+
+    i = len(dst_obj.modifiers)
+    m = dst_obj.modifiers.new('DataTransfer', 'DATA_TRANSFER')
+    dst_obj.modifiers.move(i, 0)
+    m.object = src_obj
+    m.use_vert_data = True
+    m.data_types_verts = {'VGROUP_WEIGHTS'}
+    m.vert_mapping = interp
+    if vg_name is None:
+        for vg in dst_obj.vertex_groups:
+            dst_obj.vertex_groups.remove(vg)
+        for vg in src_obj.vertex_groups:
+            dst_obj.vertex_groups.new(name=vg.name)
+    else:
+        if vg_name in dst_obj.vertex_groups:
+            dst_obj.vertex_groups.remove(dst_obj.vertex_groups[vg_name])
+        dst_obj.vertex_groups.new(name=vg_name)
+        print("Transferring ", "all weights" if vg_name is None else vg_name, " for ", dst_obj)
+        m.layers_vgroup_select_src = vg_name
+    with bpy.context.temp_override(object=dst_obj):
+        bpy.ops.object.modifier_apply(modifier=m.name)
+
+
+def clean_up_unnecessary_groups(o):
+    used_groups = [False] * len(o.vertex_groups)
+    for v in o.data.vertices:
+        for vg in v.groups:
+            if vg.weight > 0.001:
+                used_groups[vg.group] = True
+    print(o.name, 'retained:')
+    groups_to_remove = []
+    for vgi, is_used in enumerate(used_groups):
+        vg = o.vertex_groups[vgi]
+        if is_used:
+            print('    ', vg.name)
+        else:
+            groups_to_remove.append(vg)
+    print(o.name, 'removed:')
+    for vg in groups_to_remove:
+        print('    ', vg.name)
+        o.vertex_groups.remove(vg)
+
+
+def clean_up_unnecessary_groups_for_all_objs(objs=None):
+    if objs is None:
+        objs = bpy.context.selected_objects
+    if isinstance(objs, str):
+        objs = bpy.data.objects[objs]
+    if isinstance(objs, bpy.types.Object):
+        objs = [objs]
+    for o in objs:
+        clean_up_unnecessary_groups(o)
+
+
+def transfer_weights(src_obj, dst_objs, vg_names=None, interp='POLYINTERP_NEAREST'):
+    if isinstance(dst_objs, str):
+        dst_objs = bpy.data.objects[dst_objs]
+    if isinstance(dst_objs, bpy.types.Object):
+        dst_objs = [dst_objs]
+    if vg_names is not None:
+        if isinstance(vg_names, str):
+            vg_names = [vg_names]
+    for o in dst_objs:
+        if isinstance(o, str):
+            o = bpy.data.objects[o]
+        if vg_names is None:
+            transfer_weights_to_object(src_obj, o, interp=interp)
+        else:
+            for vg_name in vg_names:
+                if vg_name.endswith("."):
+                    transfer_weights_to_object(src_obj, o, vg_name + "L", interp=interp)
+                    transfer_weights_to_object(src_obj, o, vg_name + "R", interp=interp)
+                else:
+                    transfer_weights_to_object(src_obj, o, vg_name, interp=interp)
+        clean_up_unnecessary_groups(o)
+
+
 def select_bone(bone):
     bone.select = True
     bone.select_head = True
@@ -633,6 +776,45 @@ def apply_vertex_group_weights(group:bpy.types.VertexGroup, weights:np.array, ep
     for val, idx in zip(values.tolist(), indices.tolist()):
         group.add(index=(idx,), weight=val, type=type)
 
+def subdivide_bone(cuts, mesh, rig, bone_name):
+    if cuts < 1:
+        return
+    select_object(rig)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.armature.select_all(action='DESELECT')
+    bone = rig.data.edit_bones[bone_name]
+    select_bone(bone)
+    bpy.ops.armature.subdivide(number_cuts=cuts)
+    vertex_groups = []
+    for i in range(0, cuts):
+        subbone_name = bone_name + "." + str(i + 1).zfill(3)
+        subbone = rig.data.edit_bones[subbone_name]
+        subbone_name = subbone.name = bone_name + str(i + 1)
+        group = mesh.vertex_groups.new(name=subbone_name)
+        vertex_groups.append(group)
+
+
+    old_group = mesh.vertex_groups[bone_name]
+    select_object(mesh)
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    def contains_group(vertex, group_index):
+        for g in vertex.groups:
+            if g.group == group_index:
+                return g.weight
+        return 0
+
+    group_idx = old_group.index
+    old_weights = np.array([contains_group(v, group_idx) for v in mesh.data.vertices])
+    bpy.ops.object.mode_set(mode='OBJECT')
+    max_weight = np.max(old_weights)
+    steps = len(vertex_groups) + 1
+    step = max_weight / steps
+    #pec_weights_normalised = pec_weights/max_weight
+    for i, subpec_group in enumerate(vertex_groups):
+        subpec_weights = old_weights - step * (i + 1)
+        # subpec_weights = subpec_weights.clip(0, step)
+        apply_vertex_group_weights(subpec_group, subpec_weights)
 
 class DazOptimizer:
 
@@ -1518,6 +1700,7 @@ class DazOptimizer:
         # *= 0.25# nails
         # -= 0.5 # nails
 
+
     def fit_skin_tight_clothes(self):
         BODY_M = self.get_body_mesh()
         m_name = 'FitSkinTightClothes'
@@ -1541,51 +1724,13 @@ class DazOptimizer:
                 select_object(obj)
                 bpy.ops.object.modifier_apply(modifier='FitSkinTightClothes')
 
-    def subdivide_bone(self, cuts, mesh, rig, bone_name):
-        if cuts < 1:
-            return
-        select_object(rig)
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.armature.select_all(action='DESELECT')
-        bone = rig.data.edit_bones[bone_name]
-        select_bone(bone)
-        bpy.ops.armature.subdivide(number_cuts=cuts)
-        vertex_groups = []
-        for i in range(0, cuts):
-            subbone_name = bone_name + "." + str(i + 1).zfill(3)
-            subbone = rig.data.edit_bones[subbone_name]
-            subbone_name = subbone.name = bone_name + str(i + 1)
-            group = mesh.vertex_groups.new(name=subbone_name)
-            vertex_groups.append(group)
 
-
-        old_group = mesh.vertex_groups[bone_name]
-        select_object(mesh)
-        bpy.ops.object.mode_set(mode='EDIT')
-
-        def contains_group(vertex, group_index):
-            for g in vertex.groups:
-                if g.group == group_index:
-                    return g.weight
-            return 0
-
-        group_idx = old_group.index
-        old_weights = np.array([contains_group(v, group_idx) for v in mesh.data.vertices])
-        bpy.ops.object.mode_set(mode='OBJECT')
-        max_weight = np.max(old_weights)
-        steps = len(vertex_groups) + 1
-        step = max_weight / steps
-        #pec_weights_normalised = pec_weights/max_weight
-        for i, subpec_group in enumerate(vertex_groups):
-            subpec_weights = old_weights - step * (i + 1)
-            # subpec_weights = subpec_weights.clip(0, step)
-            apply_vertex_group_weights(subpec_group, subpec_weights)
 
     def subdivide_breast_bones(self, cuts = 2):
         BODY_M = self.get_body_mesh()
         BODY_RIG = self.get_body_rig()
-        self.subdivide_bone(cuts, BODY_M, BODY_RIG,'r_pectoral')
-        self.subdivide_bone(cuts, BODY_M, BODY_RIG,'l_pectoral')
+        subdivide_bone(cuts, BODY_M, BODY_RIG,'r_pectoral')
+        subdivide_bone(cuts, BODY_M, BODY_RIG,'l_pectoral')
 
 
     def save_textures(self):
@@ -1861,7 +2006,6 @@ class DazOptimizer:
         r_glute.tail.z += dz
         l_glute.tail.z += dz
 
-        # pack UVs
         select_object(body_mesh)
 
         bpy.ops.object.mode_set(mode='EDIT')
@@ -1911,10 +2055,39 @@ class DazOptimizer:
             r_glute_group.add(index=(idx,), weight=val, type='REPLACE')
 
 
+    def subdivide_glute_bones(self, cuts=2):
+        BODY_M = self.get_body_mesh()
+        BODY_RIG = self.get_body_rig()
+        subdivide_bone(cuts, BODY_M, BODY_RIG, 'l_glute')
+        subdivide_bone(cuts, BODY_M, BODY_RIG, 'r_glute')
 
 
-
-
+    def transfer_missing_bones_to_clothes(self):
+        BODY_M = self.get_body_mesh()
+        groups = []
+        if 'l_glute' in BODY_M.vertex_groups:
+            groups.append('l_glute')
+            groups.append('r_glute')
+        i = 1
+        while True:
+            group = 'l_glute'+str(i)
+            if group in BODY_M.vertex_groups:
+                groups.append(group)
+                groups.append('r_glute'+str(i))
+                i += 1
+            else:
+                break
+        i = 1
+        while True:
+            group = 'l_pectoral'+str(i)
+            if group in BODY_M.vertex_groups:
+                groups.append(group)
+                groups.append('r_pectoral'+str(i))
+                i += 1
+            else:
+                break
+        clothes = find_all_clothes()
+        transfer_weights(BODY_M, clothes, groups)
 
     def convert_daz_to_ue5_skeleton(self):
         body_rig = self.get_body_rig()
@@ -2630,6 +2803,21 @@ class DazFitSkinTightClothes_operator(bpy.types.Operator):
         DazOptimizer().fit_skin_tight_clothes()
         return {'FINISHED'}
 
+class DazTransferMissingBonesToClothes_operator(bpy.types.Operator):
+    """ transfer new bones to clothes """
+    bl_idname = "dazoptim.transfer_new_bones_to_clothes"
+    bl_label = "transfer new bones to clothes"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().transfer_missing_bones_to_clothes()
+        return {'FINISHED'}
+
+
 class DazApplyFitSkinTightClothes_operator(bpy.types.Operator):
     """ fit skin tight clothes """
     bl_idname = "dazoptim.apply_fit_skin_tight_clothes"
@@ -2894,6 +3082,7 @@ operators = [
     (DazSeparateLipUVs_operator, "Separate Lip UVs"),
     (DazMakeSingleMaterial_operator, "Unify skin materials into one"),
     (DazFitSkinTightClothes_operator, "Fit skin-tight clothes"),
+    (DazTransferMissingBonesToClothes_operator, "Transfer new bones to clothes"),
     (DazApplyFitSkinTightClothes_operator, "Apply skin-tight clothes"),
     (DazOptimizeHair_operator, "Optimize hair"),
     (DazConvertToUe5Skeleton_operator, "Convert to UE5 Skeleton"),

@@ -10,6 +10,7 @@ import numpy as np
 import bpy
 import bmesh
 import json
+from collections import namedtuple
 
 
 def rle_decode(rle: [int], shape)->np.ndarray:
@@ -419,6 +420,13 @@ MORPHS = {
         }
     }
 }
+ClothesMeta = namedtuple('ClothesMeta', ['fingerprint', 'is_skin_tight'])
+CLOTHES = {
+    "Romance Bra":ClothesMeta('13332-26195-12864', True),
+    "Romance Choker":ClothesMeta('823-1590-768', True),
+    "Romance Panties":ClothesMeta('4110-7999-3890', True),
+    "Romance Thigh Straps":ClothesMeta('7852-15680-7840', True),
+}
 NEW_GP_UV_MAP = 'unified_gp_uv'
 NEW_EYES_UV_MAP = 'optimised_eyes_uvs'
 UE5_BONE_HIERARCHY = {'pelvis': '', 'spine_01': 'pelvis', 'spine_02': 'spine_01', 'spine_03': 'spine_02',
@@ -624,6 +632,15 @@ def select_object(obj):
     bpy.context.object.hide_render = False
     if bpy.context.object.mode != 'OBJECT':
         bpy.ops.object.mode_set(mode='OBJECT')
+
+
+def apply_vertex_group_weights(group:bpy.types.VertexGroup, weights:np.array, epsilon:float = 0.001, type='REPLACE'):
+    mask = weights>epsilon
+    values = weights[mask]
+    indices, = np.where(mask)
+    for val, idx in zip(values.tolist(), indices.tolist()):
+        group.add(index=(idx,), weight=val, type=type)
+
 
 class DazOptimizer:
 
@@ -1232,7 +1249,18 @@ class DazOptimizer:
             if g in bpy.data.objects:
                 self.merge_two_rigs(BODY_RIG, bpy.data.objects[g])
 
+    def transfer_morphs_to_geografts(self):
+        BODY_M = self.get_body_mesh()
+        BODY_RIG = self.get_body_rig()
+        select_object(BODY_M)
+        # merge meshes
+        #selection = [shape for shapes in MORPHS['__base__']['shapes'].values() for shape in shapes]
 
+        for g in GEOGRAFTS:
+            if g + ' Mesh' in bpy.data.objects:
+                g_m = bpy.data.objects[g + ' Mesh']
+                g_m.select_set(True)
+        bpy.ops.daz.transfer_shapekeys('INVOKE_DEFAULT') #, selection=selection)
 
     def merge_two_rigs(self, original, addon):
         select_object(original)
@@ -1525,33 +1553,53 @@ class DazOptimizer:
         # *= 0.25# nails
         # -= 0.5 # nails
 
-    def subdivide_breast_bones(self):
+    def fit_skin_tight_clothes(self):
+        BODY_M = self.get_body_mesh()
+        m_name = 'FitSkinTightClothes'
+        for obj in bpy.data.objects:
+            if obj.name.endswith(" Mesh"):
+                name = obj.name[:-len(" Mesh")]
+                meta:ClothesMeta = CLOTHES.get(name)
+                if meta is not None and meta.is_skin_tight and m_name not in obj.modifiers:
+                    # m_len = len(obj.modifiers)
+                    m = obj.modifiers.new(name=m_name, type="SHRINKWRAP")
+                    m.target = BODY_M
+                    m.offset = 0.003
+                    m.wrap_mode = 'OUTSIDE'
+                    # select_object(obj)
+                    # for _ in range(m_len):
+                    #     bpy.ops.object.modifier_move_up(modifier=m.name)
 
+    def apply_fit_skin_tight_clothes(self):
+        for obj in bpy.data.objects:
+            if 'FitSkinTightClothes' in obj.modifiers:
+                select_object(obj)
+                bpy.ops.object.modifier_apply(modifier='FitSkinTightClothes')
+
+    def subdivide_breast_bones(self, cuts = 2):
+        BODY_M = self.get_body_mesh()
         BODY_RIG = self.get_body_rig()
-        bpy.ops.object.select_all(action='DESELECT')
-        BODY_RIG.select_set(True)
-        bpy.context.view_layer.objects.active = BODY_RIG
+        select_object(BODY_RIG)
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.armature.select_all(action='DESELECT')
-        cuts = 2
         for bone_name in ['r_pectoral', 'l_pectoral']:
             bone = BODY_RIG.data.edit_bones[bone_name]
             select_bone(bone)
         bpy.ops.armature.subdivide(number_cuts=cuts)
-        l_pec_groups = []
-        r_pec_groups = []
-        pectorals = [('r_pectoral', r_pec_groups), ('l_pectoral', l_pec_groups)]
-        for bone_name, vertex_groups in pectorals:
+        l_new_pec_groups = []
+        r_new_pec_groups = []
+        for bone_name, vertex_groups in [('r_pectoral', r_new_pec_groups), ('l_pectoral', l_new_pec_groups)]:
             for i in range(0, cuts):
                 subbone_name = bone_name + "." + str(i + 1).zfill(3)
                 subbone = BODY_RIG.data.edit_bones[subbone_name]
                 subbone_name = subbone.name = bone_name + str(i + 1)
-                group = bpy.context.object.vertex_groups.new(name=subbone_name)
-                vertex_groups.append(group.index)
-        BODY_M = self.get_body_mesh()
-        bpy.ops.object.select_all(action='DESELECT')
-        BODY_M.select_set(True)
-        bpy.context.view_layer.objects.active = BODY_M
+                group = BODY_M.vertex_groups.new(name=subbone_name)
+                vertex_groups.append(group)
+
+
+        l_old_pec_group = BODY_M.vertex_groups['l_pectoral']
+        r_old_pec_group = BODY_M.vertex_groups['r_pectoral']
+        select_object(BODY_M)
         bpy.ops.object.mode_set(mode='EDIT')
 
         def contains_group(vertex, group_index):
@@ -1560,14 +1608,20 @@ class DazOptimizer:
                     return g.weight
             return 0
 
-        l_pec_idx = BODY_M.vertex_groups['l_pectoral'].index
-        r_pec_idx = BODY_M.vertex_groups['r_pectoral'].index
-        l_pec_weights = np.array([contains_group(v, l_pec_idx) for v in BODY_M.data.vertices])
-        r_pec_weights = np.array([contains_group(v, r_pec_idx) for v in BODY_M.data.vertices])
-        for pec_weights, pec_groups in [(l_pec_weights, l_pec_groups), (r_pec_weights, r_pec_groups)]:
-            max_weight = np.max(pec_weights)
-            for i, subpec_group in enumerate(l_pec_groups):
-                subpec_weights = pec_weights - (i + 1) / (cuts + 1)
+        l_pec_idx = l_old_pec_group.index
+        r_pec_idx = r_old_pec_group.index
+        l_old_pec_weights = np.array([contains_group(v, l_pec_idx) for v in BODY_M.data.vertices])
+        r_old_pec_weights = np.array([contains_group(v, r_pec_idx) for v in BODY_M.data.vertices])
+        bpy.ops.object.mode_set(mode='OBJECT')
+        for old_pec_weights, new_pec_groups in [(l_old_pec_weights, l_new_pec_groups), (r_old_pec_weights, r_new_pec_groups)]:
+            max_weight = np.max(old_pec_weights)
+            steps = len(new_pec_groups) + 1
+            step = max_weight / steps
+            #pec_weights_normalised = pec_weights/max_weight
+            for i, subpec_group in enumerate(new_pec_groups):
+                subpec_weights = old_pec_weights - step * (i + 1)
+                # subpec_weights = subpec_weights.clip(0, step)
+                apply_vertex_group_weights(subpec_group, subpec_weights)
 
     def save_textures(self):
         BODY_M = self.get_body_mesh()
@@ -2498,10 +2552,10 @@ class DazAddThighBones_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class DazFitClothes_operator(bpy.types.Operator):
-    """ fit clothes """
-    bl_idname = "dazoptim.fit_clothes"
-    bl_label = "Fit clothes"
+class DazFitSkinTightClothes_operator(bpy.types.Operator):
+    """ fit skin tight clothes """
+    bl_idname = "dazoptim.fit_skin_tight_clothes"
+    bl_label = "Fit skin tight clothes"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -2509,9 +2563,22 @@ class DazFitClothes_operator(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-
+        DazOptimizer().fit_skin_tight_clothes()
         return {'FINISHED'}
 
+class DazApplyFitSkinTightClothes_operator(bpy.types.Operator):
+    """ fit skin tight clothes """
+    bl_idname = "dazoptim.apply_fit_skin_tight_clothes"
+    bl_label = "Apply fit skin tight clothes"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().apply_fit_skin_tight_clothes()
+        return {'FINISHED'}
 
 class DazOptimizeHair_operator(bpy.types.Operator):
     """ Optimize hair """
@@ -2664,6 +2731,21 @@ class LoadMorphs(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class TransferMorphsToGeografts(bpy.types.Operator):
+    """ load morphs """
+    bl_idname = "dazoptim.transfer_morphs_to_geografts"
+    bl_label = "Transfer morphs to geografts"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().transfer_morphs_to_geografts()
+
+        return {'FINISHED'}
+
 class RemoveShapeKeyDrivers(bpy.types.Operator):
     """ export fbx """
     bl_idname = "dazoptim.remove_shape_key_drivers"
@@ -2720,6 +2802,7 @@ operators = [
     (SaveMaleMorphs, "Save male fav morphs"),
     (SaveFemaleMorphs, "Save female fav morphs"),
     (LoadMorphs, "Load fav morphs"),
+    (TransferMorphsToGeografts, "Transfer morphs to geografts"),
     (DazSimplifyMaterials_operator, "Simplify materials"),
     (DazOptimizeEyes_operator, "Optimize eyes mesh"),
     (DazOptimizeEyelashes_operator, "Optimize eyelashes"),
@@ -2746,7 +2829,8 @@ operators = [
     (DazAddBreastBones_operator, "Subdivide breast bones"),
     (DazAddGluteBones_operator, "Add glute bones"),
     (DazAddThighBones_operator, "Add thigh bones"),
-    (DazFitClothes_operator, "Fit Clothes"),
+    (DazFitSkinTightClothes_operator, "Fit skin-tight clothes"),
+    (DazApplyFitSkinTightClothes_operator, "Apply skin-tight clothes"),
     (DazOptimizeHair_operator, "Optimize hair"),
     (DazConvertToUe5Skeleton_operator, "Convert to UE5 Skeleton"),
     (AddUe5IkBones, "Add UE5 IK bones"),

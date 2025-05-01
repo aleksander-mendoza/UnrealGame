@@ -176,7 +176,7 @@ def install_libraries():
         py_exe = sys.executable
         res_path = os.path.realpath(os.path.join(py_exe, "../../lib/site-packages"))
         print("Run the following command as an admin: ")
-        print('&"' + py_exe + '" -m pip install pillow opencv-python "--target=' + res_path + '"')
+        print('&"' + py_exe + '" -m pip install Pillow opencv-python "--target=' + res_path + '"')
 
 
 install_libraries()
@@ -854,7 +854,9 @@ class DazOptimizer:
 
     def get_uv_mask(self):
         from PIL import Image
-        uv_region_mask = np.array(Image.open(self.us_mask_path()), dtype=np.uint32)
+        p = self.us_mask_path()
+        print("Reading UV mask ", p)
+        uv_region_mask = np.array(Image.open(p), dtype=np.uint32)
         uv_region_mask = (uv_region_mask[:, :, 0] * 256 + uv_region_mask[:, :, 1]) * 256 + uv_region_mask[:, :, 2]
         return uv_region_mask
 
@@ -982,9 +984,12 @@ class DazOptimizer:
         ma = obj.modifiers.new(name='Armature', type="ARMATURE")
         ma.object = RIG
 
+    def apply_optimized_eyebrows(self):
+        obj = bpy.data.objects['Eyebrows Mesh']
         select_object(obj)
-        bpy.ops.object.modifier_apply(modifier=m.name)
-
+        bpy.ops.object.modifier_apply(modifier='FitEyebrows')
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        BODY = self.get_body_mesh()
         for g in ['head', 'centerbrow', 'r_browouter', 'l_browouter', 'r_browinner', 'l_browinner']:
             transfer_weights_to_object(BODY, obj, g)
 
@@ -1038,9 +1043,21 @@ class DazOptimizer:
     def merge_eyebrows_and_eyelashes(self):
         eyelashes = self.get_eyelashes_mesh()
         eyebrows = bpy.data.objects['Eyebrows Mesh']
+        eyelashes.data.uv_layers.active.name = 'Eyelashes UVs'
+        eyebrows.data.uv_layers.active.name = 'Eyebrows UVs'
         select_object(eyelashes)
         eyebrows.select_set(True)
         bpy.ops.object.join()
+
+        eyelashes_uvs = eyelashes.data.uv_layers['Eyelashes UVs']
+        eyebrows_uvs = eyelashes.data.uv_layers['Eyebrows UVs']
+        eyebrows_uvs_np = np.array([v.uv for v in eyebrows_uvs.data])
+        is_eyebrows = np.all(eyebrows_uvs_np > 0, axis=1)
+        eyelashes_np = np.array([v.uv for v in eyelashes_uvs.data])
+        eyelashes_np[is_eyebrows] = eyebrows_uvs_np[is_eyebrows]
+        for v, new_uv in zip(eyelashes_uvs.data, eyelashes_np):
+            v.uv = new_uv
+        eyelashes.data.uv_layers.remove(eyebrows_uvs)
 
     def optimize_eyes(self):
 
@@ -1266,19 +1283,23 @@ class DazOptimizer:
                                                                                         bpy.types.ShaderNodeTexImage,
                                                                                         set()):
                                 body_part_filepaths[channel].add(img_node.image)
+                                print(body_part, channel, img_node.image)
                     elif bsdf.node_tree.name == 'DAZ Dual Lobe PBR':
                         for img_node in NodesUtils.from_socket_backwards_search_for(bsdf.inputs['Roughness 1'],
                                                                                     bpy.types.ShaderNodeTexImage,
                                                                                     set()):
                             body_part_filepaths['Roughness'].add(img_node.image)
+                            print(body_part,"Roughness",img_node.image)
                         for img_node in NodesUtils.from_socket_backwards_search_for(bsdf.inputs['Roughness 2'],
                                                                                     bpy.types.ShaderNodeTexImage,
                                                                                     set()):
                             body_part_filepaths['Roughness'].add(img_node.image)
+                            print(body_part, "Roughness", img_node.image)
                         for img_node in NodesUtils.from_socket_backwards_search_for(bsdf.inputs['Normal'],
                                                                                     bpy.types.ShaderNodeTexImage,
                                                                                     set()):
                             body_part_filepaths['Normal'].add(img_node.image)
+                            print(body_part, "Normal", img_node.image)
         for body_part_name, body_part_filepaths in all_filepaths.items():
             occurrences = {}
             filenames = []
@@ -1373,9 +1394,12 @@ class DazOptimizer:
                 fp = fp[0]
             if isinstance(fp, bpy.types.Image):
                 fp = bpy.path.abspath(fp.filepath)
+            if not isinstance(fp, str) or len(fp)==0:
+                raise Exception(str(fp)+" is not string")
+            print("Reading ", fp, end='', flush=True)
             tile = Image.open(fp)
             tile = np.array(tile)
-            print("Reading ",fp," of size ", tile.shape," and type ", tile.dtype)
+            print(" of size ", tile.shape," and type ", tile.dtype)
             if map_type == "Roughness" and tile.ndim>2 and tile.shape[2]>1:
                 tile = np.average(tile, axis=2)
                 tile = tile.astype(np.uint8)
@@ -1522,7 +1546,7 @@ class DazOptimizer:
         bpy.ops.object.mode_set(mode='OBJECT')
 
     def make_fav_morphs_list(self, is_female):
-        settingsDir = bpy.context.preferences.addons['bl_ext.user_default.import_daz'].preferences['settingsDir']
+        settingsDir = bpy.context.preferences.addons['bl_ext.user_default.import_daz'].preferences.settingsDir
         settings = os.path.join(settingsDir, 'import_daz_settings.json')
         settings = io.open(settings, 'r', encoding='utf-8-sig')
         settings = json.load(settings)
@@ -1557,9 +1581,9 @@ class DazOptimizer:
             morphs_path = morphs['path']
             mesh = morphs['mesh']
             custom_shapes_list = []
-            mesh_url = urllib.parse.quote(mesh.DazUrl)
+            mesh_url = urllib.parse.quote(mesh.daz_importer.DazUrl)
             fav_morphs[mesh_url] = {
-                "finger_print": mesh.data.DazFingerPrint,
+                "finger_print": mesh.data.daz_importer.DazFingerPrint,
                 "morphs": {
                     "Custom/Shapes": custom_shapes_list
                 }
@@ -2013,6 +2037,7 @@ class DazOptimizer:
             name = 'GP_Baked_' + channel
             if name in bpy.data.images:
                 bpy.data.images[name].save(filepath=gp_baked_path)
+                bpy.data.images[name].filepath = gp_baked_path
 
 
     def make_single_material(self):
@@ -2260,12 +2285,13 @@ class DazOptimizer:
                     visited.add(child)
                     stack.append(child)
 
-    def export_to_fbx(self):
+    def export_to_fbx(self, with_eyelashes=True):
         body = self.get_body_mesh()
         rig = self.get_body_rig()
         select_object(rig)
         body.select_set(True)
-
+        if with_eyelashes and 'Genesis 9 Eyelashes Mesh' in bpy.data.objects:
+            bpy.data.objects['Genesis 9 Eyelashes Mesh'].select_set(True)
         if "Subsurf" in body.modifiers:
             body.modifiers.remove(body.modifiers["Subsurf"])
 
@@ -2651,6 +2677,21 @@ class DazOptimizeEyelashes_operator(bpy.types.Operator):
 
     def execute(self, context):
         DazOptimizer().optimize_eyelashes()
+
+        return {'FINISHED'}
+
+class DazApplyEyebrows_operator(bpy.types.Operator):
+    """ Apply eyebrows """
+    bl_idname = "dazoptim.apply_eyebrows"
+    bl_label = "Apply eyebrows"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().apply_optimized_eyebrows()
 
         return {'FINISHED'}
 
@@ -3193,6 +3234,7 @@ operators = [
     (DazOptimizeEyes_operator, "Optimize eyes mesh"),
     (DazOptimizeEyelashes_operator, "Optimize eyelashes"),
     (DazOptimizeEyebrows_operator, "Optimize eyebrows"),
+    (DazApplyEyebrows_operator, "Apply eyebrows"),
     (DazTransferFACSToEyebrow_operator, "Transfer FACS to Eyebrows"),
     (DazSimplifyEyesMaterial_operator, "Simplify eyes material"),
     (DazSeparateIrisUVs_operator, "Separate iris UVs"),

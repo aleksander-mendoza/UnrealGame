@@ -972,7 +972,7 @@ class DazOptimizer:
         bsdf = n['Principled BSDF']
         #l.new(bsdf.inputs['Base Color'], target_texture.outputs['Color'])
         bsdf.inputs['Base Color'].default_value = (0.0, 0.0, 0.0, 1.0)
-        l.new(bsdf.inputs['Alpha'], target_texture.outputs['Base Color'])
+        l.new(bsdf.inputs['Alpha'], target_texture.outputs['Color'])
 
         m = obj.modifiers.new(name='FitEyebrows', type="SHRINKWRAP")
         m.target = BODY
@@ -1012,7 +1012,12 @@ class DazOptimizer:
                 loop_uv = loop[uv_layer]
                 u, v = loop_uv.uv
                 up, vp = int(u*MASK_SHAPE[0]), int((1-v)*MASK_SHAPE[0])
-                if not mask[vp, up]:
+                if mask[vp, up]:
+                    u, v = u-0.5, v-0.5 # change center of rotation
+                    u, v = v, -u # rotate 90 degrees clockwise
+                    u, v = u + 0.5 + 0.25, v + 0.5 # undo center of rotation and move .25 to the right
+                    loop_uv.uv = u,v
+                else:
                     loop.vert.select = True
         for v in bm.verts:
             if v.select:
@@ -1020,6 +1025,15 @@ class DazOptimizer:
         # bm.select_flush(True)
         bmesh.update_edit_mesh(me)
         bpy.ops.object.mode_set(mode='OBJECT')
+
+        eyelashes_img = bpy.data.images.load('//eyebrows_and_eyelashes.png')
+        for mat in EYELASHES_M.data.materials:
+            bsdf = NodesUtils.find_by_type(mat.node_tree, bpy.types.ShaderNodeBsdfPrincipled)
+            texture_nodes = set()
+            for channel in ["Base Color", "Alpha"]:
+                NodesUtils.from_socket_backwards_search_for(bsdf.inputs[channel], bpy.types.ShaderNodeTexImage, texture_nodes)
+            texture_node, = texture_nodes
+            texture_node.image = eyelashes_img
 
     def optimize_eyes(self):
 

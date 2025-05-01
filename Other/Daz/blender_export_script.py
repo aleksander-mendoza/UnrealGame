@@ -2457,10 +2457,10 @@ class DazLoad_operator(bpy.types.Operator):
                                     useFixTiles=True,
                                     useSubDDisplacement=True,
                                     useGeoNodes=False,
-                                    morphStrength=1,
+                                    #morphStrength=1,
                                     skinColor=(0.6, 0.4, 0.25, 1),
                                     clothesColor=(0.09, 0.01, 0.015, 1),
-                                    useApplyRestPoses=True,
+                                    #useApplyRestPoses=True,
                                     favoPath="")
         context.scene['daz_optim_stage'] = DazLoad_operator.idx
         return {'FINISHED'}

@@ -1035,6 +1035,13 @@ class DazOptimizer:
             texture_node, = texture_nodes
             texture_node.image = eyelashes_img
 
+    def merge_eyebrows_and_eyelashes(self):
+        eyelashes = self.get_eyelashes_mesh()
+        eyebrows = bpy.data.objects['Eyebrows Mesh']
+        select_object(eyelashes)
+        eyebrows.select_set(True)
+        bpy.ops.object.join()
+
     def optimize_eyes(self):
 
         EYES_M = self.get_eyes_mesh()
@@ -2308,7 +2315,6 @@ class DazOptimizer:
 
 
 
-
 def save_blend_file(duf_filepath):
     duf_filepath = os.path.abspath(duf_filepath)
     workdir = os.path.dirname(duf_filepath)
@@ -2756,6 +2762,21 @@ class DazMergeMouth_operator(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class DazMergeEyebrowsAndEyelashes_operator(bpy.types.Operator):
+    """ Merge eyebrows and eyelashes """
+    bl_idname = "dazoptim.merge_eyebrows_and_eyelashes"
+    bl_label = "Merge eyebrows and eyelashes"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().merge_eyebrows_and_eyelashes()
+
+        return {'FINISHED'}
+
 class DazRemoveTear_operator(bpy.types.Operator):
     """ Merge Eyes """
     bl_idname = "dazoptim.remove_tear"
@@ -3188,6 +3209,7 @@ operators = [
     (DazMergeEyes_operator, "Merge eyes"),
     (DazMergeMouth_operator, "Merge mouth"),
     (DazRemoveTear_operator, "Remove tear"),
+    (DazMergeEyebrowsAndEyelashes_operator, "Merge eyebrows+eyelashes"),
     (DazConcatTextures_operator, "Merge textures"),
     (DazOptimizeUVs_operator, "Optimize UVs"),
     (DazOptimizeUVsHalfGP_operator, "Optimize UVs (half GP)"),

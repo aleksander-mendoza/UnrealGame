@@ -952,8 +952,8 @@ class DazOptimizer:
         bm.faces.ensure_lookup_table()
         uv_layer = bm.loops.layers.uv.verify()
         for bm_face, uv_face in zip(bm.faces, uvs):
-            for bm_loop, uv_loop in zip(bm_face.loops, uv_face):
-                bm_loop[uv_layer].uv = uv_loop
+            for bm_loop, (u,v) in zip(bm_face.loops, uv_face):
+                bm_loop[uv_layer].uv = (u/2,v)
         bm.to_mesh(mesh)
         #bmesh.update_edit_mesh(mesh)
         # bpy.ops.object.mode_set(mode='OBJECT')
@@ -965,13 +965,14 @@ class DazOptimizer:
         n = mat.node_tree.nodes
         l = mat.node_tree.links
         target_texture = n.new('ShaderNodeTexImage')
-        img = bpy.data.images.load('//eyebrows.png')
+        img = bpy.data.images.load('//eyebrows_and_eyelashes.png')
         target_texture.image = img
         target_texture.name = 'Eyebrows Texture'
         target_texture.location = (0, -300)
         bsdf = n['Principled BSDF']
-        l.new(bsdf.inputs['Base Color'], target_texture.outputs['Color'])
-        l.new(bsdf.inputs['Alpha'], target_texture.outputs['Alpha'])
+        #l.new(bsdf.inputs['Base Color'], target_texture.outputs['Color'])
+        bsdf.inputs['Base Color'].default_value = (0.0, 0.0, 0.0, 1.0)
+        l.new(bsdf.inputs['Alpha'], target_texture.outputs['Base Color'])
 
         m = obj.modifiers.new(name='FitEyebrows', type="SHRINKWRAP")
         m.target = BODY
@@ -1461,6 +1462,15 @@ class DazOptimizer:
                 g_m = bpy.data.objects[g + ' Mesh']
                 g_m.select_set(True)
         bpy.ops.daz.transfer_shapekeys('INVOKE_DEFAULT') #, selection=selection)
+
+
+    def transfer_morphs_to_eyebrows(self):
+        if 'Eyebrows Mesh' in bpy.data.objects:
+            BODY_M = self.get_body_mesh()
+            select_object(BODY_M)
+            g_m = bpy.data.objects['Eyebrows Mesh']
+            g_m.select_set(True)
+            bpy.ops.daz.transfer_shapekeys('INVOKE_DEFAULT')
 
     def merge_two_rigs(self, original, addon):
         select_object(original)
@@ -2640,6 +2650,21 @@ class DazOptimizeEyebrows_operator(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class DazTransferFACSToEyebrow_operator(bpy.types.Operator):
+    """ Optimize eyes """
+    bl_idname = "dazoptim.transfer_facs_to_eyebrows"
+    bl_label = "Transfer FACS to eyebrows"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().transfer_morphs_to_eyebrows()
+
+        return {'FINISHED'}
+
 class DazSimplifyEyesMaterial_operator(bpy.types.Operator):
     """ Simplify eyes material """
     bl_idname = "dazoptim.simpl_eyes_mat"
@@ -3133,6 +3158,7 @@ operators = [
     (DazOptimizeEyes_operator, "Optimize eyes mesh"),
     (DazOptimizeEyelashes_operator, "Optimize eyelashes"),
     (DazOptimizeEyebrows_operator, "Optimize eyebrows"),
+    (DazTransferFACSToEyebrow_operator, "Transfer FACS to Eyebrows"),
     (DazSimplifyEyesMaterial_operator, "Simplify eyes material"),
     (DazSeparateIrisUVs_operator, "Separate iris UVs"),
     (DazOptimizeGoldenPalaceUVs, "Optimize golden palace UVs"),

@@ -1063,6 +1063,31 @@ class DazOptimizer:
             bpy.ops.object.material_slot_remove()
         eyelashes.data.materials[0].name = 'Facial hair'
 
+    def merge_eyelashes_and_body(self):
+        eyelashes = self.get_eyelashes_mesh()
+        # eyelashes_mats = [m.name for m in eyelashes.material_slots]
+        body = self.get_body_mesh()
+        eyelashes_uv_layer = eyelashes.data.uv_layers.active.name
+        body_uv_layer = body.data.uv_layers.active.name
+        select_object(body)
+        eyelashes.select_set(True)
+        bpy.ops.object.join()
+
+
+        eyelashes_uvs = body.data.uv_layers[eyelashes_uv_layer]
+        body_uvs = body.data.uv_layers[body_uv_layer]
+        eyelashes_uvs_np = np.array([v.uv for v in eyelashes_uvs.data])
+        is_eyelashes = np.any(eyelashes_uvs_np > 0, axis=1)
+        body_np = np.array([v.uv for v in body_uvs.data])
+        body_np[is_eyelashes] = eyelashes_uvs_np[is_eyelashes]
+        for v, new_uv in zip(body_uvs.data, body_np):
+            v.uv = new_uv
+        body.data.uv_layers.remove(eyelashes_uvs)
+        # for mat in eyelashes_mats:
+        #     mat = eyelashes.material_slots[mat]
+        #     eyelashes.active_material_index = mat.slot_index
+        #     bpy.ops.object.material_slot_remove()
+
     def optimize_eyes(self):
 
         EYES_M = self.get_eyes_mesh()
@@ -2839,6 +2864,20 @@ class DazRemoveTear_operator(bpy.types.Operator):
             bpy.data.objects.remove(bpy.data.objects['Genesis 9 Tear'])
         return {'FINISHED'}
 
+class DazMergeEyelashesAndBody_operator(bpy.types.Operator):
+    """ Merge eyelashes and body """
+    bl_idname = "dazoptim.merge_eyelashes_and_body"
+    bl_label = "Merge eyelashes and body"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().merge_eyelashes_and_body()
+
+        return {'FINISHED'}
 
 class DazConcatTextures_operator(bpy.types.Operator):
     """ Concatenate textures into one """
@@ -3256,6 +3295,7 @@ operators = [
     (DazMergeMouth_operator, "Merge mouth"),
     (DazRemoveTear_operator, "Remove tear"),
     (DazMergeEyebrowsAndEyelashes_operator, "Merge eyebrows+eyelashes"),
+    (DazMergeEyelashesAndBody_operator, "Merge eyelashes+body"),
     (DazConcatTextures_operator, "Merge textures"),
     (DazOptimizeUVs_operator, "Optimize UVs"),
     (DazOptimizeUVsHalfGP_operator, "Optimize UVs (half GP)"),

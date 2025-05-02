@@ -1052,12 +1052,16 @@ class DazOptimizer:
         eyelashes_uvs = eyelashes.data.uv_layers['Eyelashes UVs']
         eyebrows_uvs = eyelashes.data.uv_layers['Eyebrows UVs']
         eyebrows_uvs_np = np.array([v.uv for v in eyebrows_uvs.data])
-        is_eyebrows = np.all(eyebrows_uvs_np > 0, axis=1)
+        is_eyebrows = np.any(eyebrows_uvs_np > 0, axis=1)
         eyelashes_np = np.array([v.uv for v in eyelashes_uvs.data])
         eyelashes_np[is_eyebrows] = eyebrows_uvs_np[is_eyebrows]
         for v, new_uv in zip(eyelashes_uvs.data, eyelashes_np):
             v.uv = new_uv
         eyelashes.data.uv_layers.remove(eyebrows_uvs)
+        for mat in eyelashes.material_slots[1:]:
+            eyelashes.active_material_index = mat.slot_index
+            bpy.ops.object.material_slot_remove()
+        eyelashes.data.materials[0].name = 'Facial hair'
 
     def optimize_eyes(self):
 
@@ -1515,7 +1519,7 @@ class DazOptimizer:
             select_object(BODY_M)
             g_m = bpy.data.objects['Eyebrows Mesh']
             g_m.select_set(True)
-            bpy.ops.daz.transfer_shapekeys('INVOKE_DEFAULT')
+            bpy.ops.daz.transfer_shapekeys('INVOKE_DEFAULT', bodypart='Face')
 
     def merge_two_rigs(self, original, addon):
         select_object(original)

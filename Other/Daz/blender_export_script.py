@@ -112,12 +112,34 @@ class NodesUtils:
         return mat
 
     @staticmethod
-    def remove_all_mats(mesh_object, name=None):
-        mesh_object.data.materials.clear()
+    def remove_all_mats(mesh_object, name=None, excpt=None):
+        bpy.context.view_layer.objects.active = mesh_object
+        new_mat = None
+        mat_names = [m.name for m in mesh_object.material_slots]
+        mat_count = len(mesh_object.material_slots)
         if name is not None:
-            mat = NodesUtils.new_mat(name)
-            mesh_object.data.materials.append(mat)
-            return mat
+            new_mat = NodesUtils.new_mat(name)
+            mesh_object.data.materials.append(new_mat)
+            new_slot = mesh_object.material_slots[name]
+            mesh_object.active_material_index = new_slot.slot_index
+            for _ in range(mat_count):
+                bpy.ops.object.material_slot_move(direction='UP')
+        if excpt is None:
+            excpt = []
+        mat_count = len(mesh_object.material_slots)
+        for mat_name in mat_names:
+            if mat_names in excpt:
+                mat = mesh_object.material_slots[mat_name]
+                mesh_object.active_material_index = mat.slot_index
+                for _ in range(mat_count-mat.slot_index-1):
+                    bpy.ops.object.material_slot_move(direction='DOWN')
+        for mat_name in mat_names:
+            if mat_name not in excpt:
+                mat = mesh_object.material_slots[mat_name]
+                mesh_object.active_material_index = mat.slot_index
+                bpy.ops.object.material_slot_remove()
+
+        return new_mat
 
     @staticmethod
     def gen_simple_material(node_tree, filepaths, output_socket=None, shift_x=0, uvs=None):
@@ -208,7 +230,10 @@ EYELASHES_RLE = np.array([4774846, 16, 47, 16, 3994, 118, 3975, 125, 3969, 132, 
 
 
 BREAST_GEOGRAFTS = ['BreastacularG9', 'Body Geo']
-GEOGRAFTS = ['GoldenPalace_G9'] + BREAST_GEOGRAFTS
+DICK_GEOGRAFTS = ['Genesis 9 Anatomical Elements Male']
+MALE_ONLY_GEOGRAFTS = DICK_GEOGRAFTS
+FEMALE_ONLY_GEOGRAFTS = ['GoldenPalace_G9'] + BREAST_GEOGRAFTS
+GEOGRAFTS = FEMALE_ONLY_GEOGRAFTS + MALE_ONLY_GEOGRAFTS
 
 MORPHS = {
     "Body Geo":{
@@ -354,6 +379,15 @@ MORPHS = {
                 "body_ctrl_BodyFitness",
                 "body_ctrl_BodyMuscular",
             ]
+        }
+    },
+    "Genesis 9 Anatomical Elements Male": {
+        "path": "data/DAZ 3D/Genesis 9/Anatomical Elements Male/Morphs/",
+        "shapes": {
+            "male": {
+                "body_ctrl_PenileLength",
+                "body_ctrl_PenileWidth"
+            }
         }
     },
     "GoldenPalace_G9": {
@@ -756,10 +790,11 @@ def select_bone(bone):
 
 
 def find_body_rig():
-    o = bpy.data.objects[0]
-    while o.parent is not None:
-        o = o.parent
-    return o
+    for o in bpy.data.objects:
+        if o.parent is None and isinstance(o.data, bpy.types.Armature):
+            return o
+    return None
+
 
 def select_object(obj):
     if bpy.context.view_layer.objects.active is not None:
@@ -823,6 +858,17 @@ def subdivide_bone(cuts, mesh, rig, bone_name):
         apply_vertex_group_weights(subpec_group, subpec_weights)
     vertex_groups.append(old_group)
     return vertex_groups
+
+
+def get_eyebrows_and_eyelashes_path():
+    p = bpy.path.abspath('//eyebrows_and_eyelashes.png')
+    if os.path.exists(p):
+        return p
+    else:
+        return bpy.path.abspath('//../eyebrows_and_eyelashes.png')
+
+
+
 
 class DazOptimizer:
 
@@ -899,18 +945,29 @@ class DazOptimizer:
     def get_simplified_eyes_image_path(self, map_type):
         return os.path.join(self.workdir, self.name + '_' + map_type + '_eyes.png')
 
-    def optimize_eyebrows(self):
+    def remove_old_eyebrows(self):
         for o in bpy.data.objects:
             if o.name.startswith('G9 Eyebrows'):
                 bpy.data.objects.remove(o)
-        vertices = np.array([(0.020655272528529167, -0.09718257188796997, 1.6047676801681519), (0.010495096445083618, -0.09829649329185486, 1.6020430326461792), (0.0246686190366745, -0.09323396533727646, 1.596674919128418), (0.013008052483201027, -0.0945364311337471, 1.592618465423584), (0.028579287230968475, -0.0950171947479248, 1.6074594259262085), (0.031095163896679878, -0.09265439212322235, 1.5985383987426758), (0.038159459829330444, -0.09091758728027344, 1.6076418161392212), (0.03818078339099884, -0.09061393141746521, 1.5999815464019775), (0.04382877051830292, -0.08715396374464035, 1.6074812412261963), (0.043936073780059814, -0.08735480159521103, 1.6000001430511475), (0.049159739166498184, -0.08238893747329712, 1.6065608263015747), (0.04852811247110367, -0.08362218737602234, 1.5991878509521484), (0.05282459035515785, -0.07811952382326126, 1.6048678159713745), (0.05235077813267708, -0.07928386330604553, 1.597649335861206), (0.055806536227464676, -0.07358748465776443, 1.6028879880905151), (0.055413272231817245, -0.07450003176927567, 1.5955147743225098), (0.058321163058280945, -0.06856732070446014, 1.600490927696228), (0.05764066427946091, -0.070110023021698, 1.5933258533477783), (0.061125967651605606, -0.06174656003713608, 1.5977210998535156), (0.06067896634340286, -0.06334099173545837, 1.5905429124832153), (0.01933024451136589, -0.09739914536476135, 1.6083275079727173), (0.010570534504950047, -0.09852366894483566, 1.6058554649353027), (-0.0203605554997921, -0.09722965955734253, 1.6048461198806763), (-0.010192444548010826, -0.09832023829221725, 1.60208261013031), (-0.024334117770195007, -0.09329022467136383, 1.5967687368392944), (-0.012660950422286987, -0.09456589818000793, 1.5926674604415894), (-0.028289951384067535, -0.09508249908685684, 1.6075682640075684), (-0.030766494572162628, -0.09272542595863342, 1.5986567735671997), (-0.03786155581474304, -0.09100489318370819, 1.6077872514724731), (-0.037853024899959564, -0.09070125222206116, 1.6001269817352295), (-0.04352172836661339, -0.08725428581237793, 1.607648491859436), (-0.04360099509358406, -0.08745533227920532, 1.6001676321029663), (-0.04883836582303047, -0.08250148594379425, 1.6067484617233276), (-0.04818148538470268, -0.08373325318098068, 1.5993729829788208), (-0.05248706415295601, -0.07824047654867172, 1.6050695180892944), (-0.05198841169476509, -0.07940369844436646, 1.5978491306304932), (-0.055451150983572006, -0.07371526211500168, 1.6031010150909424), (-0.05503189191222191, -0.0746268779039383, 1.5957262516021729), (-0.057945217937231064, -0.0687008649110794, 1.6007134914398193), (-0.057240959256887436, -0.07024197280406952, 1.5935457944869995), (-0.060723926872015, -0.0618865080177784, 1.597954273223877), (-0.06025322154164314, -0.06347988545894623, 1.5907745361328125), (-0.019049562513828278, -0.09744320064783096, 1.608400821685791), (-0.01028292253613472, -0.09854759275913239, 1.6058952808380127)])
+
+    def optimize_eyebrows(self):
+        offset = 1.6009911569682034
+        for o in bpy.data.objects:
+            if o.name.startswith('G9 Eyebrows'):
+                offset = 0
+                sample_points = 10
+                for i in np.random.randint(0, len(o.data.vertices), sample_points):
+                    offset += o.data.vertices[i].co.z
+                offset /= sample_points
+
+        vertices = np.array([[0.020655272528529167, -0.09718257188796997, 0.0037765231999484783], [0.010495096445083618, -0.09829649329185486, 0.001051875677975822], [0.0246686190366745, -0.09323396533727646, -0.004316237839785408], [0.013008052483201027, -0.0945364311337471, -0.008372691544619393], [0.028579287230968475, -0.0950171947479248, 0.006468268958005119], [0.031095163896679878, -0.09265439212322235, -0.002452758225527596], [0.038159459829330444, -0.09091758728027344, 0.006650659171017814], [0.03818078339099884, -0.09061393141746521, -0.0010096105662258381], [0.04382877051830292, -0.08715396374464035, 0.006490084257992912], [0.043936073780059814, -0.08735480159521103, -0.0009910139170559162], [0.049159739166498184, -0.08238893747329712, 0.00556966933337133], [0.04852811247110367, -0.08362218737602234, -0.0018033060160549397], [0.05282459035515785, -0.07811952382326126, 0.0038766590031711345], [0.05235077813267708, -0.07928386330604553, -0.0033418211069973225], [0.055806536227464676, -0.07358748465776443, 0.0018968311223117595], [0.055413272231817245, -0.07450003176927567, -0.0054763826456936116], [0.058321163058280945, -0.06856732070446014, -0.0005002292719753498], [0.05764066427946091, -0.070110023021698, -0.007665303620425057], [0.061125967651605606, -0.06174656003713608, -0.003270057114687752], [0.06067896634340286, -0.06334099173545837, -0.010448244484988045], [0.01933024451136589, -0.09739914536476135, 0.007336351004513908], [0.010570534504950047, -0.09852366894483566, 0.004864307967099357], [-0.0203605554997921, -0.09722965955734253, 0.0038549629124728924], [-0.010192444548010826, -0.09832023829221725, 0.0010914531621066814], [-0.024334117770195007, -0.09329022467136383, -0.004222420128908944], [-0.012660950422286987, -0.09456589818000793, -0.008323696526614022], [-0.028289951384067535, -0.09508249908685684, 0.006577107039364982], [-0.030766494572162628, -0.09272542595863342, -0.00233438340100367], [-0.03786155581474304, -0.09100489318370819, 0.006796094504269767], [-0.037853024899959564, -0.09070125222206116, -0.000864175232973885], [-0.04352172836661339, -0.08725428581237793, 0.006657334891232658], [-0.04360099509358406, -0.08745533227920532, -0.0008235248652370686], [-0.04883836582303047, -0.08250148594379425, 0.0057573047551242595], [-0.04818148538470268, -0.08373325318098068, -0.0016181739893825764], [-0.05248706415295601, -0.07824047654867172, 0.004078361121091056], [-0.05198841169476509, -0.07940369844436646, -0.003142026337710213], [-0.055451150983572006, -0.07371526211500168, 0.0021098581227390056], [-0.05503189191222191, -0.0746268779039383, -0.005264905366030526], [-0.057945217937231064, -0.0687008649110794, -0.00027766552838404124], [-0.057240959256887436, -0.07024197280406952, -0.0074453624812038655], [-0.060723926872015, -0.0618865080177784, -0.003036883744326424], [-0.06025322154164314, -0.06347988545894623, -0.010216620835390877], [-0.019049562513828278, -0.09744320064783096, 0.0074096647175876384], [-0.01028292253613472, -0.09854759275913239, 0.004904123869809318]])
         vertex_normals = np.array([(0.21302460134029388, -0.965381383895874, -0.1505301296710968), (0.17133180797100067, -0.9650542140007019, -0.198281928896904), (0.23409877717494965, -0.9296879172325134, -0.28439071774482727), (0.20445850491523743, -0.9217665791511536, -0.3294588029384613), (0.2950233221054077, -0.9428872466087341, -0.15467630326747894), (0.30824264883995056, -0.9361860156059265, -0.16894443333148956), (0.43910646438598633, -0.8970659375190735, -0.04958169907331467), (0.4363127052783966, -0.8983418941497803, -0.05111850053071976), (0.5882634520530701, -0.8083396553993225, 0.02308816649019718), (0.5938681960105896, -0.8041653037071228, 0.025272265076637268), (0.7094771265983582, -0.703013002872467, 0.04914076626300812), (0.711438000202179, -0.7010304927825928, 0.04911404475569725), (0.8009960651397705, -0.5974375009536743, 0.03838849067687988), (0.8086886405944824, -0.5871158242225647, 0.036299120634794235), (0.8664449453353882, -0.49890807271003723, 0.019074566662311554), (0.8745542168617249, -0.48465055227279663, 0.01639372669160366), (0.9068731665611267, -0.42126020789146423, 0.010997472330927849), (0.9094046354293823, -0.4157572090625763, 0.011365870013833046), (0.9205265045166016, -0.3904625177383423, 0.01304092351347208), (0.9205264449119568, -0.3904625177383423, 0.013040922582149506), (0.1784271001815796, -0.9839159846305847, -0.008548013865947723), (0.1276978999376297, -0.9910843968391418, -0.03801281377673149), (-0.21146777272224426, -0.9655916690826416, -0.15137451887130737), (-0.17016936838626862, -0.9649455547332764, -0.19980597496032715), (-0.23305915296077728, -0.9295825362205505, -0.2855866551399231), (-0.20367898046970367, -0.9216205477714539, -0.3303488492965698), (-0.2939514219760895, -0.9430721998214722, -0.1555873155593872), (-0.30682215094566345, -0.9363527894020081, -0.17059792578220367), (-0.43836885690689087, -0.8973409533500671, -0.05110874027013779), (-0.4348205029964447, -0.8989534974098206, -0.05304456129670143), (-0.5879247784614563, -0.8086429834365845, 0.02100095897912979), (-0.593061625957489, -0.8048291206359863, 0.022978920489549637), (-0.7096368670463562, -0.7030275464057922, 0.046558331698179245), (-0.71131432056427, -0.7013322710990906, 0.046529170125722885), (-0.8014999628067017, -0.5969457626342773, 0.035406265407800674), (-0.8090589642524719, -0.5867817997932434, 0.03332577645778656), (-0.8670861124992371, -0.49790769815444946, 0.015799948945641518), (-0.8751322627067566, -0.4837063252925873, 0.013107089325785637), (-0.9075274467468262, -0.41992461681365967, 0.007562259677797556), (-0.9100339412689209, -0.41445812582969666, 0.007917601615190506), (-0.9211719632148743, -0.3890385329723358, 0.009553579613566399), (-0.9211719036102295, -0.3890385329723358, 0.009553579613566399), (-0.1766616404056549, -0.984230101108551, -0.009047266095876694), (-0.1256365329027176, -0.9913285374641418, -0.03851176053285599)])
         uvs = [[(0.10387720167636871, 0.15240783989429474), (0.20352177321910858, 0.002554043661803007), (0.4944729804992676, 0.05704062059521675), (0.35311999917030334, 0.2287999987602234)], [(0.10387720167636871, 0.15240783989429474), (0.35311999917030334, 0.2287999987602234), (0.2858409285545349, 0.32360079884529114), (0.019021285697817802, 0.27419033646583557)], [(0.019021285697817802, 0.27419033646583557), (0.2858409285545349, 0.32360079884529114), (0.23823584616184235, 0.4334968328475952), (0.010124947875738144, 0.4299057424068451)], [(0.010124947875738144, 0.4299057424068451), (0.23823584616184235, 0.4334968328475952), (0.23564350605010986, 0.5323020219802856), (0.012801339849829674, 0.5315198302268982)], [(0.012801339849829674, 0.5315198302268982), (0.23564350605010986, 0.5323020219802856), (0.2573564350605011, 0.6207517385482788), (0.03667948767542839, 0.6383661031723022)], [(0.03667948767542839, 0.6383661031723022), (0.2573564350605011, 0.6207517385482788), (0.299108624458313, 0.7074313759803772), (0.0829995721578598, 0.7227829694747925)], [(0.0829995721578598, 0.7227829694747925), (0.299108624458313, 0.7074313759803772), (0.357651025056839, 0.7929096221923828), (0.1371798813343048, 0.8043929934501648)], [(0.1371798813343048, 0.8043929934501648), (0.357651025056839, 0.7929096221923828), (0.41832488775253296, 0.8671479225158691), (0.20339392125606537, 0.8890230059623718)], [(0.20339392125606537, 0.8890230059623718), (0.41832488775253296, 0.8671479225158691), (0.4944729804992676, 0.978790283203125), (0.27912330627441406, 1.0)], [(0.20352177321910858, 0.002554043661803007), (0.10387720167636871, 0.15240783989429474), (1.2504191460038783e-08, 0.13043661415576935), (0.08955555409193039, 2.6969557254119536e-08)], [(0.10387720167636871, 0.15240783989429474), (0.019021285697817802, 0.27419033646583557), (1.2504191460038783e-08, 0.13043661415576935)], [(0.598351240158081, 0.8475814461708069), (0.8475865721702576, 0.7711809277534485), (0.98896723985672, 0.9429332613945007), (0.6980223059654236, 0.997435450553894)], [(0.598351240158081, 0.8475814461708069), (0.5134828090667725, 0.7257977724075317), (0.7803006172180176, 0.6763840317726135), (0.8475865721702576, 0.7711809277534485)], [(0.5134828090667725, 0.7257977724075317), (0.5045840740203857, 0.5700806975364685), (0.7326943874359131, 0.5664908289909363), (0.7803006172180176, 0.6763840317726135)], [(0.5045840740203857, 0.5700806975364685), (0.5072675943374634, 0.4684655964374542), (0.7301082611083984, 0.4676879048347473), (0.7326943874359131, 0.5664908289909363)], [(0.5072675943374634, 0.4684655964374542), (0.531157374382019, 0.361620157957077), (0.7518305778503418, 0.37924033403396606), (0.7301082611083984, 0.4676879048347473)], [(0.531157374382019, 0.361620157957077), (0.5774877667427063, 0.2772054672241211), (0.7935928702354431, 0.29256266355514526), (0.7518305778503418, 0.37924033403396606)], [(0.5774877667427063, 0.2772054672241211), (0.631676197052002, 0.19559861719608307), (0.8521435260772705, 0.20708619058132172), (0.7935928702354431, 0.29256266355514526)], [(0.631676197052002, 0.19559861719608307), (0.6978949308395386, 0.11097240447998047), (0.9128215909004211, 0.13284821808338165), (0.8521435260772705, 0.20708619058132172)], [(0.6978949308395386, 0.11097240447998047), (0.7736213803291321, -1.8817928548742202e-08), (0.9889672994613647, 0.021205546334385872), (0.9128215909004211, 0.13284821808338165)], [(0.6980223059654236, 0.997435450553894), (0.5840516686439514, 0.9999967813491821), (0.4944729506969452, 0.8695566654205322), (0.598351240158081, 0.8475814461708069)], [(0.598351240158081, 0.8475814461708069), (0.4944729506969452, 0.8695566654205322), (0.5134828090667725, 0.7257977724075317)]]
         loops = np.array([(0, 0, 1), (1, 1, 2), (3, 2, 3), (2, 3, 0), (0, 4, 0), (2, 5, 5), (5, 6, 4), (4, 7, 6), (4, 8, 4), (5, 9, 8), (7, 10, 7), (6, 11, 9), (6, 12, 7), (7, 13, 11), (9, 14, 10), (8, 15, 12), (8, 16, 10), (9, 17, 14), (11, 18, 13), (10, 19, 15), (10, 20, 13), (11, 21, 17), (13, 22, 16), (12, 23, 18), (12, 24, 16), (13, 25, 20), (15, 26, 19), (14, 27, 21), (14, 28, 19), (15, 29, 23), (17, 30, 22), (16, 31, 24), (16, 32, 22), (17, 33, 26), (19, 34, 25), (18, 35, 27), (1, 36, 1), (0, 37, 29), (20, 38, 28), (21, 39, 30), (0, 40, 6), (4, 41, 31), (20, 42, 29), (22, 43, 32), (24, 44, 35), (25, 45, 34), (23, 46, 33), (22, 47, 38), (26, 48, 36), (27, 49, 37), (24, 50, 32), (26, 51, 41), (28, 52, 39), (29, 53, 40), (27, 54, 36), (28, 55, 44), (30, 56, 42), (31, 57, 43), (29, 58, 39), (30, 59, 47), (32, 60, 45), (33, 61, 46), (31, 62, 42), (32, 63, 50), (34, 64, 48), (35, 65, 49), (33, 66, 45), (34, 67, 53), (36, 68, 51), (37, 69, 52), (35, 70, 48), (36, 71, 56), (38, 72, 54), (39, 73, 55), (37, 74, 51), (38, 75, 59), (40, 76, 57), (41, 77, 58), (39, 78, 54), (23, 79, 62), (43, 80, 60), (42, 81, 61), (22, 82, 33), (22, 83, 61), (42, 84, 63), (26, 85, 38)], dtype=np.int32)
         polygons = np.array([(0, 4), (4, 4), (8, 4), (12, 4), (16, 4), (20, 4), (24, 4), (28, 4), (32, 4), (36, 4), (40, 3), (43, 4), (47, 4), (51, 4), (55, 4), (59, 4), (63, 4), (67, 4), (71, 4), (75, 4), (79, 4), (83, 3)], dtype=np.int32)
         polygon_normals = np.array([(0.204458549618721, -0.9217666387557983, -0.329458624124527), (0.2573009133338928, -0.9340332746505737, -0.2477456033229828), (0.35233110189437866, -0.9309596419334412, -0.09579653292894363), (0.5236645340919495, -0.851923406124115, -0.0013364654732868075), (0.6546372175216675, -0.7543064951896667, 0.0497170016169548), (0.7625151872634888, -0.6451690793037415, 0.04824307933449745), (0.8438367247581482, -0.5359628200531006, 0.02614249475300312), (0.894795835018158, -0.446378618478775, 0.009297684766352177), (0.9205259084701538, -0.3904636800289154, 0.013040537014603615), (0.12769724428653717, -0.9910845160484314, -0.03801056370139122), (0.25233086943626404, -0.9670045971870422, 0.03509100154042244), (-0.20367690920829773, -0.9216209053993225, -0.3303491473197937), (-0.25626254081726074, -0.9340181350708008, -0.24887651205062866), (-0.3509964346885681, -0.9313123822212219, -0.09725535660982132), (-0.5227794647216797, -0.8524614572525024, -0.003333872416988015), (-0.6543564796447754, -0.7547026872634888, 0.04734565317630768), (-0.7627802491188049, -0.6450580358505249, 0.045457348227500916), (-0.8443940281867981, -0.5352294445037842, 0.022982647642493248), (-0.8954243659973145, -0.4451744854450226, 0.0059044249355793), (-0.9211748838424683, -0.38903138041496277, 0.009553337469696999), (-0.12563464045524597, -0.9913288950920105, -0.038512177765369415), (-0.2502712309360504, -0.9675723910331726, 0.0341765321791172)])
         mesh = bpy.data.meshes.new(name='Eyebrows Mesh')
-
+        vertices[:,2] += offset
         # add the amount of vertices, in this case 4.
         mesh.vertices.add(len(vertices))
 
@@ -967,7 +1024,7 @@ class DazOptimizer:
         n = mat.node_tree.nodes
         l = mat.node_tree.links
         target_texture = n.new('ShaderNodeTexImage')
-        img = bpy.data.images.load('//eyebrows_and_eyelashes.png')
+        img = bpy.data.images.load(get_eyebrows_and_eyelashes_path())
         target_texture.image = img
         target_texture.name = 'Eyebrows Texture'
         target_texture.location = (0, -300)
@@ -1031,7 +1088,7 @@ class DazOptimizer:
         bmesh.update_edit_mesh(me)
         bpy.ops.object.mode_set(mode='OBJECT')
 
-        eyelashes_img = bpy.data.images.load('//eyebrows_and_eyelashes.png')
+        eyelashes_img = bpy.data.images.load(get_eyebrows_and_eyelashes_path())
         for mat in EYELASHES_M.data.materials:
             bsdf = NodesUtils.find_by_type(mat.node_tree, bpy.types.ShaderNodeBsdfPrincipled)
             texture_nodes = set()
@@ -1186,6 +1243,7 @@ class DazOptimizer:
                 self.iris = iris
                 self.simplified_texture = simplified_texture
             def join(self):
+                print("Joining ",self.iris.filepath,"and",self.sclera.filepath)
                 iris = Image.open(bpy.path.abspath(self.iris.filepath))
                 sclera = Image.open(bpy.path.abspath(self.sclera.filepath))
                 iris = np.array(iris)
@@ -1205,6 +1263,7 @@ class DazOptimizer:
                 sclera[sclera_h // 2:] = sclera_half
                 sclera = Image.fromarray((sclera*255).astype(np.uint8))
                 sclera.save(self.simplified_texture)
+                print("Creating eye texture", self.simplified_texture)
                 return iris_a
 
 
@@ -1214,9 +1273,9 @@ class DazOptimizer:
             sclera_img = None
             simplified_texture = self.get_simplified_eyes_image_path(channel)
             for image in images:
-                if 'iris' in image.filepath:
+                if 'iris' in image.filepath.lower():
                     iris_img = image
-                elif 'sclera' in image.filepath:
+                elif 'sclera' in image.filepath.lower():
                     sclera_img = image
             if iris_img is not None and sclera_img is not None:
                 eye_map = EyeMapType(sclera_img, iris_img, simplified_texture)
@@ -1300,7 +1359,11 @@ class DazOptimizer:
         BODY_M = self.get_body_mesh()
 
         all_filepaths: {str: {str: [bpy.types.Image]}} = {}
-        for mat in BODY_M.data.materials:
+        mats = list(BODY_M.data.materials)
+        for g in DICK_GEOGRAFTS:
+            if g+' Mesh' in bpy.data.objects:
+                mats.extend(bpy.data.objects[g+' Mesh'].data.materials)
+        for mat in mats:
             output_node = NodesUtils.find_by_type(mat.node_tree, bpy.types.ShaderNodeOutputMaterial)
             body_part = mat.name.rstrip('0123456789-_.')
             body_part_filepaths = all_filepaths[body_part] = {'Base Color': set(), 'Roughness': set(), 'Normal': set()}
@@ -1356,7 +1419,7 @@ class DazOptimizer:
 
 
         mats = list(BODY_M.data.materials)
-        for n in BREAST_GEOGRAFTS:
+        for n in BREAST_GEOGRAFTS+MALE_ONLY_GEOGRAFTS:
             n = n + ' Mesh'
             if n in bpy.data.objects:
                 mats.extend(bpy.data.objects[n].data.materials)
@@ -1398,6 +1461,7 @@ class DazOptimizer:
         mouth_filepaths = {}
         eyes_filepaths = {}
         gp_filepaths = {}
+        genitalia_filepaths = {}
         for body_part, body_part_filepaths in all_filepaths.items():
             body_part = body_part.lower()
             if 'head' in body_part:
@@ -1416,6 +1480,8 @@ class DazOptimizer:
                 eyes_filepaths = body_part_filepaths
             elif body_part.startswith('gp_'):
                 gp_filepaths = body_part_filepaths
+            elif 'genital' in body_part:
+                genitalia_filepaths = body_part_filepaths
 
         def open_img(filepaths, map_type, resize=None):
             fp = filepaths[map_type]
@@ -1462,7 +1528,9 @@ class DazOptimizer:
             gp_tile = None
             if map_type in gp_filepaths and len(gp_filepaths[map_type])>0:
                 gp_tile = open_img(gp_filepaths, map_type, [s4, s4])
-
+            genital_tile = None
+            if map_type in genitalia_filepaths and len(genitalia_filepaths[map_type])>0:
+                genital_tile = open_img(genitalia_filepaths, map_type, [s4, s4])
             def shift_img(img: np.ndarray, y0, y1, x0, x1, mask: np.ndarray, translation: [float, float], hflip=False):
                 shape = [s2, s2, legs_tile.shape[2]] if len(legs_tile.shape) > 2 else [s2, s2]
                 new_img = np.zeros(shape, dtype=legs_tile.dtype)
@@ -1497,6 +1565,8 @@ class DazOptimizer:
                 packed[s2 - s4 - s8:s2 - s4, s + s4 * 2:s + s4 * 3] = eyes_tile[s8:]
             if gp_tile is not None:
                 packed[s2 - s4:s2, s+s4*2:s + s4*3] = gp_tile
+            if genital_tile is not None:
+                packed[s2 - s4:s2, s + s4 * 2:s + s4 * 3] = genital_tile
 
 
             # packed[:s, :s] = legs_tile
@@ -1512,17 +1582,20 @@ class DazOptimizer:
         BODY_RIG = self.get_body_rig()
         select_object(BODY_M)
         # merge meshes
-
+        anything = False
         for g in GEOGRAFTS:
-            if g+' Mesh' in bpy.data.objects:
-                g_m = bpy.data.objects[g+' Mesh']
-                g_m.select_set(True)
-        bpy.ops.daz.merge_geografts()
+            if g not in DICK_GEOGRAFTS:
+                if g+' Mesh' in bpy.data.objects:
+                    g_m = bpy.data.objects[g+' Mesh']
+                    g_m.select_set(True)
+                    anything = True
+        if anything:
+            bpy.ops.daz.merge_geografts()
 
-        # merge bones
-        for g in GEOGRAFTS:
-            if g in bpy.data.objects:
-                self.merge_two_rigs(BODY_RIG, bpy.data.objects[g])
+            # merge bones
+            for g in GEOGRAFTS:
+                if g in bpy.data.objects:
+                    self.merge_two_rigs(BODY_RIG, bpy.data.objects[g])
 
     def transfer_morphs_to_geografts(self):
         BODY_M = self.get_body_mesh()
@@ -1535,7 +1608,7 @@ class DazOptimizer:
             if g + ' Mesh' in bpy.data.objects:
                 g_m = bpy.data.objects[g + ' Mesh']
                 g_m.select_set(True)
-        bpy.ops.daz.transfer_shapekeys('INVOKE_DEFAULT') #, selection=selection)
+        bpy.ops.daz.transfer_shapekeys('INVOKE_DEFAULT', bodypart='NoFace') #, selection=selection)
 
 
     def transfer_morphs_to_eyebrows(self):
@@ -1724,18 +1797,21 @@ class DazOptimizer:
         base_layer_np[is_arms_legs_head_body] *= 0.5
         out_of_bounds = np.logical_and(1 < base_layer_np[:, 0], is_arms_legs_head_body)
         base_layer_np[out_of_bounds] += [-1, 0.5]
-        gp_layer = BODY_M.data.uv_layers[NEW_GP_UV_MAP]
-        gp_layer_np = np.array([v.uv for v in gp_layer.data])
-        gp_layer_np = np.mod(gp_layer_np, 1)
-        is_gp = gp_layer_np[:, 0] > 0
-        if not use_full_gp:
-            is_outer_gp = gp_layer_np[:, 0] > 0.5
-            is_gp = np.logical_and(is_gp, np.logical_not(is_outer_gp))
+        gp_np = None
+        if NEW_GP_UV_MAP in BODY_M.data.uv_layers:
+            gp_layer = BODY_M.data.uv_layers[NEW_GP_UV_MAP]
+            gp_layer_np = np.array([v.uv for v in gp_layer.data])
+            gp_layer_np = np.mod(gp_layer_np, 1)
+            is_gp = gp_layer_np[:, 0] > 0
+            if not use_full_gp:
+                is_outer_gp = gp_layer_np[:, 0] > 0.5
+                is_gp = np.logical_and(is_gp, np.logical_not(is_outer_gp))
+            gp_np = gp_layer_np[is_gp]
         nails_np = base_layer_np[is_nails]
         sclera_np = base_layer_np[is_eyes_sclera]
         iris_np = base_layer_np[is_eyes_iris]
         mouth_np = base_layer_np[is_mouth]
-        gp_np = gp_layer_np[is_gp]
+
 
 
         s2 = 1
@@ -1750,9 +1826,10 @@ class DazOptimizer:
         base_layer_np[is_nails] = np.mod(nails_np,1) / 8 + [s, 0]
         base_layer_np[is_eyes_sclera] = np.mod(sclera_np, 1) / 8 + [s + s4 * 1, s4 - s8]
         base_layer_np[is_eyes_iris] = np.mod(iris_np, 1) / 8 + [s + s4 * 2, s4]
-        base_layer_np[is_gp] = np.mod(gp_np, 1) / 8 + [s + s4 * 2, 0]
-        if not use_full_gp:
-            base_layer_np[is_outer_gp] += np.array([0.5,0]) + BODY_TRANS
+        if gp_np is not None:
+            base_layer_np[is_gp] = np.mod(gp_np, 1) / 8 + [s + s4 * 2, 0]
+            if not use_full_gp:
+                base_layer_np[is_outer_gp] += np.array([0.5,0]) + BODY_TRANS
         base_layer_np[is_mouth] = np.mod(mouth_np, 1) / 8 + [s + s4, 0]
         self.update_base_uv_layer(base_layer_np)
 
@@ -2071,10 +2148,11 @@ class DazOptimizer:
 
     def make_single_material(self):
         body_m = self.select_body()
-        mat = NodesUtils.remove_all_mats(body_m, "UnifiedSkin")
+        mat = NodesUtils.remove_all_mats(body_m, "UnifiedSkin", excpt=["Facial hair"])
         filepaths = {}
         for channel in ['Base Color', 'Roughness', 'Normal']:
             filepaths[channel] = self.get_concat_image_path(channel)
+        print("unified filepaths", filepaths)
         NodesUtils.gen_simple_material(mat.node_tree, filepaths)
         old_uv_maps = [o.name for o in body_m.data.uv_layers]
         for uv_layer_name in old_uv_maps:
@@ -2740,6 +2818,22 @@ class DazOptimizeEyebrows_operator(bpy.types.Operator):
 
         return {'FINISHED'}
 
+
+class DazRemoveOldEyebrows_operator(bpy.types.Operator):
+    """ Remove old eyebrows """
+    bl_idname = "dazoptim.remove_old_eyebrows"
+    bl_label = "Remove old eyebrows"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK # context.mode == "OBJECT"
+
+    def execute(self, context):
+        DazOptimizer().remove_old_eyebrows()
+
+        return {'FINISHED'}
+
 class DazTransferFACSToEyebrow_operator(bpy.types.Operator):
     """ Optimize eyes """
     bl_idname = "dazoptim.transfer_facs_to_eyebrows"
@@ -3277,6 +3371,7 @@ operators = [
     (DazOptimizeEyes_operator, "Optimize eyes mesh"),
     (DazOptimizeEyelashes_operator, "Optimize eyelashes"),
     (DazOptimizeEyebrows_operator, "Optimize eyebrows"),
+    (DazRemoveOldEyebrows_operator,"Remove old eyebrows"),
     (DazApplyEyebrows_operator, "Apply eyebrows"),
     (DazTransferFACSToEyebrow_operator, "Transfer FACS to Eyebrows"),
     (DazSimplifyEyesMaterial_operator, "Simplify eyes material"),
@@ -3295,12 +3390,12 @@ operators = [
     (DazMergeMouth_operator, "Merge mouth"),
     (DazRemoveTear_operator, "Remove tear"),
     (DazMergeEyebrowsAndEyelashes_operator, "Merge eyebrows+eyelashes"),
-    (DazMergeEyelashesAndBody_operator, "Merge eyelashes+body"),
     (DazConcatTextures_operator, "Merge textures"),
     (DazOptimizeUVs_operator, "Optimize UVs"),
     (DazOptimizeUVsHalfGP_operator, "Optimize UVs (half GP)"),
     (DazSeparateLipUVs_operator, "Separate Lip UVs"),
     (DazMakeSingleMaterial_operator, "Unify skin materials into one"),
+    (DazMergeEyelashesAndBody_operator, "Merge eyelashes+body"),
     (DazFitSkinTightClothes_operator, "Fit skin-tight clothes"),
     (DazTransferMissingBonesToClothes_operator, "Transfer new bones to clothes"),
     (DazApplyFitSkinTightClothes_operator, "Apply skin-tight clothes"),

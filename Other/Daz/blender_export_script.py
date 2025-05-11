@@ -2159,6 +2159,19 @@ class DazOptimizer:
             if uv_layer_name != 'Base Multi UDIM':
                 l = body_m.data.uv_layers[uv_layer_name]
                 body_m.data.uv_layers.remove(l)
+        for g in DICK_GEOGRAFTS:
+            if g+' Mesh' in bpy.data.objects:
+                dick = bpy.data.objects[g+' Mesh']
+                bpy.context.view_layer.objects.active = dick
+                l = dick.data.uv_layers[0]
+                l.active = True
+                l_np = np.array([v.uv for v in l.data])
+                l_np = l_np / 8 + [0.75, 0]
+                for v, new_uv in zip(l.data, l_np):
+                    v.uv = new_uv
+                bpy.context.object.data.materials.clear()
+                dick.data.materials.append(mat)
+
 
     def add_thigh_bones(self):
         body_rig = self.get_body_rig()
@@ -2351,7 +2364,7 @@ class DazOptimizer:
         body_rig.name = 'root'
         body_mesh.name = 'root Mesh'
         for other_rig in bpy.data.objects:
-            if isinstance(other_rig.data, bpy.types.Armature):
+            if other_rig != body_rig and isinstance(other_rig.data, bpy.types.Armature):
                 convert_rig(other_rig, mid=mid_pelvis_loc)
 
     def add_ue5_ik_bones(self):
@@ -2392,59 +2405,61 @@ class DazOptimizer:
                     visited.add(child)
                     stack.append(child)
 
-    def export_to_fbx(self, with_eyelashes=True):
+    def export_to_fbx(self):
         body = self.get_body_mesh()
         rig = self.get_body_rig()
-        select_object(rig)
-        body.select_set(True)
-        if with_eyelashes and 'Genesis 9 Eyelashes Mesh' in bpy.data.objects:
-            bpy.data.objects['Genesis 9 Eyelashes Mesh'].select_set(True)
-        if "Subsurf" in body.modifiers:
-            body.modifiers.remove(body.modifiers["Subsurf"])
 
-        p = os.path.join(self.workdir, self.name + '.fbx')
-        bpy.ops.export_scene.fbx(filepath=p,
-                                 check_existing=False,
-                                 filter_glob='*.fbx',
-                                 use_selection=True,
-                                 use_visible=False,
-                                 use_active_collection=False,
-                                 collection='',
-                                 global_scale=1.0,
-                                 apply_unit_scale=True,
-                                 apply_scale_options='FBX_SCALE_NONE',
-                                 use_space_transform=True,
-                                 bake_space_transform=False,
-                                 object_types={'ARMATURE', 'CAMERA', 'EMPTY', 'LIGHT', 'MESH', 'OTHER'},
-                                 use_mesh_modifiers=True,
-                                 use_mesh_modifiers_render=True,
-                                 mesh_smooth_type='FACE',
-                                 colors_type='SRGB',
-                                 prioritize_active_color=False,
-                                 use_subsurf=False,
-                                 use_mesh_edges=False,
-                                 use_tspace=False,
-                                 use_triangles=False,
-                                 use_custom_props=False,
-                                 add_leaf_bones=False,
-                                 primary_bone_axis='Y',
-                                 secondary_bone_axis='X',
-                                 use_armature_deform_only=False,
-                                 armature_nodetype='NULL',
-                                 bake_anim=False,
-                                 bake_anim_use_all_bones=True,
-                                 bake_anim_use_nla_strips=True,
-                                 bake_anim_use_all_actions=True,
-                                 bake_anim_force_startend_keying=True,
-                                 bake_anim_step=1.0,
-                                 bake_anim_simplify_factor=1.0,
-                                 path_mode='AUTO',
-                                 embed_textures=False,
-                                 batch_mode='OFF',
-                                 use_batch_own_dir=True,
-                                 use_metadata=True,
-                                 axis_forward='-Z',
-                                 axis_up='Y')
+        for c in rig.children:
+            if not c.name.endswith(' Mesh'):
+                continue
+            if "Subsurf" in c.modifiers:
+                c.modifiers.remove(c.modifiers["Subsurf"])
+            select_object(rig)
+            c.select_set(True)
+            name = self.name if c == body else c.name[:-len(' Mesh')]
+            p = os.path.join(self.workdir, name + '.fbx')
+            bpy.ops.export_scene.fbx(filepath=p,
+                                     check_existing=False,
+                                     filter_glob='*.fbx',
+                                     use_selection=True,
+                                     use_visible=False,
+                                     use_active_collection=False,
+                                     collection='',
+                                     global_scale=1.0,
+                                     apply_unit_scale=True,
+                                     apply_scale_options='FBX_SCALE_NONE',
+                                     use_space_transform=True,
+                                     bake_space_transform=False,
+                                     object_types={'ARMATURE', 'CAMERA', 'EMPTY', 'LIGHT', 'MESH', 'OTHER'},
+                                     use_mesh_modifiers=True,
+                                     use_mesh_modifiers_render=True,
+                                     mesh_smooth_type='FACE',
+                                     colors_type='SRGB',
+                                     prioritize_active_color=False,
+                                     use_subsurf=False,
+                                     use_mesh_edges=False,
+                                     use_tspace=False,
+                                     use_triangles=False,
+                                     use_custom_props=False,
+                                     add_leaf_bones=False,
+                                     primary_bone_axis='Y',
+                                     secondary_bone_axis='X',
+                                     use_armature_deform_only=False,
+                                     armature_nodetype='NULL',
+                                     bake_anim=False,
+                                     bake_anim_use_all_bones=True,
+                                     bake_anim_use_nla_strips=True,
+                                     bake_anim_use_all_actions=True,
+                                     bake_anim_force_startend_keying=True,
+                                     bake_anim_step=1.0,
+                                     bake_anim_simplify_factor=1.0,
+                                     path_mode='AUTO',
+                                     embed_textures=False,
+                                     batch_mode='OFF',
+                                     use_batch_own_dir=True,
+                                     use_metadata=True,
+                                     axis_forward='-Z',
+                                     axis_up='Y')
 
 
 

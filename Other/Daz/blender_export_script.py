@@ -457,6 +457,42 @@ MORPHS = {
         }
     }
 }
+DAZ_TO_UE5_POSE_ROTATIONS = {
+    'upperarm_l': [0.03490658849477768, -0.0, -0.10471975803375244],
+    'upperarm_twist_01_l': [0,0,0],
+    'upperarm_twist_02_l': [0,0,0],
+    'lowerarm_l': [0.3490658402442932, 0.0, -0.03490658476948738],
+    'lowerarm_twist_01_l': [0,0,0],
+    'lowerarm_twist_02_l': [0,0,0],
+    'hand_l': [0.10471975058317184, 0.06981316953897476, -0.0],
+    'thumb_01_l': [0.01745329238474369, 0.0872664600610733, 0.1745329350233078],
+    'thumb_02_l': [0.20943953096866608, 0.0, -0.0],
+    'thumb_03_l': [0.27925270795822144, 0.0, -0.0],
+    'index_metacarpal_l': [0,0,0],
+    'index_01_l': [0.2967059910297394, 0.0, -0.0],
+    'index_02_l': [0.0872664600610733, 0.0, -0.0],
+    'index_03_l': [0.13962633907794952, 0.0, -0.0],
+    'middle_metacarpal_l': [0,0,0],
+    'middle_01_l': [0.24434612691402435, 0.0, -0.0],
+    'middle_02_l': [0.3141592741012573, 0.0, -0.0],
+    'middle_03_l': [0.2967059910297394, 0.0, -0.0],
+    'ring_metacarpal_l': [0,0,0],
+    'ring_01_l': [0.1745329350233078, 0.0, -0.0],
+    'ring_02_l': [0.418878972530365, 0.0, -0.0],
+    'ring_03_l': [0.33161255717277527, 0.0, -0.0],
+    'pinky_metacarpal_l': [0,0,0],
+    'pinky_01_l': [0.24434612691402435, 0.0, -0.0],
+    'pinky_02_l': [0.36651912331581116, 0.0, -0.0],
+    'pinky_03_l': [0.2617994248867035, 0.0, -0.0]
+}
+
+
+def symmetrize_daz_tu_ue5_pose_rotations():
+    symmetric = {bone_name[:-1]+"r": [-y, -z, x] for bone_name, (y, z, x) in DAZ_TO_UE5_POSE_ROTATIONS.items() if bone_name.endswith("_l")}
+    DAZ_TO_UE5_POSE_ROTATIONS.update(symmetric)
+
+symmetrize_daz_tu_ue5_pose_rotations()
+
 ClothesMeta = namedtuple('ClothesMeta', ['fingerprint', 'is_skin_tight'])
 CLOTHES = {
     "Romance Bra":ClothesMeta('13332-26195-12864', True),
@@ -2302,48 +2338,103 @@ class DazOptimizer:
             if other_rig != body_rig and isinstance(other_rig.data, bpy.types.Armature):
                 convert_rig(other_rig, mid=mid_pelvis_loc)
 
+    def align_pose_to_ue5(self):
+        body_rig = self.get_body_rig()
+        body_rig.location.y = -0.02
+        select_object(body_rig)
+        bpy.ops.object.mode_set(mode='POSE')
+        for bone, rotation in DAZ_TO_UE5_POSE_ROTATIONS.items():
+            body_rig.pose.bones[bone].rotation_euler = rotation
+
+    def apply_pose(self):
+        body_rig = self.get_body_rig()
+        select_object(body_rig)
+        bpy.ops.object.mode_set(mode='POSE')
+        bpy.ops.pose.armature_apply(selected=True)
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
+
+    # def reorient_bones(self):
+    #     import mathutils
+    #     body_rig = self.get_body_rig()
+    #     select_object(body_rig)
+    #     bpy.ops.object.mode_set(mode='POSE')
+    #     bone_transforms = {b.name: b.matrix.copy() for b in body_rig.pose.bones}
+    #     bpy.ops.object.mode_set(mode='EDIT')
+    #     for bone in body_rig.data.edit_bones:
+    #         bone_name = bone.name
+    #         if bone_name in UE5_BONE_HIERARCHY:
+    #             matrix = bone_transforms[bone_name]
+    #             matrix = matrix.inverted()
+    #             matrix = np.array(matrix)
+    #             print("matrix=", matrix.shape)
+    #             ue5_start, ue5_tail, x_axis, y_axis, z_axis, _ = UE5_BONE_HIERARCHY[bone_name]
+    #             ue5_orientation = np.empty(4)
+    #             ue5_orientation[:3] = np.subtract(ue5_tail, ue5_start) / 100
+    #             ue5_orientation[3] = 1
+    #             print("ue5_orientation=", ue5_orientation.shape)
+    #             daz_orientation = ue5_orientation @ matrix
+    #             print("daz_orientation=", daz_orientation.shape)
+    #             bone.tail = np.add(bone.head, daz_orientation[:3])
+    #     bpy.ops.object.mode_set(mode='OBJECT')
+
+    # def reorient_bones(self):
+    #     import mathutils
+    #     body_rig = self.get_body_rig()
+    #     select_object(body_rig)
+    #     bpy.ops.object.mode_set(mode='EDIT')
+    #
+    #     def recursion(bone, quat):
+    #         bone_name = bone.name
+    #         if bone_name in UE5_BONE_HIERARCHY:
+    #             if bone_name in DAZ_TO_UE5_POSE_ROTATIONS:
+    #                 rotation = DAZ_TO_UE5_POSE_ROTATIONS[bone_name]
+    #                 rotation = mathutils.Euler(rotation, 'YZX')
+    #                 rotation = rotation.to_quaternion()
+    #                 # quat2 = quat.copy()
+    #                 # quat2.rotate(rotation)
+    #                 # rotation = quat2
+    #                 # rotation.rotate(quat)
+    #             else:
+    #                 rotation = quat
+    #             ue5_start, ue5_tail, x_axis, y_axis, z_axis, _ = UE5_BONE_HIERARCHY[bone_name]
+    #             # ue5_orientation = np.empty(4)
+    #             # ue5_orientation[:3] = np.subtract(ue5_tail, ue5_start) / 100
+    #             # ue5_orientation[3] = 1
+    #             ue5_orientation = mathutils.Vector(ue5_tail) - mathutils.Vector(ue5_start)
+    #             ue5_orientation /= 100
+    #             ue5_orientation.rotate(rotation.inverted())
+    #             bone.tail = bone.head+ue5_orientation
+    #             for child in bone.children:
+    #                 recursion(child, rotation)
+    #
+    #     recursion(body_rig.data.edit_bones['pelvis'], mathutils.Quaternion())
+    #     bpy.ops.object.mode_set(mode='OBJECT')
+
     def reorient_bones(self):
         import mathutils
         body_rig = self.get_body_rig()
         select_object(body_rig)
         bpy.ops.object.mode_set(mode='EDIT')
-
-        def recursive(bone, composed_rotation:mathutils.Quaternion):
+        for bone in body_rig.data.edit_bones:
             bone_name = bone.name
-            ue5_start, ue5_tail, x_axis, y_axis, z_axis, _ = UE5_BONE_HIERARCHY[bone_name]
-            daz_start = bone.head
-            ue5_orientation = np.subtract(ue5_tail, ue5_start) / 100
-            daz_orientation = composed_rotation.to_matrix()
-            daz_orientation = np.array(daz_orientation)
-            daz_orientation = daz_orientation * ue5_orientation
-            # daz_orientation.rotate(mathutils.Quaternion(ue5_orientation))
-            # daz_orientation.rotate(composed_rotation.conjugated())
-            #daz_orientation = composed_rotation * mathutils.Quaternion(ue5_orientation) * composed_rotation.conjugated()
-            bone.tail = np.add(bone.head, daz_orientation[:3])
-            for child in bone.children:
-                print("?", child.name, composed_rotation)
-                if child.name in UE5_BONE_HIERARCHY:
-                    daz_end = child.head
-                    ue5_end, tail, _, _, _, _ = UE5_BONE_HIERARCHY[child.name]
-                    ue5_direction = np.subtract(ue5_end, ue5_start)
-                    daz_direction = np.subtract(daz_end, daz_start)
-                    daz_direction /= np.linalg.norm(daz_direction)
-                    ue5_direction /= np.linalg.norm(ue5_direction)
-                    quaternion = np.empty(4)
-                    quaternion[:3] = np.cross(ue5_direction, daz_direction) # https://stackoverflow.com/questions/1171849/finding-quaternion-representing-the-rotation-from-one-vector-to-another
-                    quaternion[3] = np.sqrt(np.dot(ue5_direction, daz_direction))
-                    print(child.name, quaternion)
-                    quaternion = mathutils.Quaternion(quaternion)
-                    rotation = quaternion * composed_rotation
+            if bone_name in UE5_BONE_HIERARCHY:
+                ue5_start, ue5_tail, x_axis, y_axis, z_axis, _ = UE5_BONE_HIERARCHY[bone_name]
+                ue5_orientation = mathutils.Vector(ue5_tail)-mathutils.Vector(ue5_start)
+                ue5_orientation /= 100
+                if bone_name in DAZ_TO_UE5_POSE_ROTATIONS:
+                    length = ue5_orientation.length
+                    if ue5_orientation.dot(bone.z_axis) < 0:
+                        length = -length
 
-                    # np.array([bone.x_axis, bone.y_axis, bone.z_axis])
+                    bone.tail = bone.head + bone.z_axis * length
+                else:
+                    bone.tail = bone.head + ue5_orientation
+        bpy.ops.object.mode_set(mode='OBJECT')
 
-                    # start = bone.head
-                    #
-                    # bone.roll = 0
-                    recursive(child, rotation)
 
-        recursive(body_rig.data.edit_bones['pelvis'], mathutils.Quaternion())
+
+
 
     def add_ue5_ik_bones(self):
         rig = self.get_body_rig()
@@ -2360,7 +2451,7 @@ class DazOptimizer:
             ik_bone.tail.y += 0.2
         for ik_bone_name in UE5_IK_BONES:
             parent_ik_bone_name = UE5_BONE_HIERARCHY[ik_bone_name][-1]
-            if parent_ik_bone_name != '':
+            if parent_ik_bone_name is not None and parent_ik_bone_name != '':
                 rig.data.edit_bones[ik_bone_name].parent = rig.data.edit_bones[parent_ik_bone_name]
 
     def scale_to_ue5_units(self):
@@ -3281,6 +3372,37 @@ class DazScaleToQuinn(bpy.types.Operator):
 
         return {'FINISHED'}
 
+
+class DazAlignPoseQuinn(bpy.types.Operator):
+    """ Align pose to quinn """
+    bl_idname = "dazoptim.align_pose_to_quinn"
+    bl_label = "ALign pose to quinn"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().align_pose_to_ue5()
+
+        return {'FINISHED'}
+
+class DazApplyPose(bpy.types.Operator):
+    """ Apply pose """
+    bl_idname = "dazoptim.apply_pose"
+    bl_label = "Apply pose"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().apply_pose()
+
+        return {'FINISHED'}
+
 class DazScaleToUnreal(bpy.types.Operator):
     """ Scale to unreal """
     bl_idname = "dazoptim.scale_to_ue5"
@@ -3452,6 +3574,8 @@ operators = [
     (DazCompareToUe5Skeleton_operator, "Compare to UE5 Skeleton"),
     (DazConvertToUe5Skeleton_operator, "Convert to UE5 Skeleton"),
     (DazScaleToQuinn, "Scale to quinn height"),
+    # (DazAlignPoseQuinn, "Align pose to ue5 quinn"),
+    # (DazApplyPose, "Apply pose"),
     (DazReorientBones_operator, "Reorient bones"),
     (AddUe5IkBones, "Add UE5 IK bones"),
     (DazScaleToUnreal, "Scale to ue5 units"),

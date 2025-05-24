@@ -2422,19 +2422,15 @@ class DazOptimizer:
                 ue5_start, ue5_tail, x_axis, y_axis, z_axis, _ = UE5_BONE_HIERARCHY[bone_name]
                 ue5_orientation = mathutils.Vector(ue5_tail)-mathutils.Vector(ue5_start)
                 ue5_orientation /= 100
-                if bone_name in DAZ_TO_UE5_POSE_ROTATIONS:
-                    length = ue5_orientation.length
-                    if ue5_orientation.dot(bone.z_axis) < 0:
-                        length = -length
+                #if bone_name in DAZ_TO_UE5_POSE_ROTATIONS:
+                length = ue5_orientation.length
+                if ue5_orientation.dot(bone.z_axis) < 0:
+                    length = -length
 
-                    bone.tail = bone.head + bone.z_axis * length
-                else:
-                    bone.tail = bone.head + ue5_orientation
+                bone.tail = bone.head + bone.z_axis * length
+                # else:
+                #     bone.tail = bone.head + ue5_orientation
         bpy.ops.object.mode_set(mode='OBJECT')
-
-
-
-
 
     def add_ue5_ik_bones(self):
         rig = self.get_body_rig()

@@ -166,7 +166,10 @@ class NodesUtils:
                 tex_node.location = (-600 + shift_x, -(idx - 1) * 300)
                 filepath = filepaths[channel]
                 if isinstance(filepath, list):
-                    filepath = filepath[0]
+                    if len(filepath) > 0:
+                        filepath = filepath[0]
+                    else:
+                        continue
                 if isinstance(filepath, str):
                     filepath = bpy.data.images.load(filepath)
                     filepath.colorspace_settings.name = 'sRGB' if channel == 'Base Color' else 'Non-Color'

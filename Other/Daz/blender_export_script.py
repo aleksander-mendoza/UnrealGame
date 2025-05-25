@@ -1493,7 +1493,13 @@ class DazOptimizer:
                 if hflip:
                     mask = np.flipud(mask)
                     img = np.flipud(img)
-                new_img[y0:y1, x0:x1][mask] = img[mask]
+                if img.shape[2] > new_img.shape[2]:
+                    img = img[:, :, :3]
+                if img.shape[2] < new_img.shape[2]:
+                    patch = new_img[y0:y1, x0:x1, :3]
+                else:
+                    patch = new_img[y0:y1, x0:x1]
+                patch[mask] = img[mask]
                 x, y = np.int32(np.array(translation) * s2)
                 if x != 0 or y != 0:
                     new_img = np.roll(new_img, [-y, x], axis=[0, 1])

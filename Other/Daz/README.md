@@ -91,7 +91,8 @@ Just execute the steps in the order as they appear. Here is what each of them do
 - Merge eyebrows+eyelashes
   - Do this if you want eyebrows and eyelashes to be a single mesh with a single (optimized) material.
 - Merge textures
-  - This step will now scan all of our simplified materials, extract their textures, and concatenate all the textures into a single texture atlas. This atlas will be saved next to the .blend file. However at this point this atlas is not yet used by any of the materials. 
+  - This step will now scan all of our simplified materials, extract their textures, and concatenate all the textures into a single texture atlas. This atlas will be saved next to the .blend file. However at this point this atlas is not yet used by any of the materials.
+  - If in the future you decide to redo the whole process but you still use the same skin materials, you can skip this step. There would be no need to regenerate the same atlas twice. You can even generate one atlas for each skin and then ad-hoc swap them in the game. The UVs are always going to be compatible. 
 - Optimize UVs
   - This will reshuffle all UVs to match the texture atlas generated previously. However, I recommend using the "half GP" instead as the baking process is not perfect and a seam around golden palace might sometimes be noticeable.
   - At this point you might notice that your character's material got all messed up. This is expected and will be fixed in "Unify skin materials into one" step.

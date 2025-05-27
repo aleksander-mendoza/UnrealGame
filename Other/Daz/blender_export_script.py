@@ -1467,11 +1467,13 @@ class DazOptimizer:
             body_tile = open_img(body_filepaths, map_type)
             arms_tile = open_img(arms_filepaths, map_type)
             legs_tile = open_img(legs_filepaths, map_type)
-
+            d = min(head_tile.ndim, body_tile.ndim, arms_tile.ndim, legs_tile.ndim)
+            c = 1 if d < 3 else min(head_tile.shape[-1], body_tile.shape[-1], arms_tile.shape[-1], legs_tile.shape[-1])
             s = legs_tile.shape[0]
             s2 = s * 2
             s4 = s // 4
             s8 = s // 8
+            merged_shape = [s2, s2, c]
             mouth_tile = None
             if map_type in mouth_filepaths and len(mouth_filepaths[map_type]) > 0:
                 mouth_tile = open_img(mouth_filepaths, map_type,  [s4, s4])
@@ -1487,31 +1489,43 @@ class DazOptimizer:
             genital_tile = None
             if map_type in genitalia_filepaths and len(genitalia_filepaths[map_type])>0:
                 genital_tile = open_img(genitalia_filepaths, map_type, [s4, s4])
+
+            def prepare_channels(img: np.ndarray):
+                if img.ndim < 3:
+                    img = np.expand_dims(img, 2)
+                if c == 1:
+                    if img.shape[2] > 1:
+                        return np.mean(axis=2)
+                elif c >= 3:
+                    if img.shape[2] == 1:
+                        img = img.repeat(c, 2)
+                        if c == 4:
+                            img[:, :, 3] = 1
+                    elif img.shape[2] == 3:
+                        if c > 3:
+                            hwc = (img.shape[0], img.shape[1], 1)
+                            img = np.dstack([img, np.ones(hwc)])
+                    elif img.shape[2] == 4:
+                        if c == 3:
+                            img = img[:, :, :c]
+                return img
+
             def shift_img(img: np.ndarray, y0, y1, x0, x1, mask: np.ndarray, translation: [float, float], hflip=False):
-                shape = [s2, s2, legs_tile.shape[2]] if len(legs_tile.shape) > 2 else [s2, s2]
-                new_img = np.zeros(shape, dtype=legs_tile.dtype)
+                new_img = np.zeros(merged_shape, dtype=legs_tile.dtype)
                 if hflip:
                     mask = np.flipud(mask)
                     img = np.flipud(img)
-                if img.shape[2] > new_img.shape[2]:
-                    img = img[:, :, :3]
-                if img.shape[2] < new_img.shape[2]:
-                    patch = new_img[y0:y1, x0:x1, :3]
-                else:
-                    patch = new_img[y0:y1, x0:x1]
-                patch[mask] = img[mask]
+                img = prepare_channels(img)
+                print("img.shape=",img.shape,"\nnew_img.shape=",new_img.shape,"\nmask.shape=",mask.shape, "\nnew_img[y0:y1, x0:x1].shape=", new_img[y0:y1, x0:x1].shape, "\nimg[mask].shape=", img[mask].shape, "\nnew_img[y0:y1, x0:x1][mask]=",new_img[y0:y1, x0:x1][mask].shape)
+                new_img[y0:y1, x0:x1][mask] = img[mask]
                 x, y = np.int32(np.array(translation) * s2)
                 if x != 0 or y != 0:
                     new_img = np.roll(new_img, [-y, x], axis=[0, 1])
                 return new_img
 
             def assign_img(img: np.ndarray, y0, y1, x0, x1):
-                if img.shape[2] > packed.shape[2]:
-                    img = img[:, :, :3]
-                if img.shape[2] < packed.shape[2]:
-                    packed[y0:y1, x0:x1, :3] = img
-                else:
-                    packed[y0:y1, x0:x1] = img
+                img = prepare_channels(img)
+                packed[y0:y1, x0:x1] = img
             # Textures are concatenated as follows:
             #   Legs | Arms
             #  ------+-----
@@ -1541,6 +1555,9 @@ class DazOptimizer:
             # packed[:s, :s] = legs_tile
             # packed[s:, s:] = body_tile
             # packed[:s, s:] = arms_tile
+            print("packed.shape=", packed.shape)
+            if packed.ndim>2 and packed.shape[2]==1:
+                packed = np.squeeze(packed, 2)
             packed = Image.fromarray(packed)
             packed.save(self.get_concat_image_path(map_type))
             # plt.imshow(packed)
@@ -3351,7 +3368,7 @@ class DazBakeGoldenPalaceDiffuse(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-        bpy.ops.object.bake()
+        bpy.ops.object.bake('INVOKE_DEFAULT', type='DIFFUSE')
         return {'FINISHED'}
 
 
@@ -3366,7 +3383,7 @@ class DazBakeGoldenPalaceNormal(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-        bpy.ops.object.bake()
+        bpy.ops.object.bake('INVOKE_DEFAULT', type='NORMAL')
         return {'FINISHED'}
 
 class DazBakeGoldenPalaceRoughness(bpy.types.Operator):
@@ -3380,7 +3397,7 @@ class DazBakeGoldenPalaceRoughness(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-        bpy.ops.object.bake()
+        bpy.ops.object.bake('INVOKE_DEFAULT', type='ROUGHNESS')
         return {'FINISHED'}
 
 class AddUe5IkBones(bpy.types.Operator):

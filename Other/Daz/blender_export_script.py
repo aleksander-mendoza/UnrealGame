@@ -1505,6 +1505,13 @@ class DazOptimizer:
                     new_img = np.roll(new_img, [-y, x], axis=[0, 1])
                 return new_img
 
+            def assign_img(img: np.ndarray, y0, y1, x0, x1):
+                if img.shape[2] > packed.shape[2]:
+                    img = img[:, :, :3]
+                if img.shape[2] < packed.shape[2]:
+                    packed[y0:y1, x0:x1, :3] = img
+                else:
+                    packed[y0:y1, x0:x1] = img
             # Textures are concatenated as follows:
             #   Legs | Arms
             #  ------+-----
@@ -1517,18 +1524,18 @@ class DazOptimizer:
             packed = np.maximum(packed, shift_img(body_tile, s, s2, s, s2, rle_decode(BODY_RLE, MASK_SHAPE), BODY_TRANS))
             packed = np.maximum(packed, shift_img(head_tile, s, s2, 0, s, rle_decode(LIP_RLE, MASK_SHAPE), LIP_TRANS))
             # packed += shift_img(head, s, s2, s, s2, head_region_mask == HEAD_COLOR, [0.008526, 0.019377])
-            packed[s:, :s] = head_tile
+            assign_img(head_tile, s,s2,0,s)
             if nails_tile is not None:
-                packed[s2 - s4:s2, s:s + s4] = nails_tile
+                assign_img(nails_tile, s2 - s4,s2, s,s + s4)
             if mouth_tile is not None:
-                packed[s2 - s4:s2, s+s4:s + s4*2] = mouth_tile
+                assign_img(mouth_tile, s2 - s4,s2, s+s4,s + s4*2)
             if eyes_tile is not None:
-                packed[s2 - s4 - s8:s2 - s4, s + s4 * 1:s + s4 * 2] = eyes_tile[:s8]
-                packed[s2 - s4 - s8:s2 - s4, s + s4 * 2:s + s4 * 3] = eyes_tile[s8:]
+                assign_img(eyes_tile[:s8], s2 - s4 - s8,s2 - s4, s + s4 * 1,s + s4 * 2)
+                assign_img(eyes_tile[s8:], s2 - s4 - s8, s2 - s4, s + s4 * 2, s + s4 * 3)
             if gp_tile is not None:
-                packed[s2 - s4:s2, s+s4*2:s + s4*3] = gp_tile
+                assign_img(gp_tile, s2 - s4,s2, s+s4*2,s + s4*3)
             if genital_tile is not None:
-                packed[s2 - s4:s2, s + s4 * 2:s + s4 * 3] = genital_tile
+                assign_img(genital_tile, s2 - s4,s2, s + s4 * 2,s + s4 * 3)
 
 
             # packed[:s, :s] = legs_tile

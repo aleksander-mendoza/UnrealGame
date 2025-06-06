@@ -748,7 +748,8 @@ def select_bone(bone):
 def find_body_rig():
     for o in bpy.data.objects:
         if o.parent is None and isinstance(o.data, bpy.types.Armature):
-            return o
+            if o.daz_importer.DazRig == 'genesis9':
+                return o
     return None
 
 
@@ -2324,32 +2325,23 @@ class DazOptimizer:
                         print(bone.name + ".parent == ", bone.parent.name + " != " + str(parent))
 
     def convert_daz_to_ue5_skeleton(self):
+        import mathutils
         body_rig = self.get_body_rig()
         body_mesh = self.get_body_mesh()
-        def convert_rig(rig, mid = None):
+        ue5_thigh_start = UE5_BONE_HIERARCHY['thigh_r'][0]
+        ue5_pelvis_start = UE5_BONE_HIERARCHY['pelvis'][0]
+        ue5_spine_01_start = UE5_BONE_HIERARCHY['spine_01'][0]
+        ue5_pelvis_height =  (ue5_pelvis_start[2] - ue5_thigh_start[2])/100
+        ue5_spine_01_height = (ue5_spine_01_start[2] - ue5_pelvis_start[2])/100
+        def convert_rig(rig):
             select_object(rig)
             bpy.ops.object.mode_set(mode='EDIT')
-            pelvis = None
-            if mid is None:
-                pelvis = rig.data.edit_bones['pelvis']
-                pelvis_head = np.array(pelvis.head)
-                pelvis_tail = np.array(pelvis.tail)
-                t = 0.80
-                mid = pelvis_tail * t + pelvis_head * (1 - t)
-            if 'pelvis' in rig.data.edit_bones:
-                pelvis = rig.data.edit_bones['pelvis']
-                pelvis_head = np.array(pelvis.head)
-                pelvis.head = mid
-                pelvis.tail = pelvis_head
-            if 'hip' in rig.data.edit_bones:
-                hip = rig.data.edit_bones['hip']
-                hip_tail = np.array(hip.tail)
-                hip.head = hip_tail
-                hip.tail = mid
-                if pelvis is not None:
-                    pelvis_children = list(pelvis.children)
-                    for c in pelvis_children:
-                        c.parent = hip
+            pelvis = rig.data.edit_bones.get('pelvis')
+            hip = rig.data.edit_bones.get('hip')
+            if hip is not None and pelvis is not None:
+                pelvis_children = list(pelvis.children)
+                for c in pelvis_children:
+                    c.parent = hip
             if 'spine1' in rig.data.edit_bones and pelvis is not None:
                 rig.data.edit_bones['spine1'].parent = pelvis
             for daz_name, ue5_name in DAZ_G9_TO_UE5_BONES.items():
@@ -2360,16 +2352,37 @@ class DazOptimizer:
                 daz_name = daz_name + "_tmp_suffix"
                 if daz_name in rig.data.edit_bones:
                     bone = rig.data.edit_bones[daz_name]
-
                     bone.name = ue5_name
-            return mid
+            for bone_name in ['pelvis', 'spine_01']: # , 'spine_02', 'spine_03', 'spine_04'
+                if bone_name in rig.data.edit_bones:
+                    daz_bone = rig.data.edit_bones.get(bone_name)
+                    ue5_bone = UE5_BONE_HIERARCHY[bone_name][0]
+                    ue5_bone = mathutils.Vector(ue5_bone)/100
+                    old_daz_bone = daz_bone.head.copy()
+                    daz_bone.head = ue5_bone
+                    daz_bone.tail += ue5_bone-old_daz_bone
+            # r_thigh = rig.data.edit_bones.get('thigh_r')
+            # spine_01 = rig.data.edit_bones.get('spine_01')
+            # if r_thigh is not None and pelvis is not None:
+            #     new_z = r_thigh.head.z + ue5_pelvis_height
+            #     old_z = pelvis.head.z
+            #     pelvis.head.z = new_z
+            #     pelvis.tail.z += (new_z-old_z)
+            # if spine_01 is not None and pelvis is not None:
+            #     new_z = pelvis.head.z + ue5_spine_01_height
+            #     old_z = spine_01.head.z
+            #     spine_01.head.z = new_z
+            #     spine_01.tail.z += (new_z-old_z)
 
-        mid_pelvis_loc = convert_rig(body_rig)
+        convert_rig(body_rig)
         body_rig.name = 'root'
         body_mesh.name = 'root Mesh'
-        for other_rig in bpy.data.objects:
-            if other_rig != body_rig and isinstance(other_rig.data, bpy.types.Armature):
-                convert_rig(other_rig, mid=mid_pelvis_loc)
+        children = list(body_rig.children)
+        while len(children)>0:
+            o = children.pop()
+            if isinstance(o.data, bpy.types.Armature):
+                convert_rig(o)
+            children.extend(o.children)
 
     def align_pose_to_ue5(self):
         body_rig = self.get_body_rig()
@@ -2512,6 +2525,21 @@ class DazOptimizer:
         mesh = self.get_body_mesh()
         height = mesh.dimensions[2]
         self.scale(QUINN_HEIGHT/height)
+        self.match_quinn_pelvis()
+
+
+    def match_quinn_pelvis(self):
+        rig = self.get_body_rig()
+        select_object(rig)
+        if 'hip' in rig.data.bones:
+            root = rig.data.bones['hip']
+        elif 'pelvis' in rig.data.bones:
+            root = rig.data.bones['pelvis']
+        else:
+            return
+        ue5_pevis_pos = UE5_BONE_HIERARCHY['pelvis'][0]
+        self.translate((0,ue5_pevis_pos[1]/100 - root.head.y,0))
+
 
     def scale(self, z):
         rig = self.get_body_rig()
@@ -2525,6 +2553,23 @@ class DazOptimizer:
             obj.select_set(True)
             bpy.context.view_layer.objects.active = obj
             bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+            for child in obj.children:
+                if child not in visited:
+                    visited.add(child)
+                    stack.append(child)
+
+    def translate(self, t):
+        rig = self.get_body_rig()
+        select_object(rig)
+        rig.location = t
+        stack = [rig]
+        visited = {rig}
+        while len(stack)>0:
+            bpy.ops.object.select_all(action='DESELECT')
+            obj = stack.pop()
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
             for child in obj.children:
                 if child not in visited:
                     visited.add(child)
@@ -3651,9 +3696,9 @@ operators = [
     (DazTransferMissingBonesToClothes_operator, "Transfer new bones to clothes"),
     (DazApplyFitSkinTightClothes_operator, "Apply skin-tight clothes"),
     (DazOptimizeHair_operator, "Optimize hair"),
+    (DazScaleToQuinn, "Scale to quinn height"),
     (DazCompareToUe5Skeleton_operator, "Compare to UE5 Skeleton"),
     (DazConvertToUe5Skeleton_operator, "Convert to UE5 Skeleton"),
-    (DazScaleToQuinn, "Scale to quinn height"),
     # (DazAlignPoseQuinn, "Align pose to ue5 quinn"),
     # (DazApplyPose, "Apply pose"),
     (DazReorientBones_operator, "Reorient bones"),

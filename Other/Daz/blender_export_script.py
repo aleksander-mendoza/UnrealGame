@@ -2449,18 +2449,23 @@ class DazOptimizer:
         body_rig = self.get_body_rig()
         select_object(body_rig)
         bpy.ops.object.mode_set(mode='EDIT')
-        tail_axis_per_bone = {}
+        new_y_axis_per_bone = {}
+        new_z_axis_per_bone = {}
         for bone in body_rig.data.edit_bones:
             bone_name = bone.name
-            tail_axis_per_bone[bone_name] = bone.z_axis.copy()
-        tail_axis_per_bone['foot_l'] = tail_axis_per_bone['calf_l']
-        tail_axis_per_bone['foot_r'] = tail_axis_per_bone['calf_r']
+            new_y_axis_per_bone[bone_name] = bone.z_axis.copy()
+            new_z_axis_per_bone[bone_name] = bone.x_axis.copy()
+        for side in ['l', 'r']:
+            for bone_name in ['hand_', 'clavicle_']:
+                bone_name = bone_name+side
+                new_y_axis_per_bone[bone_name] = body_rig.data.edit_bones[bone_name].x_axis.copy()
+                new_z_axis_per_bone[bone_name] = body_rig.data.edit_bones[bone_name].z_axis.copy()
+            new_y_axis_per_bone['foot_'+side] = new_y_axis_per_bone['calf_'+side]
         for bone in body_rig.data.edit_bones:
             bone_name = bone.name
             if bone_name in UE5_BONE_HIERARCHY:
-                old_x_axis = bone.x_axis.copy()
-                new_z_axis = old_x_axis
-                new_y_axis = tail_axis_per_bone[bone_name]
+                new_z_axis = new_z_axis_per_bone[bone_name]
+                new_y_axis = new_y_axis_per_bone[bone_name]
                 ue5_start, ue5_tail, x_axis, y_axis, z_axis, roll, parent_name = UE5_BONE_HIERARCHY[bone_name]
                 z_axis = mathutils.Vector(z_axis)
                 y_axis = mathutils.Vector(y_axis)

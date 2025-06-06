@@ -2474,6 +2474,10 @@ class DazOptimizer:
                 new_y_axis_per_bone[bone_name] = body_rig.data.edit_bones[bone_name].x_axis.copy()
                 new_z_axis_per_bone[bone_name] = body_rig.data.edit_bones[bone_name].z_axis.copy()
             new_y_axis_per_bone['foot_'+side] = new_y_axis_per_bone['calf_'+side]
+        for spine_bone in ['pelvis', 'spine_01', 'spine_02', 'spine_03', 'spine_04', 'spine_05', 'neck_01', 'neck_02']:
+            _, _, x_axis, y_axis, z_axis, _, _= UE5_BONE_HIERARCHY[spine_bone]
+            new_y_axis_per_bone[spine_bone] = mathutils.Vector(y_axis)
+            new_z_axis_per_bone[spine_bone] = mathutils.Vector(z_axis)
         for bone in body_rig.data.edit_bones:
             bone_name = bone.name
             if bone_name in UE5_BONE_HIERARCHY:

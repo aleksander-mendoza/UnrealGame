@@ -2328,11 +2328,6 @@ class DazOptimizer:
         import mathutils
         body_rig = self.get_body_rig()
         body_mesh = self.get_body_mesh()
-        ue5_thigh_start = UE5_BONE_HIERARCHY['thigh_r'][0]
-        ue5_pelvis_start = UE5_BONE_HIERARCHY['pelvis'][0]
-        ue5_spine_01_start = UE5_BONE_HIERARCHY['spine_01'][0]
-        ue5_pelvis_height =  (ue5_pelvis_start[2] - ue5_thigh_start[2])/100
-        ue5_spine_01_height = (ue5_spine_01_start[2] - ue5_pelvis_start[2])/100
         def convert_rig(rig):
             select_object(rig)
             bpy.ops.object.mode_set(mode='EDIT')
@@ -2464,6 +2459,7 @@ class DazOptimizer:
         bpy.ops.object.mode_set(mode='EDIT')
         new_y_axis_per_bone = {}
         new_z_axis_per_bone = {}
+        lengths = {}
         for bone in body_rig.data.edit_bones:
             bone_name = bone.name
             new_y_axis_per_bone[bone_name] = bone.z_axis.copy()
@@ -2475,7 +2471,7 @@ class DazOptimizer:
                 new_z_axis_per_bone[bone_name] = body_rig.data.edit_bones[bone_name].z_axis.copy()
             new_y_axis_per_bone['foot_'+side] = new_y_axis_per_bone['calf_'+side]
         for spine_bone in ['pelvis', 'spine_01', 'spine_02', 'spine_03', 'spine_04', 'spine_05', 'neck_01', 'neck_02']:
-            _, _, x_axis, y_axis, z_axis, _, _= UE5_BONE_HIERARCHY[spine_bone]
+            _, _, x_axis, y_axis, z_axis, _, _ = UE5_BONE_HIERARCHY[spine_bone]
             new_y_axis_per_bone[spine_bone] = mathutils.Vector(y_axis)
             new_z_axis_per_bone[spine_bone] = mathutils.Vector(z_axis)
         for bone in body_rig.data.edit_bones:
@@ -2494,12 +2490,32 @@ class DazOptimizer:
                     new_y_axis = -new_y_axis
                 if z_axis.dot(new_z_axis) < 0:
                     new_z_axis = -new_z_axis
+                new_z_axis_per_bone[bone_name] = new_z_axis
+                new_y_axis_per_bone[bone_name] = new_y_axis
+                lengths[bone_name] = length
 
-                bone.tail = bone.head + new_y_axis * length
-                bone.align_roll(new_z_axis)
+        def reorient(rig):
+            select_object(rig)
+            bpy.ops.object.mode_set(mode='EDIT')
+            for bone in rig.data.edit_bones:
+                bone_name = bone.name
+                if bone_name in UE5_BONE_HIERARCHY:
+                    new_z_axis = new_z_axis_per_bone[bone_name]
+                    new_y_axis = new_y_axis_per_bone[bone_name]
+                    length = lengths[bone_name]
+                    bone.tail = bone.head + new_y_axis * length
+                    bone.align_roll(new_z_axis)
                 # else:
                 #     bone.tail = bone.head + ue5_orientation
-        bpy.ops.object.mode_set(mode='OBJECT')
+            bpy.ops.object.mode_set(mode='OBJECT')
+
+        reorient(body_rig)
+        children = list(body_rig.children)
+        while len(children) > 0:
+            o = children.pop()
+            if isinstance(o.data, bpy.types.Armature):
+                reorient(o)
+            children.extend(o.children)
 
     def add_ue5_ik_bones(self):
         rig = self.get_body_rig()

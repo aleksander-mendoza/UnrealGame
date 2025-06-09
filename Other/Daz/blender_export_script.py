@@ -497,15 +497,38 @@ def symmetrize_daz_tu_ue5_pose_rotations():
 symmetrize_daz_tu_ue5_pose_rotations()
 
 ClothesMeta = namedtuple('ClothesMeta', ['fingerprint', 'is_skin_tight'])
+# {o.name: o.data.daz_importer.DazFingerPrint for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh)}
 CLOTHES = {
     "Romance Bra":ClothesMeta('13332-26195-12864', True),
     "Romance Choker":ClothesMeta('823-1590-768', True),
     "Romance Panties":ClothesMeta('4110-7999-3890', True),
     "Romance Thigh Straps":ClothesMeta('7852-15680-7840', True),
-    'SU Bunny Suit Clothes G9 Mesh': ClothesMeta('7097-14070-6972', True),
-    'SU Bunny Suit Pantyhose G9 Mesh': ClothesMeta('8926-17819-8894', True),
-    'SU Bunny Suit Top G9 Mesh': ClothesMeta('6677-13295-6618', True),
-
+    'SU Bunny Suit Clothes G9': ClothesMeta('7097-14070-6972', True),
+    'SU Bunny Suit Pantyhose G9': ClothesMeta('8926-17819-8894', True),
+    'SU Bunny Suit Top G9': ClothesMeta('6677-13295-6618', True),
+    'M3DAO ArmBands': ClothesMeta('6696-12834-6138', True),
+    'M3DAO BodySuit': ClothesMeta('9047-18026-8976', True),
+    'M3DAO Covers': ClothesMeta('390-724-336', True),
+    'M3DAO Harness Bodysuit': ClothesMeta('39533-76438-36896', True),
+    'M3DAO Legbands': ClothesMeta('11054-21144-10090', True),
+    'M3DAO Upper ArmBands': ClothesMeta('1144-2184-1040', True),
+    'M3DEORing': ClothesMeta('801-1606-805', True),
+    'Midnight Lingerie Corset': ClothesMeta('18102-35732-17622', True),
+    'Midnight Lingerie Panties': ClothesMeta('3601-6736-3136', True),
+    'Midnight Lingerie Stockings': ClothesMeta('4358-8688-4332', True),
+    'Refined Lingerie Corset for Genesis 9': ClothesMeta('29842-58911-29056', True),
+    'Refined Lingerie Gloves for Genesis 9': ClothesMeta('24066-48052-23988', True),
+    'Refined Lingerie Panties for Genesis 9': ClothesMeta('6236-12222-5987', True),
+    'Refined Lingerie Stockings for Genesis 9': ClothesMeta('14072-28090-14020', True),
+    'Romance Bra': ClothesMeta('13332-26195-12864', True),
+    'Romance Choker': ClothesMeta('823-1590-768', True),
+    'Romance Panties': ClothesMeta('4110-7999-3890', True),
+    'Romance Thigh Straps': ClothesMeta('7852-15680-7840', True),
+    'Scarlett Lingerie': ClothesMeta('11517-22868-11385', True),
+    'SU Sexy Line Bikini G9': ClothesMeta('7880-14804-6913', True),
+    'XF Court Stylish Bottom': ClothesMeta('949-1838-888', True),
+    'XF Court Stylish Corset': ClothesMeta('32855-64044-31240', True),
+    'XF Court Stylish Stockings': ClothesMeta('4904-9740-4836', True),
 }
 QUINN_HEIGHT = 1.80169
 NEW_GP_UV_MAP = 'unified_gp_uv'
@@ -2280,6 +2303,13 @@ class DazOptimizer:
         subdivide_bone(cuts, BODY_M, BODY_RIG, 'l_glute')
         subdivide_bone(cuts, BODY_M, BODY_RIG, 'r_glute')
 
+    def transfer_morphs_to_clothes(self):
+        BODY_M = self.get_body_mesh()
+        select_object(BODY_M)
+        clothes = find_all_clothes()
+        for c in clothes:
+            c.select_set(True)
+        bpy.ops.daz.transfer_shapekeys('INVOKE_DEFAULT', bodypart='NoFace')
 
     def transfer_missing_bones_to_clothes(self):
         BODY_M = self.get_body_mesh()
@@ -2348,7 +2378,7 @@ class DazOptimizer:
                 if daz_name in rig.data.edit_bones:
                     bone = rig.data.edit_bones[daz_name]
                     bone.name = ue5_name
-            for bone_name in ['pelvis', 'spine_01']: # , 'spine_02', 'spine_03', 'spine_04'
+            for bone_name in ['pelvis', 'spine_01', 'spine_02', 'spine_03', 'spine_04', 'spine_05', 'neck_01', 'neck_02']: #
                 if bone_name in rig.data.edit_bones:
                     daz_bone = rig.data.edit_bones.get(bone_name)
                     ue5_bone = UE5_BONE_HIERARCHY[bone_name][0]
@@ -2595,61 +2625,71 @@ class DazOptimizer:
                     visited.add(child)
                     stack.append(child)
 
-    def export_to_fbx(self):
+    def export_body_to_fbx(self):
+        body = self.get_body_mesh()
+        rig = self.get_body_rig()
+        self.export_to_fbx(rig, body, os.path.join(self.workdir, self.name + '.fbx'))
+
+    def export_hair_to_fbx(self):
         body = self.get_body_mesh()
         rig = self.get_body_rig()
 
-        for c in rig.children:
-            if not c.name.endswith(' Mesh'):
-                continue
-            if "Subsurf" in c.modifiers:
-                c.modifiers.remove(c.modifiers["Subsurf"])
-            select_object(rig)
-            c.select_set(True)
-            name = self.name if c == body else c.name[:-len(' Mesh')]
-            p = os.path.join(self.workdir, name + '.fbx')
-            bpy.ops.export_scene.fbx(filepath=p,
-                                     check_existing=False,
-                                     filter_glob='*.fbx',
-                                     use_selection=True,
-                                     use_visible=False,
-                                     use_active_collection=False,
-                                     collection='',
-                                     global_scale=1.0,
-                                     apply_unit_scale=True,
-                                     apply_scale_options='FBX_SCALE_NONE',
-                                     use_space_transform=True,
-                                     bake_space_transform=False,
-                                     object_types={'ARMATURE', 'CAMERA', 'EMPTY', 'LIGHT', 'MESH', 'OTHER'},
-                                     use_mesh_modifiers=True,
-                                     use_mesh_modifiers_render=True,
-                                     mesh_smooth_type='FACE',
-                                     colors_type='SRGB',
-                                     prioritize_active_color=False,
-                                     use_subsurf=False,
-                                     use_mesh_edges=False,
-                                     use_tspace=False,
-                                     use_triangles=False,
-                                     use_custom_props=False,
-                                     add_leaf_bones=False,
-                                     primary_bone_axis='Y',
-                                     secondary_bone_axis='X',
-                                     use_armature_deform_only=False,
-                                     armature_nodetype='NULL',
-                                     bake_anim=False,
-                                     bake_anim_use_all_bones=True,
-                                     bake_anim_use_nla_strips=True,
-                                     bake_anim_use_all_actions=True,
-                                     bake_anim_force_startend_keying=True,
-                                     bake_anim_step=1.0,
-                                     bake_anim_simplify_factor=1.0,
-                                     path_mode='AUTO',
-                                     embed_textures=False,
-                                     batch_mode='OFF',
-                                     use_batch_own_dir=True,
-                                     use_metadata=True,
-                                     axis_forward='-Z',
-                                     axis_up='Y')
+    def export_clothes_to_fbx(self):
+        rig = self.get_body_rig()
+        p = os.path.join(self.workdir, self.name+"_clothes")
+        if not os.path.exists(p):
+            os.mkdir(p)
+        for clothes in find_all_clothes():
+            name = clothes.name[:-len(' Mesh')] if clothes.name.endswith(' Mesh') else clothes.name
+            self.export_to_fbx(rig, clothes, os.path.join(p, name + '.fbx'))
+
+    def export_to_fbx(self, rig, obj, path):
+        if "Subsurf" in obj.modifiers:
+            obj.modifiers.remove(obj.modifiers["Subsurf"])
+        select_object(rig)
+        obj.select_set(True)
+        bpy.ops.export_scene.fbx(filepath=path,
+                                 check_existing=False,
+                                 filter_glob='*.fbx',
+                                 use_selection=True,
+                                 use_visible=False,
+                                 use_active_collection=False,
+                                 collection='',
+                                 global_scale=1.0,
+                                 apply_unit_scale=True,
+                                 apply_scale_options='FBX_SCALE_NONE',
+                                 use_space_transform=True,
+                                 bake_space_transform=False,
+                                 object_types={'ARMATURE', 'CAMERA', 'EMPTY', 'LIGHT', 'MESH', 'OTHER'},
+                                 use_mesh_modifiers=True,
+                                 use_mesh_modifiers_render=True,
+                                 mesh_smooth_type='FACE',
+                                 colors_type='SRGB',
+                                 prioritize_active_color=False,
+                                 use_subsurf=False,
+                                 use_mesh_edges=False,
+                                 use_tspace=False,
+                                 use_triangles=False,
+                                 use_custom_props=False,
+                                 add_leaf_bones=False,
+                                 primary_bone_axis='Y',
+                                 secondary_bone_axis='X',
+                                 use_armature_deform_only=False,
+                                 armature_nodetype='NULL',
+                                 bake_anim=False,
+                                 bake_anim_use_all_bones=True,
+                                 bake_anim_use_nla_strips=True,
+                                 bake_anim_use_all_actions=True,
+                                 bake_anim_force_startend_keying=True,
+                                 bake_anim_step=1.0,
+                                 bake_anim_simplify_factor=1.0,
+                                 path_mode='AUTO',
+                                 embed_textures=False,
+                                 batch_mode='OFF',
+                                 use_batch_own_dir=True,
+                                 use_metadata=True,
+                                 axis_forward='-Z',
+                                 axis_up='Y')
 
 
 
@@ -3606,7 +3646,7 @@ class LoadMorphs(bpy.types.Operator):
         return {'FINISHED'}
 
 class TransferMorphsToGeografts(bpy.types.Operator):
-    """ load morphs """
+    """ transfer morphs to geografts """
     bl_idname = "dazoptim.transfer_morphs_to_geografts"
     bl_label = "Transfer morphs to geografts"
     bl_options = {"REGISTER", "UNDO"}
@@ -3617,6 +3657,21 @@ class TransferMorphsToGeografts(bpy.types.Operator):
 
     def execute(self, context):
         DazOptimizer().transfer_morphs_to_geografts()
+
+        return {'FINISHED'}
+
+class TransferMorphsToClothes(bpy.types.Operator):
+    """ transfer morphs to clothes """
+    bl_idname = "dazoptim.transfer_morphs_to_clothes"
+    bl_label = "Transfer morphs to clothes"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().transfer_morphs_to_clothes()
 
         return {'FINISHED'}
 
@@ -3635,10 +3690,10 @@ class RemoveShapeKeyDrivers(bpy.types.Operator):
 
         return {'FINISHED'}
 
-class DazExportFbx(bpy.types.Operator):
+class DazExportBodyFbx(bpy.types.Operator):
     """ export fbx """
-    bl_idname = "dazoptim.export_fbx"
-    bl_label = "Export fbx"
+    bl_idname = "dazoptim.export_body_fbx"
+    bl_label = "Export body fbx"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -3646,7 +3701,39 @@ class DazExportFbx(bpy.types.Operator):
         return UNLOCK
 
     def execute(self, context):
-        DazOptimizer().export_to_fbx()
+        DazOptimizer().export_body_to_fbx()
+
+        return {'FINISHED'}
+
+
+class DazExportClothesFbx(bpy.types.Operator):
+    """ export fbx """
+    bl_idname = "dazoptim.export_clothes_fbx"
+    bl_label = "Export clothes fbx"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().export_clothes_to_fbx()
+
+        return {'FINISHED'}
+
+
+class DazExportHairFbx(bpy.types.Operator):
+    """ export fbx """
+    bl_idname = "dazoptim.export_hair_fbx"
+    bl_label = "Export hair fbx"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().export_hair_to_fbx()
 
         return {'FINISHED'}
 
@@ -3713,8 +3800,9 @@ operators = [
     (DazMakeSingleMaterial_operator, "Unify skin materials into one"),
     (DazMergeEyelashesAndBody_operator, "Merge eyelashes+body"),
     (DazFitSkinTightClothes_operator, "Fit skin-tight clothes"),
-    (DazTransferMissingBonesToClothes_operator, "Transfer new bones to clothes"),
     (DazApplyFitSkinTightClothes_operator, "Apply skin-tight clothes"),
+    (DazTransferMissingBonesToClothes_operator, "Transfer new bones to clothes"),
+    (TransferMorphsToClothes, "Transfer morphs to clothes"),
     (DazOptimizeHair_operator, "Optimize hair"),
     (DazScaleToQuinn, "Scale to quinn height"),
     (DazCompareToUe5Skeleton_operator, "Compare to UE5 Skeleton"),
@@ -3724,7 +3812,9 @@ operators = [
     (DazReorientBones_operator, "Reorient bones"),
     (AddUe5IkBones, "Add UE5 IK bones"),
     (DazScaleToUnreal, "Scale to ue5 units"),
-    (DazExportFbx, "Export to fbx"),
+    (DazExportBodyFbx, "Export body to fbx"),
+    (DazExportClothesFbx, "Export clothes to fbx"),
+    (DazExportHairFbx, "Export hair to fbx"),
 ]
 
 classes = [

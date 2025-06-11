@@ -239,224 +239,237 @@ MALE_ONLY_GEOGRAFTS = DICK_GEOGRAFTS
 FEMALE_ONLY_GEOGRAFTS = ['GoldenPalace_G9'] + BREAST_GEOGRAFTS
 GEOGRAFTS = FEMALE_ONLY_GEOGRAFTS + MALE_ONLY_GEOGRAFTS
 
+def camel_case_to_spaces(text:str)->str:
+    import re
+    max_length = 0
+    longest_part = text
+    for part in text.split('_'):
+        if len(part) > max_length:
+            longest_part = part
+            max_length = len(part)
+    text = longest_part
+    return re.sub(r'((?<=[a-z])[A-Z0-9]|(?<!\A)[A-Z](?=[a-z]))', r' \1', text)
+
+MorphMeta = namedtuple('MorphMeta', ['category', 'title'])
 MORPHS = {
     "Body Geo":{
         "path": "data/Vyusur/Body Geo/Body Geo/Morphs/",
-        "shapes": { "female": [
-            "Navel",
-            "Nipples",
-            "Nipples2",
-            "Nipples3",
-        ]},
+        "shapes": { "female": {
+            "Navel":MorphMeta("Breasts","Navel"),
+            "Nipples":MorphMeta("Breasts","Nipples"),
+            "Nipples2":MorphMeta("Breasts","Nipples 2"),
+            "Nipples3":MorphMeta("Breasts","Nipples 3"),
+        }},
     },
     "__base__": {
         "path": "data/DAZ 3D/Genesis 9/Base/Morphs/",
         "shapes": {
-            "female": [
-                "body_bs_BodyPearFigure",
-                "body_bs_BodyVoluptuous",
-                "body_bs_BreastsCleavage",
-                "body_bs_BreastsDiameter",
-                "body_bs_BreastsDownwardSlope",
-                "body_bs_BreastsFullnessLower",
-                "body_bs_BreastsFullnessUpper",
-                "body_bs_BreastsGone",
-                "body_bs_BreastsHeavy",
-                "body_bs_BreastsLarge",
-                "body_bs_BreastsLargeHigh",
-                "body_bs_BreastsNatural",
-                "body_bs_BreastsPerkSide",
-                "body_bs_BreastsShape01",
-                "body_bs_BreastsShape02",
-                "body_bs_BreastsShape03",
-                "body_bs_BreastsShape04",
-                "body_bs_BreastsShape05",
-                "body_bs_BreastsShape06",
-                "body_bs_BreastsSidesDepth",
-                "body_bs_BreastsSmall",
-                "body_bs_NipplesAreolaeDepthFeminine",
-                "body_bs_NipplesAreolaeDiameterFeminine",
-                "body_bs_NipplesDepthFeminine_HD3",
-                "body_bs_NipplesDiameterFeminine",
-                "body_bs_Pregnant",
-            ],
-            "male": [
-                "body_bs_BodyPortly",
-                "body_bs_BodyStocky",
-                "body_bs_NipplesAreolaeDepthMasculine",
-                "body_bs_NipplesAreolaeDiameterMasculine",
-                "body_bs_NipplesDepthMasculine_HD3",
-                "body_bs_NipplesDiameterMasculine",
-                "body_bs_PectoralsCleavage",
-                "body_bs_PectoralsDiameter",
-                "body_bs_PectoralsHeight",
-                "body_bs_PectoralsHeightOuter",
-                "body_bs_PectoralsSag",
-                "body_bs_PectoralsSize",
-                "body_bs_PectoralsUnderCurve",
-                "body_bs_PectoralsWidth",
-            ],
-            "unisex": [
-                "body_bs_AbdominalsCenterDefine",
-                "body_bs_AbdominalsOuterDefine",
-                "body_bs_AbdominalsWidth",
-                "body_bs_BodyEmaciated",
-                "body_bs_BodyFitnessDetails",
-                "body_bs_BodyFitnessMass",
-                "body_bs_BodyHeavy",
-                "body_bs_BodyLithe",
-                "body_bs_BodyMuscularDetails",
-                "body_bs_BodyMuscularMass",
-                "body_bs_BodyOlder",
-                "body_bs_BodyThin",
-                "body_bs_BodyTone",
-                "body_bs_CalvesSize",
-                "body_bs_CollarboneDetail",
-                "body_bs_FingersWidth",
-                "body_bs_FootArchDepth",
-                "body_bs_GluteCrease",
-                "body_bs_GluteDepthLower",
-                "body_bs_GluteDepthUpper",
-                "body_bs_GluteSize",
-                "body_bs_GluteWidth",
-                "body_bs_HipBackDimples",
-                "body_bs_HipBoneCrest",
-                "body_bs_HipBoneSize",
-                "body_bs_HipGenitalBulge",
-                "body_bs_HipPelvicTilt",
-                "body_bs_HipSize",
-                "body_bs_HipVDefine",
-                "body_bs_KneeBonesSize",
-                "body_bs_LatsSize",
-                "body_bs_LoveHandles",
-                "body_bs_MassAnkles",
-                "body_bs_MassBody",
-                "body_bs_MassFeet",
-                "body_bs_MassForearms",
-                "body_bs_MassHands",
-                "body_bs_MassKnees",
-                "body_bs_MassLowerTorso",
-                "body_bs_MassNeck",
-                "body_bs_MassShins",
-                "body_bs_MassShoulders",
-                "body_bs_MassThighs",
-                "body_bs_MassUpperarms",
-                "body_bs_MassUpperTorso",
-                "body_bs_MassWrist",
-                "body_bs_NailsLengthRound",
-                "body_bs_NailsLengthSharp",
-                "body_bs_NailsLengthSquare",
-                "body_bs_NavelDepth_HD3",
-                "body_bs_NavelHollow_HD3",
-                "body_bs_NavelHorizontal_HD3",
-                "body_bs_NavelOut_HD3",
-                "body_bs_NavelSize_HD3",
-                "body_bs_NavelVertical_HD3",
-                "body_bs_RibcageArched",
-                "body_bs_RibcagePointed",
-                "body_bs_RibcageSize",
-                "body_bs_ScapulaDepth",
-                "body_bs_ScapulaSize",
-                "body_bs_SternumDepth",
-                "body_bs_SternumHeight",
-                "body_bs_SternumWidth",
-                "body_bs_StomachDepth",
-                "body_bs_StomachDepthLower",
-                "body_bs_StomachSoften",
-                "body_bs_TaperForearmA",
-                "body_bs_TaperForearmB",
-                "body_bs_TaperNeckA",
-                "body_bs_TaperNeckB",
-                "body_bs_TaperShinA",
-                "body_bs_TaperShinB",
-                "body_bs_TaperThighA",
-                "body_bs_TaperThighB",
-                "body_bs_TaperUpperArmA",
-                "body_bs_TaperUpperArmB",
-                "body_bs_ThighDepth",
-                "body_bs_ThighTone",
-                "body_bs_TrapsSize",
-                "body_bs_UpperArmTaperWidth",
-                "body_bs_WaistDepth",
-                "body_bs_WaistWidth",
-                "body_bs_WaistWidthUpper",
-                "body_ctrl_BodyFitness",
-                "body_ctrl_BodyMuscular",
-            ]
+            "female": {
+                "body_bs_BodyPearFigure":MorphMeta("Body","Body Pear Figure"),
+                "body_bs_BodyVoluptuous":MorphMeta("Body","Body Voluptuous"),
+                "body_bs_BreastsCleavage":MorphMeta("Breasts","Breasts Cleavage"),
+                "body_bs_BreastsDiameter":MorphMeta("Breasts","Breasts Diameter"),
+                "body_bs_BreastsDownwardSlope":MorphMeta("Breasts","Breasts Downward Slope"),
+                "body_bs_BreastsFullnessLower":MorphMeta("Breasts","Breasts Fullness Lower"),
+                "body_bs_BreastsFullnessUpper":MorphMeta("Breasts","Breasts Fullness Upper"),
+                "body_bs_BreastsGone":MorphMeta("Breasts","Breasts Gone"),
+                "body_bs_BreastsHeavy":MorphMeta("Breasts","Breasts Heavy"),
+                "body_bs_BreastsLarge":MorphMeta("Breasts","Breasts Large"),
+                "body_bs_BreastsLargeHigh":MorphMeta("Breasts","Breasts Large High"),
+                "body_bs_BreastsNatural":MorphMeta("Breasts","Breasts Natural"),
+                "body_bs_BreastsPerkSide":MorphMeta("Breasts","Breasts Perk Side"),
+                "body_bs_BreastsShape01":MorphMeta("Breasts","Breasts Shape 01"),
+                "body_bs_BreastsShape02":MorphMeta("Breasts","Breasts Shape 02"),
+                "body_bs_BreastsShape03":MorphMeta("Breasts","Breasts Shape 03"),
+                "body_bs_BreastsShape04":MorphMeta("Breasts","Breasts Shape 04"),
+                "body_bs_BreastsShape05":MorphMeta("Breasts","Breasts Shape 05"),
+                "body_bs_BreastsShape06":MorphMeta("Breasts","Breasts Shape 06"),
+                "body_bs_BreastsSidesDepth":MorphMeta("Breasts","Breasts Sides Depth"),
+                "body_bs_BreastsSmall":MorphMeta("Breasts","Breasts Small"),
+                "body_bs_NipplesAreolaeDepthFeminine":MorphMeta("Breasts","Nipples Areolae Depth Feminine"),
+                "body_bs_NipplesAreolaeDiameterFeminine":MorphMeta("Breasts","Nipples Areolae Diameter Feminine"),
+                "body_bs_NipplesDepthFeminine_HD3":MorphMeta("Breasts","Nipples Depth Feminine"),
+                "body_bs_NipplesDiameterFeminine":MorphMeta("Breasts","Nipples Diameter Feminine"),
+                "body_bs_Pregnant":MorphMeta("Special","Pregnant"),
+            },
+            "male": {
+                "body_bs_BodyPortly":MorphMeta("Body","Body Portly"),
+                "body_bs_BodyStocky":MorphMeta("Body","Body Stocky"),
+                "body_bs_NipplesAreolaeDepthMasculine":MorphMeta("Body","Nipples Areolae Depth Masculine"),
+                "body_bs_NipplesAreolaeDiameterMasculine":MorphMeta("Body","Nipples Areolae Diameter Masculine"),
+                "body_bs_NipplesDepthMasculine_HD3":MorphMeta("Body","Nipples Depth Masculine"),
+                "body_bs_NipplesDiameterMasculine":MorphMeta("Body","Nipples Diameter Masculine"),
+                "body_bs_PectoralsCleavage":MorphMeta("Body","Pectorals Cleavage"),
+                "body_bs_PectoralsDiameter":MorphMeta("Body","Pectorals Diameter"),
+                "body_bs_PectoralsHeight":MorphMeta("Body","Pectorals Height"),
+                "body_bs_PectoralsHeightOuter":MorphMeta("Body","Pectorals Height Outer"),
+                "body_bs_PectoralsSag":MorphMeta("Body","Pectorals Sag"),
+                "body_bs_PectoralsSize":MorphMeta("Body","Pectorals Size"),
+                "body_bs_PectoralsUnderCurve":MorphMeta("Body","Pectorals Under Curve"),
+                "body_bs_PectoralsWidth":MorphMeta("Body","Pectorals Width"),
+            },
+            "unisex": {
+                "body_bs_AbdominalsCenterDefine": MorphMeta("Body", "Abdominals Center Define"),
+                "body_bs_AbdominalsOuterDefine": MorphMeta("Body", "Abdominals Outer Define"),
+                "body_bs_AbdominalsWidth": MorphMeta("Body", "Abdominals Width"),
+                "body_bs_BodyEmaciated": MorphMeta("Body", "Body Emaciated"),
+                "body_bs_BodyFitnessDetails": MorphMeta("Body", "Body Fitness Details"),
+                "body_bs_BodyFitnessMass": MorphMeta("Body", "Body Fitness Mass"),
+                "body_bs_BodyHeavy": MorphMeta("Body", "Body Heavy"),
+                "body_bs_BodyLithe": MorphMeta("Body", "Body Lithe"),
+                "body_bs_BodyMuscularDetails": MorphMeta("Body", "Body Muscular Details"),
+                "body_bs_BodyMuscularMass": MorphMeta("Body", "Body Muscular Mass"),
+                "body_bs_BodyOlder": MorphMeta("Body", "Body Older"),
+                "body_bs_BodyThin": MorphMeta("Body", "Body Thin"),
+                "body_bs_BodyTone": MorphMeta("Body", "Body Tone"),
+                "body_bs_CalvesSize": MorphMeta("Legs", "Calves Size"),
+                "body_bs_CollarboneDetail": MorphMeta("Body", "Collarbone Detail"),
+                "body_bs_FingersWidth": MorphMeta("Arms", "Fingers Width"),
+                "body_bs_FootArchDepth": MorphMeta("Legs", "Foot Arch Depth"),
+                "body_bs_GluteCrease": MorphMeta("Ass", "Glute Crease"),
+                "body_bs_GluteDepthLower": MorphMeta("Ass", "Glute Depth Lower"),
+                "body_bs_GluteDepthUpper": MorphMeta("Ass", "Glute Depth Upper"),
+                "body_bs_GluteSize": MorphMeta("Ass", "Glute Size"),
+                "body_bs_GluteWidth": MorphMeta("Ass", "Glute Width"),
+                "body_bs_HipBackDimples": MorphMeta("Ass", "Hip Back Dimples"),
+                "body_bs_HipBoneCrest": MorphMeta("Ass", "Hip Bone Crest"),
+                "body_bs_HipBoneSize": MorphMeta("Ass", "Hip Bone Size"),
+                "body_bs_HipGenitalBulge": MorphMeta("Ass", "Hip Genital Bulge"),
+                "body_bs_HipPelvicTilt": MorphMeta("Ass", "Hip Pelvic Tilt"),
+                "body_bs_HipSize": MorphMeta("Ass", "Hip Size"),
+                "body_bs_HipVDefine": MorphMeta("Ass", "Hip V Define"),
+                "body_bs_KneeBonesSize": MorphMeta("Legs", "Knee Bones Size"),
+                "body_bs_LatsSize": MorphMeta("Body", "Lats Size"),
+                "body_bs_LoveHandles": MorphMeta("Body", "Love Handles"),
+                "body_bs_MassAnkles": MorphMeta("Legs", "Mass Ankles"),
+                "body_bs_MassBody": MorphMeta("Body", "Mass Body"),
+                "body_bs_MassFeet": MorphMeta("Legs", "Mass Feet"),
+                "body_bs_MassForearms": MorphMeta("Arms", "Mass Forearms"),
+                "body_bs_MassHands": MorphMeta("Arms", "Mass Hands"),
+                "body_bs_MassKnees": MorphMeta("Legs", "Mass Knees"),
+                "body_bs_MassLowerTorso": MorphMeta("Body", "Mass Lower Torso"),
+                "body_bs_MassNeck": MorphMeta("Head", "Mass Neck"),
+                "body_bs_MassShins": MorphMeta("Legs", "Mass Shins"),
+                "body_bs_MassShoulders": MorphMeta("Arms", "Mass Shoulders"),
+                "body_bs_MassThighs": MorphMeta("Legs", "Mass Thighs"),
+                "body_bs_MassUpperarms": MorphMeta("Arms", "Mass Upperarms"),
+                "body_bs_MassUpperTorso": MorphMeta("Body", "Mass Upper Torso"),
+                "body_bs_MassWrist": MorphMeta("Arms", "Mass Wrist"),
+                "body_bs_NailsLengthRound": MorphMeta("Arms", "Nails Length Round"),
+                "body_bs_NailsLengthSharp": MorphMeta("Arms", "Nails Length Sharp"),
+                "body_bs_NailsLengthSquare": MorphMeta("Arms", "Nails Length Square"),
+                "body_bs_NavelDepth_HD3": MorphMeta("Body", "Navel Depth"),
+                "body_bs_NavelHollow_HD3": MorphMeta("Body", "Navel Hollow"),
+                "body_bs_NavelHorizontal_HD3": MorphMeta("Body", "Navel Horizontal"),
+                "body_bs_NavelOut_HD3": MorphMeta("Body", "Navel Out"),
+                "body_bs_NavelSize_HD3": MorphMeta("Body", "Navel Size"),
+                "body_bs_NavelVertical_HD3": MorphMeta("Body", "Navel Vertical"),
+                "body_bs_RibcageArched": MorphMeta("Body", "Ribcage Arched"),
+                "body_bs_RibcagePointed": MorphMeta("Body", "Ribcage Pointed"),
+                "body_bs_RibcageSize": MorphMeta("Body", "Ribcage Size"),
+                "body_bs_ScapulaDepth": MorphMeta("Body", "Scapula Depth"),
+                "body_bs_ScapulaSize": MorphMeta("Body", "Scapula Size"),
+                "body_bs_SternumDepth": MorphMeta("Body", "Sternum Depth"),
+                "body_bs_SternumHeight": MorphMeta("Body", "Sternum Height"),
+                "body_bs_SternumWidth": MorphMeta("Body", "Sternum Width"),
+                "body_bs_StomachDepth": MorphMeta("Body", "Stomach Depth"),
+                "body_bs_StomachDepthLower": MorphMeta("Body", "Stomach Depth Lower"),
+                "body_bs_StomachSoften": MorphMeta("Body", "Stomach Soften"),
+                "body_bs_TaperForearmA": MorphMeta("Arms", "Taper Forearm A"),
+                "body_bs_TaperForearmB": MorphMeta("Arms", "Taper Forearm B"),
+                "body_bs_TaperNeckA": MorphMeta("Body", "Taper Neck A"),
+                "body_bs_TaperNeckB": MorphMeta("Body", "Taper Neck B"),
+                "body_bs_TaperShinA": MorphMeta("Legs", "Taper Shin A"),
+                "body_bs_TaperShinB": MorphMeta("Legs", "Taper Shin B"),
+                "body_bs_TaperThighA": MorphMeta("Legs", "Taper Thigh A"),
+                "body_bs_TaperThighB": MorphMeta("Legs", "Taper Thigh B"),
+                "body_bs_TaperUpperArmA": MorphMeta("Arms", "Taper Upper Arm A"),
+                "body_bs_TaperUpperArmB": MorphMeta("Arms", "Taper Upper Arm B"),
+                "body_bs_ThighDepth": MorphMeta("Legs", "Thigh Depth"),
+                "body_bs_ThighTone": MorphMeta("Legs", "Thigh Tone"),
+                "body_bs_TrapsSize": MorphMeta("Body", "Traps Size"),
+                "body_bs_UpperArmTaperWidth": MorphMeta("Arms", "Upper Arm Taper Width"),
+                "body_bs_WaistDepth": MorphMeta("Body", "Waist Depth"),
+                "body_bs_WaistWidth": MorphMeta("Body", "Waist Width"),
+                "body_bs_WaistWidthUpper": MorphMeta("Body", "Waist Width Upper"),
+                "body_ctrl_BodyFitness": MorphMeta("Body", "Body Fitness"),
+                "body_ctrl_BodyMuscular": MorphMeta("Body", "Body Muscular"),
+            }
         }
     },
     "Genesis 9 Anatomical Elements Male": {
         "path": "data/DAZ 3D/Genesis 9/Anatomical Elements Male/Morphs/",
         "shapes": {
             "male": {
-                "body_ctrl_PenileLength",
-                "body_ctrl_PenileWidth"
+                "body_ctrl_PenileLength":MorphMeta("Genitals","Penile Length"),
+                "body_ctrl_PenileWidth":MorphMeta("Genitals","Penile Width"),
             }
         }
     },
     "GoldenPalace_G9": {
         "path": "data/meipex/GoldenPalace_Genitalia_G9/G9GoldenPalace_Graft/Morphs/",
         "shapes": {
-            "female": [
-                "GP_MonsVeneris_Front-Back1",
-                "GP_MonsVeneris_Front-Back2",
-                "GP_MonsVeneris_Up-Down",
-                "GP_PR-Aicie",
-                "GP_PR-Angelica",
-                "GP_PR-Astra",
-                "GP_PR-Augusta",
-                "GP_PR-Bammi",
-                "GP_PR-Carmen",
-                "GP_PR-Chiktad",
-                "GP_PR-Crystal",
-                "GP_PR-Felicitas",
-                "GP_PR-Gaia",
-                "GP_PR-Ilzolla",
-                "GP_PR-Krognea",
-                "GP_PR-Laetitia",
-                "GP_PR-Livia",
-                "GP_PR-Raad",
-                "GP_PR-Remphea",
-                "GP_PR-Tophae",
-                "GP_PR-Valentina",
-                "GP_PR-Yelqi",
-                "GP_PR-Zetill",
-                "GP_PR_Albina",
-                "GP_PR_Amazon",
-                "GP_PR_Aurelia",
-                "GP_PR_Majora01",
-                "GP_PR_Majora02",
-                "GP_PR_Majora03",
-                "GP_PR_Minora01",
-                "GP_PR_Minora02",
-                "GP_PR_Minora03",
-                "GP_PR_Minora04",
-                "GP_PR_Minora05",
-                "GP_PR_Minora06",
-                "GP_PR_Minora07",
-                "GP_PR_Minora08",
-                "GP_PR_Minora09",
-                "GP_PR_Minora10",
-                "GP_Anus_Bump1",
-                "GP_Anus_Bump2",
-                "GP_Anus_Bump3",
-                "GP_Anus_Bump4",
-                "GP_Anus_Bump5",
-                "GP_Anus_Contraction",
-                "GP_Anus_ContractionMore",
-                "GP_Anus_Contraction_Shape1",
-                "GP_Anus_Contraction_Shape2",
-                "GP_Anus_Contraction_Wrinkles1",
-                "GP_Anus_Contraction_Wrinkles2",
-                "GP_Anus_Contraction_Wrinkles3",
-                "GP_Anus_Open1",
-                "GP_Anus_Open2",
-                "GP_Anus_Open3",
-                "GP_PR_Vagina_Open",
-                "GP_Vagina_Open1",
-                "GP_Vagina_Open2",
-                "GP_Vagina_Open3",
-            ]
+            "female": {
+                "GP_MonsVeneris_Front-Back1":MorphMeta("Genitals","Mons Veneris Front-Back 1"),
+                "GP_MonsVeneris_Front-Back2":MorphMeta("Genitals","Mons Veneris Front-Back 2"),
+                "GP_MonsVeneris_Up-Down":MorphMeta("Genitals","Mons Veneris Up-Down"),
+                "GP_PR-Aicie":MorphMeta("Genitals","Aicie"),
+                "GP_PR-Angelica":MorphMeta("Genitals","Angelica"),
+                "GP_PR-Astra":MorphMeta("Genitals","Astra"),
+                "GP_PR-Augusta":MorphMeta("Genitals","Augusta"),
+                "GP_PR-Bammi":MorphMeta("Genitals","Bammi"),
+                "GP_PR-Carmen":MorphMeta("Genitals","Carmen"),
+                "GP_PR-Chiktad":MorphMeta("Genitals","Chiktad"),
+                "GP_PR-Crystal":MorphMeta("Genitals","Crystal"),
+                "GP_PR-Felicitas":MorphMeta("Genitals","Felicitas"),
+                "GP_PR-Gaia":MorphMeta("Genitals","Gaia"),
+                "GP_PR-Ilzolla":MorphMeta("Genitals","Ilzolla"),
+                "GP_PR-Krognea":MorphMeta("Genitals","Krognea"),
+                "GP_PR-Laetitia":MorphMeta("Genitals","Laetitia"),
+                "GP_PR-Livia":MorphMeta("Genitals","Livia"),
+                "GP_PR-Raad":MorphMeta("Genitals","Raad"),
+                "GP_PR-Remphea":MorphMeta("Genitals","Remphea"),
+                "GP_PR-Tophae":MorphMeta("Genitals","Tophae"),
+                "GP_PR-Valentina":MorphMeta("Genitals","Valentina"),
+                "GP_PR-Yelqi":MorphMeta("Genitals","Yelqi"),
+                "GP_PR-Zetill":MorphMeta("Genitals","Zetill"),
+                "GP_PR_Albina":MorphMeta("Genitals","Albina"),
+                "GP_PR_Amazon":MorphMeta("Genitals","Amazon"),
+                "GP_PR_Aurelia":MorphMeta("Genitals","Aurelia"),
+                "GP_PR_Majora01":MorphMeta("Genitals","Majora 01"),
+                "GP_PR_Majora02":MorphMeta("Genitals","Majora 02"),
+                "GP_PR_Majora03":MorphMeta("Genitals","Majora 03"),
+                "GP_PR_Minora01":MorphMeta("Genitals","Minora 01"),
+                "GP_PR_Minora02":MorphMeta("Genitals","Minora 02"),
+                "GP_PR_Minora03":MorphMeta("Genitals","Minora 03"),
+                "GP_PR_Minora04":MorphMeta("Genitals","Minora 04"),
+                "GP_PR_Minora05":MorphMeta("Genitals","Minora 05"),
+                "GP_PR_Minora06":MorphMeta("Genitals","Minora 06"),
+                "GP_PR_Minora07":MorphMeta("Genitals","Minora 07"),
+                "GP_PR_Minora08":MorphMeta("Genitals","Minora 08"),
+                "GP_PR_Minora09":MorphMeta("Genitals","Minora 09"),
+                "GP_PR_Minora10":MorphMeta("Genitals","Minora 10"),
+                "GP_Anus_Bump1":MorphMeta("Genitals","Anus Bump 1"),
+                "GP_Anus_Bump2":MorphMeta("Genitals","Anus Bump 2"),
+                "GP_Anus_Bump3":MorphMeta("Genitals","Anus Bump 3"),
+                "GP_Anus_Bump4":MorphMeta("Genitals","Anus Bump 4"),
+                "GP_Anus_Bump5":MorphMeta("Genitals","Anus Bump 5"),
+                "GP_Anus_Contraction":MorphMeta("Genitals","Anus Contraction"),
+                "GP_Anus_ContractionMore":MorphMeta("Genitals","Anus Contraction More"),
+                "GP_Anus_Contraction_Shape1":MorphMeta("Genitals","Anus Contraction"),
+                "GP_Anus_Contraction_Shape2":MorphMeta("Genitals","Anus Contraction"),
+                "GP_Anus_Contraction_Wrinkles1":MorphMeta("Genitals","Anus Contraction"),
+                "GP_Anus_Contraction_Wrinkles2":MorphMeta("Genitals","Anus Contraction"),
+                "GP_Anus_Contraction_Wrinkles3":MorphMeta("Genitals","Anus Contraction"),
+                "GP_Anus_Open1":MorphMeta("Special","Anus Open 1"),
+                "GP_Anus_Open2":MorphMeta("Special","Anus Open 2"),
+                "GP_Anus_Open3":MorphMeta("Special","Anus Open 3"),
+                "GP_PR_Vagina_Open":MorphMeta("Special","Vagina Open"),
+                "GP_Vagina_Open1":MorphMeta("Special","Vagina Open 1"),
+                "GP_Vagina_Open2":MorphMeta("Special","Vagina Open 2"),
+                "GP_Vagina_Open3":MorphMeta("Special","Vagina Open 3"),
+
+            }
         }
     }
 }
@@ -1681,7 +1694,7 @@ class DazOptimizer:
                 shapes = morphs['shapes']
                 for key  in ['unisex', 'female' if is_female else 'male']:
                     if key in shapes:
-                        shape_keys.extend(shapes[key])
+                        shape_keys.extend(shapes[key].keys())
         ext = '.dsf'
         shape_keys = {m + ext for m in shape_keys}
         fav_morphs = {
@@ -2691,7 +2704,29 @@ class DazOptimizer:
                                  axis_forward='-Z',
                                  axis_up='Y')
 
-
+    def print_morphs_csv(self):
+        shape_key_categories = {}
+        for mesh_name, morphs in MORPHS.items():
+            for gender, shapes in morphs['shapes'].items():
+                if gender == 'female':
+                    is_female = True
+                    is_male = False
+                elif gender == 'male':
+                    is_female = False
+                    is_male = True
+                elif gender == 'unisex':
+                    is_female = True
+                    is_male = True
+                for shape, meta in shapes.items():
+                    shape_key_categories[shape] = is_female, is_male, meta
+        body = self.get_body_mesh()
+        print("---,Name,MorphName,BodyPart,IsForFemales,IsForMales,Min,Max,Default")
+        for b in body.data.shape_keys.key_blocks:
+            n = b.name
+            if n in shape_key_categories:
+                is_female, is_male, meta = shape_key_categories[n]
+                row = [n, meta.title, n, meta.category, is_female, is_male, b.slider_min, b.slider_max, b.value]
+                print(",".join(map(str,row)))
 
 def save_blend_file(duf_filepath):
     duf_filepath = os.path.abspath(duf_filepath)
@@ -3737,6 +3772,20 @@ class DazExportHairFbx(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class PrintMorphCsv(bpy.types.Operator):
+    """ Print morph csv """
+    bl_idname = "dazoptim.print_morph_csv"
+    bl_label = "Print morpgh csv"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().print_morphs_csv()
+
+        return {'FINISHED'}
 
 class DazOptimize_sidebar(bpy.types.Panel):
     """DazOptim actions"""
@@ -3815,6 +3864,7 @@ operators = [
     (DazExportBodyFbx, "Export body to fbx"),
     (DazExportClothesFbx, "Export clothes to fbx"),
     (DazExportHairFbx, "Export hair to fbx"),
+    (PrintMorphCsv, "Print Morphs CSV"),
 ]
 
 classes = [

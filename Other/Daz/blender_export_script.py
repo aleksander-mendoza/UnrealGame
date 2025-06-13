@@ -509,39 +509,39 @@ def symmetrize_daz_tu_ue5_pose_rotations():
 
 symmetrize_daz_tu_ue5_pose_rotations()
 
-ClothesMeta = namedtuple('ClothesMeta', ['fingerprint', 'is_skin_tight'])
+ClothesMeta = namedtuple('ClothesMeta', ['fingerprint', 'skin_tight'])
 # {o.name: o.data.daz_importer.DazFingerPrint for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh)}
 CLOTHES = {
-    "Romance Bra":ClothesMeta('13332-26195-12864', True),
-    "Romance Choker":ClothesMeta('823-1590-768', True),
-    "Romance Panties":ClothesMeta('4110-7999-3890', True),
-    "Romance Thigh Straps":ClothesMeta('7852-15680-7840', True),
-    'SU Bunny Suit Clothes G9': ClothesMeta('7097-14070-6972', True),
-    'SU Bunny Suit Pantyhose G9': ClothesMeta('8926-17819-8894', True),
-    'SU Bunny Suit Top G9': ClothesMeta('6677-13295-6618', True),
-    'M3DAO ArmBands': ClothesMeta('6696-12834-6138', True),
-    'M3DAO BodySuit': ClothesMeta('9047-18026-8976', True),
-    'M3DAO Covers': ClothesMeta('390-724-336', True),
-    'M3DAO Harness Bodysuit': ClothesMeta('39533-76438-36896', True),
-    'M3DAO Legbands': ClothesMeta('11054-21144-10090', True),
-    'M3DAO Upper ArmBands': ClothesMeta('1144-2184-1040', True),
-    'M3DEORing': ClothesMeta('801-1606-805', True),
-    'Midnight Lingerie Corset': ClothesMeta('18102-35732-17622', True),
-    'Midnight Lingerie Panties': ClothesMeta('3601-6736-3136', True),
-    'Midnight Lingerie Stockings': ClothesMeta('4358-8688-4332', True),
-    'Refined Lingerie Corset for Genesis 9': ClothesMeta('29842-58911-29056', True),
-    'Refined Lingerie Gloves for Genesis 9': ClothesMeta('24066-48052-23988', True),
-    'Refined Lingerie Panties for Genesis 9': ClothesMeta('6236-12222-5987', True),
-    'Refined Lingerie Stockings for Genesis 9': ClothesMeta('14072-28090-14020', True),
-    'Romance Bra': ClothesMeta('13332-26195-12864', True),
-    'Romance Choker': ClothesMeta('823-1590-768', True),
-    'Romance Panties': ClothesMeta('4110-7999-3890', True),
-    'Romance Thigh Straps': ClothesMeta('7852-15680-7840', True),
-    'Scarlett Lingerie': ClothesMeta('11517-22868-11385', True),
-    'SU Sexy Line Bikini G9': ClothesMeta('7880-14804-6913', True),
-    'XF Court Stylish Bottom': ClothesMeta('949-1838-888', True),
-    'XF Court Stylish Corset': ClothesMeta('32855-64044-31240', True),
-    'XF Court Stylish Stockings': ClothesMeta('4904-9740-4836', True),
+    "Romance Bra": ClothesMeta('13332-26195-12864', 0.003),
+    "Romance Choker": ClothesMeta('823-1590-768', 0.003),
+    "Romance Panties": ClothesMeta('4110-7999-3890', 0.001),
+    "Romance Thigh Straps": ClothesMeta('7852-15680-7840', 0.003),
+    'SU Bunny Suit Clothes G9': ClothesMeta('7097-14070-6972', 0.003),
+    'SU Bunny Suit Pantyhose G9': ClothesMeta('8926-17819-8894', 0.003),
+    'SU Bunny Suit Top G9': ClothesMeta('6677-13295-6618', 0.003),
+    'M3DAO ArmBands': ClothesMeta('6696-12834-6138', 0.003),
+    'M3DAO BodySuit': ClothesMeta('9047-18026-8976', 0.003),
+    'M3DAO Covers': ClothesMeta('390-724-336', 0.003),
+    'M3DAO Harness Bodysuit': ClothesMeta('39533-76438-36896', 0.003),
+    'M3DAO Legbands': ClothesMeta('11054-21144-10090', 0.003),
+    'M3DAO Upper ArmBands': ClothesMeta('1144-2184-1040', 0.003),
+    'M3DEORing': ClothesMeta('801-1606-805', 0.003),
+    'Midnight Lingerie Corset': ClothesMeta('18102-35732-17622', 0.003),
+    'Midnight Lingerie Panties': ClothesMeta('3601-6736-3136', 0.001),
+    'Midnight Lingerie Stockings': ClothesMeta('4358-8688-4332', 0.003),
+    'Refined Lingerie Corset for Genesis 9': ClothesMeta('29842-58911-29056', 0.003),
+    'Refined Lingerie Gloves for Genesis 9': ClothesMeta('24066-48052-23988', 0.003),
+    'Refined Lingerie Panties for Genesis 9': ClothesMeta('6236-12222-5987', 0.003),
+    'Refined Lingerie Stockings for Genesis 9': ClothesMeta('14072-28090-14020', 0.003),
+    'Romance Bra': ClothesMeta('13332-26195-12864', 0.003),
+    'Romance Choker': ClothesMeta('823-1590-768', 0.003),
+    'Romance Panties': ClothesMeta('4110-7999-3890', 0.003),
+    'Romance Thigh Straps': ClothesMeta('7852-15680-7840', 0.003),
+    'Scarlett Lingerie': ClothesMeta('11517-22868-11385', 0.003),
+    'SU Sexy Line Bikini G9': ClothesMeta('7880-14804-6913', 0.003),
+    'XF Court Stylish Bottom': ClothesMeta('949-1838-888', 0.003),
+    'XF Court Stylish Corset': ClothesMeta('32855-64044-31240', 0.003),
+    'XF Court Stylish Stockings': ClothesMeta('4904-9740-4836', 0.003),
 }
 QUINN_HEIGHT = 1.80169
 NEW_GP_UV_MAP = 'unified_gp_uv'
@@ -1918,11 +1918,11 @@ class DazOptimizer:
             if obj.name.endswith(" Mesh"):
                 name = obj.name[:-len(" Mesh")]
                 meta:ClothesMeta = CLOTHES.get(name)
-                if meta is not None and meta.is_skin_tight and m_name not in obj.modifiers:
+                if meta is not None and meta.skin_tight>=0 and m_name not in obj.modifiers:
                     # m_len = len(obj.modifiers)
                     m = obj.modifiers.new(name=m_name, type="SHRINKWRAP")
                     m.target = BODY_M
-                    m.offset = 0.003
+                    m.offset = meta.skin_tight
                     m.wrap_mode = 'OUTSIDE'
                     # select_object(obj)
                     # for _ in range(m_len):
@@ -1932,9 +1932,9 @@ class DazOptimizer:
         for obj in bpy.data.objects:
             if 'FitSkinTightClothes' in obj.modifiers:
                 select_object(obj)
+                if len(obj.data.shape_keys.key_blocks)>0:
+                    bpy.ops.object.shape_key_remove(all=True, apply_mix=False)
                 bpy.ops.object.modifier_apply(modifier='FitSkinTightClothes')
-
-
 
     def subdivide_breast_bones(self, cuts = 2):
         BODY_M = self.get_body_mesh()

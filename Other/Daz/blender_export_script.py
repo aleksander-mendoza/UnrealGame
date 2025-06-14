@@ -510,7 +510,7 @@ def symmetrize_daz_tu_ue5_pose_rotations():
 symmetrize_daz_tu_ue5_pose_rotations()
 
 ClothesMeta = namedtuple('ClothesMeta', ['fingerprint', 'skin_tight'])
-# {o.name: o.data.daz_importer.DazFingerPrint for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh)}
+# [print("'"+o.name[:-len(" Mesh")]+"': ClothesMeta('"+o.data.daz_importer.DazFingerPrint+"', -1),") for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh) and o.name.endswith(" Mesh")]
 CLOTHES = {
     "Romance Bra": ClothesMeta('13332-26195-12864', 0.003),
     "Romance Choker": ClothesMeta('823-1590-768', 0.003),
@@ -533,15 +533,18 @@ CLOTHES = {
     'Refined Lingerie Gloves for Genesis 9': ClothesMeta('24066-48052-23988', 0.003),
     'Refined Lingerie Panties for Genesis 9': ClothesMeta('6236-12222-5987', 0.003),
     'Refined Lingerie Stockings for Genesis 9': ClothesMeta('14072-28090-14020', 0.003),
-    'Romance Bra': ClothesMeta('13332-26195-12864', 0.003),
-    'Romance Choker': ClothesMeta('823-1590-768', 0.003),
-    'Romance Panties': ClothesMeta('4110-7999-3890', 0.003),
-    'Romance Thigh Straps': ClothesMeta('7852-15680-7840', 0.003),
     'Scarlett Lingerie': ClothesMeta('11517-22868-11385', 0.003),
     'SU Sexy Line Bikini G9': ClothesMeta('7880-14804-6913', 0.003),
     'XF Court Stylish Bottom': ClothesMeta('949-1838-888', 0.003),
     'XF Court Stylish Corset': ClothesMeta('32855-64044-31240', 0.003),
     'XF Court Stylish Stockings': ClothesMeta('4904-9740-4836', 0.003),
+    'LVA Arm Guard': ClothesMeta('28366-56444-28222', -1),
+    'LVA Belt': ClothesMeta('1948-3872-1928', -1),
+    'LVA Boots': ClothesMeta('6420-12662-6244', -1),
+    'LVA Pant': ClothesMeta('4526-8995-4468', -1),
+    'LVA Shirt': ClothesMeta('10438-20704-10264', -1),
+    'LVA Vest': ClothesMeta('3751-7337-3585', -1),
+    'LVA Vest Straps': ClothesMeta('5580-11130-5568', -1),
 }
 HairMeta = namedtuple('HairMeta', ['fingerprint', 'is_cards'])
 # {o.name: o.data.daz_importer.DazFingerPrint for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh)}
@@ -1065,7 +1068,7 @@ class DazOptimizer:
         m = obj.modifiers.new(name='FitEyebrows', type="SHRINKWRAP")
         m.target = BODY
         m.offset = 0.003
-        m.wrap_mode = 'ON_SURFACE'
+        m.wrap_mode = 'OUTSIDE'
 
         ma = obj.modifiers.new(name='Armature', type="ARMATURE")
         ma.object = RIG
@@ -1766,6 +1769,8 @@ class DazOptimizer:
             json.dump(fav_morphs, f, indent=2)
 
     def load_fav_morphs(self):
+        body = self.get_body_mesh()
+        select_object(body)
         bpy.ops.daz.load_favo_morphs(filepath=self.get_fav_morphs_path())
 
     def merge_eyes(self):

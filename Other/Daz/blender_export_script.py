@@ -543,6 +543,12 @@ CLOTHES = {
     'XF Court Stylish Corset': ClothesMeta('32855-64044-31240', 0.003),
     'XF Court Stylish Stockings': ClothesMeta('4904-9740-4836', 0.003),
 }
+HairMeta = namedtuple('HairMeta', ['fingerprint', 'is_cards'])
+# {o.name: o.data.daz_importer.DazFingerPrint for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh)}
+HAIR = {
+    "HS BBH Hair G9": HairMeta('43931-65146-21843', True)
+}
+
 QUINN_HEIGHT = 1.80169
 NEW_GP_UV_MAP = 'unified_gp_uv'
 NEW_EYES_UV_MAP = 'optimised_eyes_uvs'
@@ -650,6 +656,15 @@ def find_all_clothes():
             if meta is not None:
                 clothes.append(obj)
     return clothes
+
+
+def find_all_hair():
+    hair = []
+    for obj in bpy.data.objects:
+        if 'hair' in obj.name.lower() and obj.name.endswith(" Mesh"):
+            hair.append(obj)
+    return hair
+
 
 def remove_unnecessary_shape_keys(objs=None, tolerance=0.001):
     if objs is None:
@@ -861,6 +876,27 @@ def get_eyebrows_and_eyelashes_path():
         return bpy.path.abspath('//../eyebrows_and_eyelashes.png')
 
 
+def get_rig_of(obj):
+    for m in obj.modifiers:
+        if isinstance(m, bpy.types.ArmatureModifier):
+            return m.object
+
+
+def translate(obj, t):
+    select_object(obj)
+    obj.location = t
+    stack = [obj]
+    visited = {obj}
+    while len(stack) > 0:
+        bpy.ops.object.select_all(action='DESELECT')
+        obj = stack.pop()
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
+        for child in obj.children:
+            if child not in visited:
+                visited.add(child)
+                stack.append(child)
 
 
 class DazOptimizer:
@@ -2590,7 +2626,6 @@ class DazOptimizer:
         self.scale(QUINN_HEIGHT/height)
         self.match_quinn_pelvis()
 
-
     def match_quinn_pelvis(self):
         rig = self.get_body_rig()
         select_object(rig)
@@ -2602,7 +2637,6 @@ class DazOptimizer:
             return
         ue5_pevis_pos = UE5_BONE_HIERARCHY['pelvis'][0]
         self.translate((0,ue5_pevis_pos[1]/100 - root.head.y,0))
-
 
     def scale(self, z):
         rig = self.get_body_rig()
@@ -2623,20 +2657,22 @@ class DazOptimizer:
 
     def translate(self, t):
         rig = self.get_body_rig()
-        select_object(rig)
-        rig.location = t
-        stack = [rig]
-        visited = {rig}
-        while len(stack)>0:
-            bpy.ops.object.select_all(action='DESELECT')
-            obj = stack.pop()
-            obj.select_set(True)
-            bpy.context.view_layer.objects.active = obj
-            bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
-            for child in obj.children:
-                if child not in visited:
-                    visited.add(child)
-                    stack.append(child)
+        translate(rig, t)
+
+    def detach_hair_from_skeleton(self):
+        for hair in find_all_hair():
+            rig = get_rig_of(hair)
+            select_object(rig)
+            bpy.ops.object.mode_set(mode='EDIT')
+            if 'head' in rig.data.edit_bones:
+                head = rig.data.edit_bones['head']
+                head_pos = head.head.copy()
+                bones_to_keep = set(b.name for b in head.children_recursive)
+                bones_to_keep.add('head')
+                for bone in list(rig.data.edit_bones):
+                    if bone.name not in bones_to_keep:
+                        rig.data.edit_bones.remove(bone)
+                translate(rig, -head_pos)
 
     def export_body_to_fbx(self):
         body = self.get_body_mesh()
@@ -2644,8 +2680,13 @@ class DazOptimizer:
         self.export_to_fbx(rig, body, os.path.join(self.workdir, self.name + '.fbx'))
 
     def export_hair_to_fbx(self):
-        body = self.get_body_mesh()
         rig = self.get_body_rig()
+        p = os.path.join(self.workdir, self.name + "_hair")
+        if not os.path.exists(p):
+            os.mkdir(p)
+        for hair in find_all_hair():
+            name = hair.name[:-len(' Mesh')]
+            self.export_to_fbx(None, hair, os.path.join(p, name + '.fbx'))
 
     def export_clothes_to_fbx(self):
         rig = self.get_body_rig()
@@ -2659,6 +2700,8 @@ class DazOptimizer:
     def export_to_fbx(self, rig, obj, path):
         if "Subsurf" in obj.modifiers:
             obj.modifiers.remove(obj.modifiers["Subsurf"])
+        if rig is None:
+            rig = get_rig_of(obj)
         select_object(rig)
         obj.select_set(True)
         bpy.ops.export_scene.fbx(filepath=path,
@@ -3436,6 +3479,20 @@ class DazOptimizeHair_operator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class DazDetachHairFromSkeleton_operator(bpy.types.Operator):
+    """ Detach hair from skeleton """
+    bl_idname = "dazoptim.detach_hair_from_skeleton"
+    bl_label = "Detach hair from skeleton"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK
+
+    def execute(self, context):
+        DazOptimizer().detach_hair_from_skeleton()
+        return {'FINISHED'}
+
 
 class DazCompareToUe5Skeleton_operator(bpy.types.Operator):
     """ Compare rig to UE5-compatible skeleton """
@@ -3852,13 +3909,14 @@ operators = [
     (DazApplyFitSkinTightClothes_operator, "Apply skin-tight clothes"),
     (DazTransferMissingBonesToClothes_operator, "Transfer new bones to clothes"),
     (TransferMorphsToClothes, "Transfer morphs to clothes"),
-    (DazOptimizeHair_operator, "Optimize hair"),
     (DazScaleToQuinn, "Scale to quinn height"),
     (DazCompareToUe5Skeleton_operator, "Compare to UE5 Skeleton"),
     (DazConvertToUe5Skeleton_operator, "Convert to UE5 Skeleton"),
     # (DazAlignPoseQuinn, "Align pose to ue5 quinn"),
     # (DazApplyPose, "Apply pose"),
     (DazReorientBones_operator, "Reorient bones"),
+    (DazOptimizeHair_operator, "Optimize hair"),
+    (DazDetachHairFromSkeleton_operator, "Detach hair from skeleton"),
     (AddUe5IkBones, "Add UE5 IK bones"),
     (DazScaleToUnreal, "Scale to ue5 units"),
     (DazExportBodyFbx, "Export body to fbx"),

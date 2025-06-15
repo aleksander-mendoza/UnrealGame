@@ -1969,6 +1969,9 @@ class DazOptimizer:
         # *= 0.25# nails
         # -= 0.5 # nails
 
+    def fit_clothes(self):
+        BODY_M = self.get_body_mesh()
+
 
     def fit_skin_tight_clothes(self):
         BODY_M = self.get_body_mesh()
@@ -3187,7 +3190,7 @@ class DazSimplifyGoldenPalaceMaterials_operator(bpy.types.Operator):
     def poll(cls, context):
         if UNLOCK:
             return True
-        if not check_stage(context, [DazOptimizeGoldenPalaceUVs], [DazSimplifyGoldenPalaceMaterials_operator]):
+        if not check_stage(context, [DazOptimizeGoldenPalaceUVs, DazMergeGrografts_operator], [DazSimplifyGoldenPalaceMaterials_operator]):
             return False
         return check_stage(context, [DazSaveGoldenPalaceBaked_operator], []) or os.path.exists(DazOptimizer().get_gp_texture_path("Base Color"))
 
@@ -3360,9 +3363,9 @@ class DazMergeGrografts_operator(bpy.types.Operator):
         if UNLOCK:
             return True
         required = [DazSimplifyMaterials_operator]
-        if has_gp():
-            required.append(DazSimplifyGoldenPalaceMaterials_operator)
-        return check_stage(context, required, [DazMergeGrografts_operator])
+        # if has_gp():
+        #     required.append(DazSimplifyGoldenPalaceMaterials_operator)
+        return check_stage(context, [DazSimplifyMaterials_operator], [DazMergeGrografts_operator])
 
     def execute(self, context):
         DazOptimizer().merge_geografts()
@@ -3609,6 +3612,22 @@ class DazFitSkinTightClothes_operator(bpy.types.Operator):
 
     def execute(self, context):
         DazOptimizer().fit_skin_tight_clothes()
+        pass_stage(self)
+        return {'FINISHED'}
+
+class DazFitClothes_operator(bpy.types.Operator):
+    """ fit clothes """
+    bl_idname = "dazoptim.fit_clothes"
+    bl_label = "Fit clothes"
+    bl_options = {"REGISTER", "UNDO"}
+    stage_id = 'b'
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK or check_stage(context, [DazMergeGrografts_operator], [DazFitClothes_operator])
+
+    def execute(self, context):
+        DazOptimizer().fit_clothes()
         pass_stage(self)
         return {'FINISHED'}
 
@@ -4084,8 +4103,8 @@ operators = [
     (DazGoldenPalaceBsdf_operator, "use principled bsdf"),
     (DazGoldenPalaceDiffuse_operator, "use diffuse bsdf"),
     (DazSaveGoldenPalaceBaked_operator, "Save baked golden palace textures"),
-    (DazSimplifyGoldenPalaceMaterials_operator, "Simplify golden palace materials"),
     (DazMergeGrografts_operator, "Merge Geografts"),
+    (DazSimplifyGoldenPalaceMaterials_operator, "Simplify golden palace materials"),
     (DazMergeEyes_operator, "Merge eyes"),
     (DazMergeMouth_operator, "Merge mouth"),
     (DazRemoveTear_operator, "Remove tear"),

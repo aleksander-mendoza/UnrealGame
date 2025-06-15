@@ -510,7 +510,7 @@ def symmetrize_daz_tu_ue5_pose_rotations():
 symmetrize_daz_tu_ue5_pose_rotations()
 
 ClothesMeta = namedtuple('ClothesMeta', ['fingerprint', 'skin_tight'])
-# [print("'"+o.name[:-len(" Mesh")]+"': ClothesMeta('"+o.data.daz_importer.DazFingerPrint+"', -1),") for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh) and o.name.endswith(" Mesh")]
+# [print("'"+o.name[:-len(" Mesh")]+"': ClothesMeta('"+o.data.daz_importer.DazFingerPrint+"', -1),") for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh) and o.name.endswith(" Mesh")];
 CLOTHES = {
     "Romance Bra": ClothesMeta('13332-26195-12864', 0.003),
     "Romance Choker": ClothesMeta('823-1590-768', 0.003),
@@ -545,6 +545,19 @@ CLOTHES = {
     'LVA Shirt': ClothesMeta('10438-20704-10264', -1),
     'LVA Vest': ClothesMeta('3751-7337-3585', -1),
     'LVA Vest Straps': ClothesMeta('5580-11130-5568', -1),
+    'BattleMage Medallion G9': ClothesMeta('16291-32492-16202', 0.003),
+    'BattleMage Shirt G9': ClothesMeta('59984-117646-57745', -1),
+    'BattleMage Skirt G9': ClothesMeta('62529-124028-61617', -1),
+    'Dark Side Corset': ClothesMeta('2416-4708-2292', 0.003),
+    'Dark Side Jacket': ClothesMeta('11447-22693-11243', -1),
+    'Dark Side Pants': ClothesMeta('5387-10716-5328', 0.003),
+    'Dark Side Top': ClothesMeta('1117-2163-1044', 0.003),
+    'RMO Dress': ClothesMeta('12119-23967-11846', 0.003),
+    'VALBattleMage Bracers G9': ClothesMeta('16106-30990-14938', -1),
+    'VALBattleMage Pantie G9': ClothesMeta('582-1067-484', 0.001),
+    'White Witch Dress': ClothesMeta('22767-45315-22576', -1),
+    'White Witch Hat': ClothesMeta('6987-13875-6903', -1),
+    'White Witch Sleeves': ClothesMeta('19852-39574-19726', -1),
 }
 HairMeta = namedtuple('HairMeta', ['fingerprint', 'is_cards'])
 # {o.name: o.data.daz_importer.DazFingerPrint for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh)}
@@ -2206,9 +2219,12 @@ class DazOptimizer:
                 #                 break
 
 
+    def get_gp_texture_path(self, channel):
+        return os.path.join(self.workdir, self.name + "_" + channel + '_gp_baked.png')
+
     def save_gp_textures(self):
         for channel in ['Base Color', 'Roughness', 'Normal']:
-            gp_baked_path = os.path.join(self.workdir, self.name +"_"+ channel+'_gp_baked.png')
+            gp_baked_path = self.get_gp_texture_path(channel)
             name = 'GP_Baked_' + channel
             if name in bpy.data.images:
                 bpy.data.images[name].save(filepath=gp_baked_path)
@@ -2945,6 +2961,14 @@ def pass_stage(stage):
     if stage.stage_id not in s:
         bpy.context.scene['daz_optim_stage'] = s + stage.stage_id
 
+def toggle_stage(toggle_on, toggle_off):
+    s:str = bpy.context.scene.get('daz_optim_stage', '')
+    for off in toggle_off:
+        s = s.replace(off.stage_id, '')
+    if toggle_on.stage_id not in s:
+        s += toggle_on.stage_id
+    bpy.context.scene['daz_optim_stage'] = s
+
 
 def check_stage(context, required_stage_ids, forbidden_stage_ids):
     stage = context.scene.get('daz_optim_stage', '')
@@ -3074,7 +3098,7 @@ class DazSelectGoldenPalaceColor_operator(bpy.types.Operator):
 
     def execute(self, context):
         DazOptimizer().select_gp_color_for_baking()
-        pass_stage(self)
+        toggle_stage(self, [DazSelectGoldenPalaceNormals_operator, DazSelectGoldenPalaceRoughness_operator])
         return {'FINISHED'}
 
 
@@ -3120,7 +3144,7 @@ class DazSelectGoldenPalaceNormals_operator(bpy.types.Operator):
 
     def execute(self, context):
         DazOptimizer().select_gp_normals_for_baking()
-        pass_stage(self)
+        toggle_stage(self, [DazSelectGoldenPalaceColor_operator, DazSelectGoldenPalaceRoughness_operator])
         return {'FINISHED'}
 
 class DazSelectGoldenPalaceRoughness_operator(bpy.types.Operator):
@@ -3135,7 +3159,7 @@ class DazSelectGoldenPalaceRoughness_operator(bpy.types.Operator):
 
     def execute(self, context):
         DazOptimizer().select_gp_roughness_for_baking()
-        pass_stage(self)
+        toggle_stage(self, [DazSelectGoldenPalaceNormals_operator, DazSelectGoldenPalaceColor_operator])
         return {'FINISHED'}
 
 class DazSaveGoldenPalaceBaked_operator(bpy.types.Operator):
@@ -3161,8 +3185,13 @@ class DazSimplifyGoldenPalaceMaterials_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return UNLOCK or check_stage(context, [DazOptimizeGoldenPalaceUVs],
-                                     [DazSimplifyGoldenPalaceMaterials_operator])
+        if UNLOCK:
+            return True
+        if not check_stage(context, [DazOptimizeGoldenPalaceUVs], [DazSimplifyGoldenPalaceMaterials_operator]):
+            return False
+        return check_stage(context, [DazSaveGoldenPalaceBaked_operator], []) or os.path.exists(DazOptimizer().get_gp_texture_path("Base Color"))
+
+
 
     def execute(self, context):
         DazOptimizer().simplify_golden_palace_material()
@@ -3471,7 +3500,7 @@ class DazOptimizeUVsHalfGP_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return UNLOCK or (has_gp() and check_stage(context, [DazSimplifyMaterials_operator], [DazOptimizeUVsHalfGP_operator]))
+        return UNLOCK or check_stage(context, [DazSimplifyMaterials_operator, DazSimplifyGoldenPalaceMaterials_operator], [DazOptimizeUVsHalfGP_operator])
 
     def execute(self, context):
         DazOptimizer().pack_uvs(use_full_gp=False)
@@ -3488,7 +3517,11 @@ class DazMakeSingleMaterial_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return UNLOCK or check_stage(context, [DazSimplifyMaterials_operator, DazOptimizeUVsHalfGP_operator], [DazMakeSingleMaterial_operator])
+        if UNLOCK:
+            return True
+        if not check_stage(context, [DazOptimizeUVs_operator], [DazMakeSingleMaterial_operator]):
+            return False
+        return check_stage(context, [DazConcatTextures_operator], []) or os.path.exists(DazOptimizer().get_concat_image_path("Base Color"))
 
     def execute(self, context):
         DazOptimizer().make_single_material()
@@ -3735,7 +3768,7 @@ class DazBakeGoldenPalaceDiffuse(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return UNLOCK or check_stage(context, [DazGoldenPalaceDiffuse_operator], [DazMergeGrografts_operator])
+        return UNLOCK or check_stage(context, [DazSelectGoldenPalaceColor_operator], [DazMergeGrografts_operator])
 
     def execute(self, context):
         bpy.ops.object.bake('INVOKE_DEFAULT', type='DIFFUSE')
@@ -3888,6 +3921,7 @@ class LoadMorphs(bpy.types.Operator):
         pass_stage(self)
         return {'FINISHED'}
 
+
 class TransferMorphsToGeografts(bpy.types.Operator):
     """ transfer morphs to geografts """
     bl_idname = "dazoptim.transfer_morphs_to_geografts"
@@ -3904,6 +3938,7 @@ class TransferMorphsToGeografts(bpy.types.Operator):
         pass_stage(self)
         return {'FINISHED'}
 
+
 class TransferMorphsToClothes(bpy.types.Operator):
     """ transfer morphs to clothes """
     bl_idname = "dazoptim.transfer_morphs_to_clothes"
@@ -3913,12 +3948,13 @@ class TransferMorphsToClothes(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return UNLOCK or check_stage(context, [LoadMorphs], [])
+        return UNLOCK or check_stage(context, [LoadMorphs], [TransferMorphsToClothes])
 
     def execute(self, context):
         DazOptimizer().transfer_morphs_to_clothes()
         pass_stage(self)
         return {'FINISHED'}
+
 
 class RemoveShapeKeyDrivers(bpy.types.Operator):
     """ Remove shape key drivers """

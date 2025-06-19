@@ -509,55 +509,69 @@ def symmetrize_daz_tu_ue5_pose_rotations():
 
 symmetrize_daz_tu_ue5_pose_rotations()
 
-ClothesMeta = namedtuple('ClothesMeta', ['fingerprint', 'skin_tight'])
-# [print("'"+o.name[:-len(" Mesh")]+"': ClothesMeta('"+o.data.daz_importer.DazFingerPrint+"', -1),") for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh) and o.name.endswith(" Mesh")];
+EXTRUDED_SK_NAME = 'extruded'
+CLOTHES_MIN_DIST_TO_SKIN = 0.004
+
+
+class ClothesMeta:
+
+    def __init__(self, fingerprint, skin_tight, panties):
+        self.fingerprint = fingerprint
+        self.skin_tight = skin_tight
+        self.panties = panties
+        self.obj = None
+
+PANTIE_SCALING = 0.02
+
+# [print("'"+o.name[:-len(" Mesh")]+"': ClothesMeta('"+o.data.daz_importer.DazFingerPrint+"', -1, "+('panties' in o.name.lower())+"),") for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh) and o.name.endswith(" Mesh")];
+
 CLOTHES = {
-    "Romance Bra": ClothesMeta('13332-26195-12864', 0.003),
-    "Romance Choker": ClothesMeta('823-1590-768', 0.003),
-    "Romance Panties": ClothesMeta('4110-7999-3890', 0.001),
-    "Romance Thigh Straps": ClothesMeta('7852-15680-7840', 0.003),
-    'SU Bunny Suit Clothes G9': ClothesMeta('7097-14070-6972', 0.003),
-    'SU Bunny Suit Pantyhose G9': ClothesMeta('8926-17819-8894', 0.003),
-    'SU Bunny Suit Top G9': ClothesMeta('6677-13295-6618', 0.003),
-    'M3DAO ArmBands': ClothesMeta('6696-12834-6138', 0.003),
-    'M3DAO BodySuit': ClothesMeta('9047-18026-8976', 0.003),
-    'M3DAO Covers': ClothesMeta('390-724-336', 0.003),
-    'M3DAO Harness Bodysuit': ClothesMeta('39533-76438-36896', 0.003),
-    'M3DAO Legbands': ClothesMeta('11054-21144-10090', 0.003),
-    'M3DAO Upper ArmBands': ClothesMeta('1144-2184-1040', 0.003),
-    'M3DEORing': ClothesMeta('801-1606-805', 0.003),
-    'Midnight Lingerie Corset': ClothesMeta('18102-35732-17622', 0.003),
-    'Midnight Lingerie Panties': ClothesMeta('3601-6736-3136', 0.001),
-    'Midnight Lingerie Stockings': ClothesMeta('4358-8688-4332', 0.003),
-    'Refined Lingerie Corset for Genesis 9': ClothesMeta('29842-58911-29056', 0.003),
-    'Refined Lingerie Gloves for Genesis 9': ClothesMeta('24066-48052-23988', 0.003),
-    'Refined Lingerie Panties for Genesis 9': ClothesMeta('6236-12222-5987', 0.003),
-    'Refined Lingerie Stockings for Genesis 9': ClothesMeta('14072-28090-14020', 0.003),
-    'Scarlett Lingerie': ClothesMeta('11517-22868-11385', 0.003),
-    'SU Sexy Line Bikini G9': ClothesMeta('7880-14804-6913', 0.003),
-    'XF Court Stylish Bottom': ClothesMeta('949-1838-888', 0.003),
-    'XF Court Stylish Corset': ClothesMeta('32855-64044-31240', 0.003),
-    'XF Court Stylish Stockings': ClothesMeta('4904-9740-4836', 0.003),
-    'LVA Arm Guard': ClothesMeta('28366-56444-28222', -1),
-    'LVA Belt': ClothesMeta('1948-3872-1928', -1),
-    'LVA Boots': ClothesMeta('6420-12662-6244', -1),
-    'LVA Pant': ClothesMeta('4526-8995-4468', -1),
-    'LVA Shirt': ClothesMeta('10438-20704-10264', -1),
-    'LVA Vest': ClothesMeta('3751-7337-3585', -1),
-    'LVA Vest Straps': ClothesMeta('5580-11130-5568', -1),
-    'BattleMage Medallion G9': ClothesMeta('16291-32492-16202', 0.003),
-    'BattleMage Shirt G9': ClothesMeta('59984-117646-57745', -1),
-    'BattleMage Skirt G9': ClothesMeta('62529-124028-61617', -1),
-    'Dark Side Corset': ClothesMeta('2416-4708-2292', 0.003),
-    'Dark Side Jacket': ClothesMeta('11447-22693-11243', -1),
-    'Dark Side Pants': ClothesMeta('5387-10716-5328', 0.003),
-    'Dark Side Top': ClothesMeta('1117-2163-1044', 0.003),
-    'RMO Dress': ClothesMeta('12119-23967-11846', 0.003),
-    'VALBattleMage Bracers G9': ClothesMeta('16106-30990-14938', -1),
-    'VALBattleMage Pantie G9': ClothesMeta('582-1067-484', 0.001),
-    'White Witch Dress': ClothesMeta('22767-45315-22576', -1),
-    'White Witch Hat': ClothesMeta('6987-13875-6903', -1),
-    'White Witch Sleeves': ClothesMeta('19852-39574-19726', -1),
+    "Romance Bra": ClothesMeta('13332-26195-12864', CLOTHES_MIN_DIST_TO_SKIN, False),
+    "Romance Choker": ClothesMeta('823-1590-768', CLOTHES_MIN_DIST_TO_SKIN, False),
+    "Romance Panties": ClothesMeta('4110-7999-3890', PANTIE_SCALING, True),
+    "Romance Thigh Straps": ClothesMeta('7852-15680-7840', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'SU Bunny Suit Clothes G9': ClothesMeta('7097-14070-6972', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'SU Bunny Suit Pantyhose G9': ClothesMeta('8926-17819-8894', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'SU Bunny Suit Top G9': ClothesMeta('6677-13295-6618', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'M3DAO ArmBands': ClothesMeta('6696-12834-6138', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'M3DAO BodySuit': ClothesMeta('9047-18026-8976', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'M3DAO Covers': ClothesMeta('390-724-336', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'M3DAO Harness Bodysuit': ClothesMeta('39533-76438-36896', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'M3DAO Legbands': ClothesMeta('11054-21144-10090', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'M3DAO Upper ArmBands': ClothesMeta('1144-2184-1040', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'M3DEORing': ClothesMeta('801-1606-805', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'Midnight Lingerie Corset': ClothesMeta('18102-35732-17622', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'Midnight Lingerie Panties': ClothesMeta('3601-6736-3136', PANTIE_SCALING, True),
+    'Midnight Lingerie Stockings': ClothesMeta('4358-8688-4332', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'Refined Lingerie Corset for Genesis 9': ClothesMeta('29842-58911-29056', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'Refined Lingerie Gloves for Genesis 9': ClothesMeta('24066-48052-23988', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'Refined Lingerie Panties for Genesis 9': ClothesMeta('6236-12222-5987', CLOTHES_MIN_DIST_TO_SKIN, True),
+    'Refined Lingerie Stockings for Genesis 9': ClothesMeta('14072-28090-14020', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'Scarlett Lingerie': ClothesMeta('11517-22868-11385', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'SU Sexy Line Bikini G9': ClothesMeta('7880-14804-6913', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'XF Court Stylish Bottom': ClothesMeta('949-1838-888', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'XF Court Stylish Corset': ClothesMeta('32855-64044-31240', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'XF Court Stylish Stockings': ClothesMeta('4904-9740-4836', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'LVA Arm Guard': ClothesMeta('28366-56444-28222', -1, False),
+    'LVA Belt': ClothesMeta('1948-3872-1928', -1, False),
+    'LVA Boots': ClothesMeta('6420-12662-6244', -1, False),
+    'LVA Pant': ClothesMeta('4526-8995-4468', -1, False),
+    'LVA Shirt': ClothesMeta('10438-20704-10264', -1, False),
+    'LVA Vest': ClothesMeta('3751-7337-3585', -1, False),
+    'LVA Vest Straps': ClothesMeta('5580-11130-5568', -1, False),
+    'BattleMage Medallion G9': ClothesMeta('16291-32492-16202', -1, False),
+    'BattleMage Shirt G9': ClothesMeta('59984-117646-57745', -1, False),
+    'BattleMage Skirt G9': ClothesMeta('62529-124028-61617', -1, False),
+    'Dark Side Corset': ClothesMeta('2416-4708-2292', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'Dark Side Jacket': ClothesMeta('11447-22693-11243', -1, False),
+    'Dark Side Pants': ClothesMeta('5387-10716-5328', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'Dark Side Top': ClothesMeta('1117-2163-1044', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'RMO Dress': ClothesMeta('12119-23967-11846', CLOTHES_MIN_DIST_TO_SKIN, False),
+    'VALBattleMage Bracers G9': ClothesMeta('16106-30990-14938', -1, False),
+    'VALBattleMage Pantie G9': ClothesMeta('582-1067-484', 0.01, True),
+    'White Witch Dress': ClothesMeta('22767-45315-22576', -1, False),
+    'White Witch Hat': ClothesMeta('6987-13875-6903', -1, False),
+    'White Witch Sleeves': ClothesMeta('19852-39574-19726', -1, False),
 }
 HairMeta = namedtuple('HairMeta', ['fingerprint', 'is_cards'])
 # {o.name: o.data.daz_importer.DazFingerPrint for o in bpy.data.objects if isinstance(o.data, bpy.types.Mesh)}
@@ -667,16 +681,34 @@ DAZ_G9_TO_UE5_BONES = {
 }
 
 
-def find_all_clothes():
+def find_all_clothes(predicate=None):
     clothes = []
     for obj in bpy.data.objects:
         if obj.name.endswith(" Mesh"):
             name = obj.name[:-len(" Mesh")]
             meta: ClothesMeta = CLOTHES.get(name)
-            if meta is not None:
-                clothes.append(obj)
+            if meta is not None and (predicate is None or predicate(meta)):
+                meta.obj = obj
+                clothes.append(meta)
     return clothes
 
+def is_skin_tight(x):
+    return x.skin_tight>=0 and not x.panties
+
+def is_not_skin_tight(x):
+    return x.skin_tight < 0
+
+def is_panties(x):
+    return x.panties
+
+def find_all_panties():
+    return find_all_clothes(is_panties)
+
+def find_all_skin_tight_clothes():
+    return find_all_clothes(is_skin_tight)
+
+def find_all_non_skin_tight_clothes():
+    return find_all_clothes(is_not_skin_tight)
 
 def find_all_hair():
     hair = []
@@ -823,6 +855,10 @@ def find_body_rig():
                 return o
     return None
 
+def hide_object(obj, hide=False):
+    obj.hide_set(False)
+    obj.hide_viewport = False
+    obj.hide_render = False
 
 def select_object(obj):
     if bpy.context.view_layer.objects.active is not None:
@@ -831,9 +867,7 @@ def select_object(obj):
         bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.context.object.hide_set(False)
-    bpy.context.object.hide_viewport = False
-    bpy.context.object.hide_render = False
+    hide_object(obj, False)
     if bpy.context.object.mode != 'OBJECT':
         bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -917,6 +951,117 @@ def translate(obj, t):
             if child not in visited:
                 visited.add(child)
                 stack.append(child)
+
+
+def scale_in_edit_mode(obj, z):
+    stack = [obj]
+    visited = {obj}
+    while len(stack)>0:
+        obj = stack.pop()
+        select_object(obj)
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.transform.resize(value=z)
+        for child in obj.children:
+            if child not in visited:
+                visited.add(child)
+                stack.append(child)
+
+
+def scale(obj, z):
+    select_object(obj)
+    obj.scale = z
+    stack = [obj]
+    visited = {obj}
+    while len(stack)>0:
+        bpy.ops.object.select_all(action='DESELECT')
+        obj = stack.pop()
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        for child in obj.children:
+            if child not in visited:
+                visited.add(child)
+                stack.append(child)
+
+def bind_surf_deform(body_obj, clothes_obj, name=None):
+    if name is None:
+        name = 'TransferShapeKeys'
+    if clothes_obj.data.shape_keys is not None:
+        for sk in clothes_obj.data.shape_keys.key_blocks:
+            sk.value = 0
+    if name in clothes_obj.modifiers:
+        clothes_obj.modifiers.remove(clothes_obj.modifiers[name])
+    i = len(clothes_obj.modifiers)
+    m = clothes_obj.modifiers.new(name, 'SURFACE_DEFORM')
+    clothes_obj.modifiers.move(i, 0)
+    m.target = body_obj
+    with bpy.context.temp_override(object=clothes_obj):
+        bpy.ops.object.surfacedeform_bind(modifier=m.name)
+    return m
+
+def bind_to_objects(body_obj, clothes_objs=None, name=None):
+    return [(bind_surf_deform(body_obj, o, name=name), o) for o in clothes_objs]
+
+def transfer_all_shape_keys(body_obj, clothes_objs):
+    for sk in body_obj.data.shape_keys.key_blocks:
+        transfer_shape_key(body_obj, sk, clothes_objs)
+
+def reset_shape_keys(obj):
+    if obj.data.shape_keys is not None:
+        for sk in obj.data.shape_keys.key_blocks:
+            sk.value = 0
+
+def transfer_shape_key(body_obj, sk, clothes_objs=None):
+    reset_shape_keys(body_obj)
+    if isinstance(sk, str):
+        sk = body_obj.data.shape_keys.key_blocks[sk]
+    ms = bind_to_objects(body_obj, clothes_objs, sk.name)
+    sk.value = 1
+    for m, o in ms:
+        if o.data.shape_keys is not None:
+            dest_sks = o.data.shape_keys.key_blocks
+            if sk.name in dest_sks:
+                old_sk = dest_sks[sk.name]
+                o.shape_key_remove(old_sk)
+        select_object(o)
+        bpy.ops.object.modifier_apply_as_shapekey(modifier=m.name)
+        add_driver(body_obj, sk.name, o)
+    sk.value = 0
+
+
+def add_driver(body_obj, obj_sk, o):
+    if body_obj == o:
+        return
+    if isinstance(obj_sk, str):
+        obj_sk = o.data.shape_keys.key_blocks[obj_sk]
+    obj_sk.driver_remove('value')
+    driver = obj_sk.driver_add('value').driver
+    driver.type = "SCRIPTED"
+    driver.expression = "skw_var"
+    driver_var = driver.variables.new()
+    driver_var.name = "skw_var"
+    driver_target = driver_var.targets[0]
+    driver_target.id_type = 'OBJECT'
+    driver_target.id = body_obj
+    driver_target.data_path = 'data.shape_keys.key_blocks["' + obj_sk.name + '"].value'
+
+
+def add_drivers_for_all_shape_keys(body_obj, objs=None):
+    if objs is None:
+        objs = bpy.context.selected_objects
+    if isinstance(objs, str):
+        objs = bpy.data.objects[objs]
+    if isinstance(objs, bpy.types.Object):
+        objs = [objs]
+    for obj in objs:
+        for sk in obj.data.shape_keys.key_blocks:
+            add_driver(body_obj, sk, obj)
+
+
+def remove_shape_key(body, sk_name):
+    if sk_name in body.data.shape_keys.key_blocks:
+        body.shape_key_remove(body.data.shape_keys.key_blocks[sk_name])
 
 
 class DazOptimizer:
@@ -1969,32 +2114,85 @@ class DazOptimizer:
         # *= 0.25# nails
         # -= 0.5 # nails
 
-    def fit_clothes(self):
-        BODY_M = self.get_body_mesh()
+    def fit_panties(self):
+        clothes = find_all_panties()
+        bpy.context.scene.tool_settings.transform_pivot_point = 'MEDIAN_POINT'
+        bpy.context.scene.transform_orientation_slots[0].type = 'GLOBAL'
+        for c in clothes:
+            s = 1+c.skin_tight
+            s = (s, s, s)
+            scale_in_edit_mode(c.obj, s)
+        bpy.ops.object.mode_set(mode='OBJECT')
 
+    def fit_clothes(self):
+        body = self.get_body_mesh()
+        select_object(body)
+        remove_shape_key(body, EXTRUDED_SK_NAME)
+        sk = body.shape_key_add(name=EXTRUDED_SK_NAME, from_mix=False)
+        sk_idx = body.data.shape_keys.key_blocks.find(sk.name)
+        body.active_shape_key_index = sk_idx
+        sk.value = 1
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.transform.shrink_fatten(value=CLOTHES_MIN_DIST_TO_SKIN)
+        bpy.ops.object.mode_set(mode='OBJECT')
+        sk.value = 0
+        clothes = find_all_non_skin_tight_clothes()
+        for c in clothes:
+            hide_object(c.obj, False)
+            c.obj.select_set(True)
+        bpy.ops.daz.transfer_shapekeys('INVOKE_DEFAULT', bodypart='NoFace', filter=EXTRUDED_SK_NAME)
+
+    def bind_clothes_to_extrude(self):
+        body = self.get_body_mesh()
+        select_object(body)
+        remove_shape_key(body, EXTRUDED_SK_NAME)
+        clothes = find_all_non_skin_tight_clothes()
+        for c in clothes:
+            sk = c.obj.data.shape_keys.key_blocks['extruded']
+            sk.slider_max = 10
+            sk.driver_remove('value')
+            driver = sk.driver_add('value').driver
+            driver.type = "SCRIPTED"
+            driver.expression = "extruded_var"
+            driver_var = driver.variables.new()
+            driver_var.name = "extruded_var"
+            driver_target = driver_var.targets[0]
+            driver_target.id_type = 'SCENE'
+            driver_target.id = bpy.context.scene
+            driver_target.data_path = 'clothes_displacement'
+
+        #
+        # bind_to_objects(body, clothes, 'bind extruded')
+        # sk.value = 1
+
+    def apply_fit_clothes(self):
+        body = self.get_body_mesh()
+        remove_shape_key(body, EXTRUDED_SK_NAME)
+        for c in find_all_non_skin_tight_clothes():
+            select_object(c.obj)
+            bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
 
     def fit_skin_tight_clothes(self):
         BODY_M = self.get_body_mesh()
         m_name = 'FitSkinTightClothes'
-        for obj in bpy.data.objects:
-            if obj.name.endswith(" Mesh"):
-                name = obj.name[:-len(" Mesh")]
-                meta:ClothesMeta = CLOTHES.get(name)
-                if meta is not None and meta.skin_tight>=0 and m_name not in obj.modifiers:
-                    # m_len = len(obj.modifiers)
-                    m = obj.modifiers.new(name=m_name, type="SHRINKWRAP")
-                    m.target = BODY_M
-                    m.offset = meta.skin_tight
-                    m.wrap_mode = 'OUTSIDE'
-                    # select_object(obj)
-                    # for _ in range(m_len):
-                    #     bpy.ops.object.modifier_move_up(modifier=m.name)
+        for meta in find_all_skin_tight_clothes():
+            obj = meta.obj
+            if m_name not in obj.modifiers:
+                # m_len = len(obj.modifiers)
+                m = obj.modifiers.new(name=m_name, type="SHRINKWRAP")
+                m.target = BODY_M
+                m.offset = meta.skin_tight
+                m.wrap_mode = 'OUTSIDE'
+                # select_object(obj)
+                # for _ in range(m_len):
+                #     bpy.ops.object.modifier_move_up(modifier=m.name)
 
     def apply_fit_skin_tight_clothes(self):
         for obj in bpy.data.objects:
             if 'FitSkinTightClothes' in obj.modifiers:
                 select_object(obj)
-                if len(obj.data.shape_keys.key_blocks)>0:
+                if obj.data.shape_keys is not None and len(obj.data.shape_keys.key_blocks)>0:
                     bpy.ops.object.shape_key_remove(all=True, apply_mix=False)
                 bpy.ops.object.modifier_apply(modifier='FitSkinTightClothes')
 
@@ -2386,7 +2584,8 @@ class DazOptimizer:
         select_object(BODY_M)
         clothes = find_all_clothes()
         for c in clothes:
-            c.select_set(True)
+            hide_object(c.obj, False)
+            c.obj.select_set(True)
         bpy.ops.daz.transfer_shapekeys('INVOKE_DEFAULT', bodypart='NoFace')
 
     def transfer_missing_bones_to_clothes(self):
@@ -2412,7 +2611,7 @@ class DazOptimizer:
             groups.append('r_thigh_jiggle')
             add_subdivided('thigh_jiggle')
         add_subdivided('pectoral')
-        clothes = find_all_clothes()
+        clothes = [c.obj for c in find_all_clothes()]
         transfer_weights(BODY_M, clothes, groups)
 
     def is_female(self):
@@ -2682,20 +2881,7 @@ class DazOptimizer:
 
     def scale(self, z):
         rig = self.get_body_rig()
-        select_object(rig)
-        rig.scale = (z,z,z)
-        stack = [rig]
-        visited = {rig}
-        while len(stack)>0:
-            bpy.ops.object.select_all(action='DESELECT')
-            obj = stack.pop()
-            obj.select_set(True)
-            bpy.context.view_layer.objects.active = obj
-            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-            for child in obj.children:
-                if child not in visited:
-                    visited.add(child)
-                    stack.append(child)
+        scale(rig, (z,z,z))
 
     def translate(self, t):
         rig = self.get_body_rig()
@@ -2736,6 +2922,7 @@ class DazOptimizer:
         if not os.path.exists(p):
             os.mkdir(p)
         for clothes in find_all_clothes():
+            clothes = clothes.obj
             name = clothes.name[:-len(' Mesh')] if clothes.name.endswith(' Mesh') else clothes.name
             self.export_to_fbx(rig, clothes, os.path.join(p, name + '.fbx'))
 
@@ -3194,8 +3381,6 @@ class DazSimplifyGoldenPalaceMaterials_operator(bpy.types.Operator):
             return False
         return check_stage(context, [DazSaveGoldenPalaceBaked_operator], []) or os.path.exists(DazOptimizer().get_gp_texture_path("Base Color"))
 
-
-
     def execute(self, context):
         DazOptimizer().simplify_golden_palace_material()
         pass_stage(self)
@@ -3608,12 +3793,18 @@ class DazFitSkinTightClothes_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return UNLOCK or check_stage(context, [DazMaleLoad_operator], [DazFitSkinTightClothes_operator])
+        if UNLOCK:
+            return True
+        required = [DazMergeGrografts_operator]
+        if check_stage(context, [DazFitClothes_operator], []):
+            required.append(DazApplyFitClothes_operator)
+        return check_stage(context, required, [DazFitSkinTightClothes_operator])
 
     def execute(self, context):
         DazOptimizer().fit_skin_tight_clothes()
         pass_stage(self)
         return {'FINISHED'}
+
 
 class DazFitClothes_operator(bpy.types.Operator):
     """ fit clothes """
@@ -3624,12 +3815,69 @@ class DazFitClothes_operator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return UNLOCK or check_stage(context, [DazMergeGrografts_operator], [DazFitClothes_operator])
+        return UNLOCK or check_stage(context, [DazMergeGrografts_operator], [DazFitClothes_operator, TransferMorphsToClothes])
 
     def execute(self, context):
         DazOptimizer().fit_clothes()
         pass_stage(self)
         return {'FINISHED'}
+
+
+class DazBindFitClothes_operator(bpy.types.Operator):
+    """ Bind fit clothes """
+    bl_idname = "dazoptim.bind_fit_clothes"
+    bl_label = "Bind fit clothes"
+    bl_options = {"REGISTER", "UNDO"}
+    stage_id = 'W'
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK or check_stage(context, [DazFitClothes_operator], [DazBindFitClothes_operator])
+
+    def execute(self, context):
+        DazOptimizer().bind_clothes_to_extrude()
+        pass_stage(self)
+        return {'FINISHED'}
+
+
+class DazApplyFitClothes_operator(bpy.types.Operator):
+    """ Apply fit clothes """
+    bl_idname = "dazoptim.apply_fit_clothes"
+    bl_label = "Apply fit clothes"
+    bl_options = {"REGISTER", "UNDO"}
+    stage_id = 'Y'
+
+    @classmethod
+    def poll(cls, context):
+        return UNLOCK or check_stage(context, [DazBindFitClothes_operator], [DazApplyFitClothes_operator])
+
+    def execute(self, context):
+        DazOptimizer().apply_fit_clothes()
+        pass_stage(self)
+        return {'FINISHED'}
+
+
+class DazFitPanties_operator(bpy.types.Operator):
+    """ fit panties """
+    bl_idname = "dazoptim.fit_panites"
+    bl_label = "Fit panties"
+    bl_options = {"REGISTER", "UNDO"}
+    stage_id = 'V'
+
+    @classmethod
+    def poll(cls, context):
+        if UNLOCK:
+            return True
+        required = [DazMergeGrografts_operator]
+        if check_stage(context, [DazFitClothes_operator], []):
+            required.append(DazApplyFitClothes_operator)
+        return check_stage(context, required, [DazFitPanties_operator])
+
+    def execute(self, context):
+        DazOptimizer().fit_panties()
+        pass_stage(self)
+        return {'FINISHED'}
+
 
 class DazTransferMissingBonesToClothes_operator(bpy.types.Operator):
     """ transfer new bones to clothes """
@@ -4054,6 +4302,56 @@ class PrintMorphCsv(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class UnlockEverything(bpy.types.Operator):
+    """ unlock all stages """
+    bl_idname = "dazoptim.unlock_everything"
+    bl_label = "Lock/unlock all stages"
+    bl_options = {"REGISTER", "UNDO"}
+    stage_id = None
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+    def execute(self, context):
+        global UNLOCK
+        UNLOCK = not UNLOCK
+
+        return {'FINISHED'}
+
+class HideAllClothes(bpy.types.Operator):
+    """ hide all clothes """
+    bl_idname = "dazoptim.hide_all_clothes"
+    bl_label = "hide all clothes"
+    bl_options = {"REGISTER", "UNDO"}
+    stage_id = None
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+    def execute(self, context):
+        for c in find_all_clothes():
+            c.obj.hide_set(True)
+        return {'FINISHED'}
+
+
+class ShowAllClothes(bpy.types.Operator):
+    """ show all clothes """
+    bl_idname = "dazoptim.show_all_clothes"
+    bl_label = "show all clothes"
+    bl_options = {"REGISTER", "UNDO"}
+    stage_id = None
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+    def execute(self, context):
+        for c in find_all_clothes():
+            c.obj.hide_set(False)
+        return {'FINISHED'}
+
 class DazOptimize_sidebar(bpy.types.Panel):
     """DazOptim actions"""
     bl_label = "DazOptim"
@@ -4061,13 +4359,26 @@ class DazOptimize_sidebar(bpy.types.Panel):
     bl_region_type = "UI"
     bl_category = "DazOptim"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.props = {}
+
     def draw(self, context):
         col = self.layout.column(align=True)
         i = 0
         for op_class, op_text in operators:
-            prop = col.operator(op_class.bl_idname, text=str(i) + ". " + op_text)
-            op_class.idx = i
-            i += 1
+            if issubclass(op_class, bpy.types.Operator):
+                prop = col.operator(op_class.bl_idname, text=str(i) + ". " + op_text)
+                op_class.idx = i
+                i += 1
+            else:
+                self.props[op_text] = col.prop(context.scene, op_text)
+
+        self.layout.label(text="Utilities")
+        col = self.layout.column(align=True)
+
+        for op_class, op_text in util_operators:
+            prop = col.operator(op_class.bl_idname, text=op_text)
 
 
 operators = [
@@ -4115,12 +4426,16 @@ operators = [
     (DazSeparateLipUVs_operator, "Separate Lip UVs"),
     (DazMakeSingleMaterial_operator, "Unify skin materials into one"),
     (DazMergeEyelashesAndBody_operator, "Merge eyelashes+body"),
+    (DazFitClothes_operator, "Fit clothes"),
+    (DazBindFitClothes_operator, "Bind clothes displacement"),
+    (float, "clothes_displacement"),
+    (DazApplyFitClothes_operator, "Apply displacement"),
+    (DazFitPanties_operator, "Fit panties"),
     (DazFitSkinTightClothes_operator, "Fit skin-tight clothes"),
     (DazApplyFitSkinTightClothes_operator, "Apply skin-tight clothes"),
     (DazTransferMissingBonesToClothes_operator, "Transfer new bones to clothes"),
     (TransferMorphsToClothes, "Transfer morphs to clothes"),
     (DazScaleToQuinn, "Scale to Manny height"),
-    (DazCompareToUe5Skeleton_operator, "Compare to UE5 Skeleton"),
     (DazConvertToUe5Skeleton_operator, "Convert to UE5 Skeleton"),
     # (DazAlignPoseQuinn, "Align pose to ue5 quinn"),
     # (DazApplyPose, "Apply pose"),
@@ -4132,24 +4447,32 @@ operators = [
     (DazExportBodyFbx, "Export body to fbx"),
     (DazExportClothesFbx, "Export clothes to fbx"),
     (DazExportHairFbx, "Export hair to fbx"),
-    (PrintMorphCsv, "Print Morphs CSV"),
 ]
 
+util_operators = [
+    (DazCompareToUe5Skeleton_operator, "Compare to UE5 Skeleton"),
+    (PrintMorphCsv, "Print Morphs CSV"),
+    (HideAllClothes, "Hide all clothes"),
+    (ShowAllClothes, "Show all clothes"),
+    (UnlockEverything, "Unlock everything"),
+
+]
 classes = [
               DazOptimize_sidebar,
               EasyImportPanel,
-          ] + [op for (op, _) in operators]
-
+          ] + [op for (op, _) in operators if issubclass(op, bpy.types.Operator)] + [op for (op, _) in util_operators]
 
 
 def register():
     for c in classes:
         bpy.utils.register_class(c)
+    bpy.types.Scene.clothes_displacement = bpy.props.FloatProperty(name="clothes_displacement", default=1)
 
 
 def unregister():
     for c in classes:
         bpy.utils.unregister_class(c)
+    del bpy.types.Scene.clothes_displacement
 
 
 if __name__ == '__main__':
